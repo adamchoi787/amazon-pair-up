@@ -1,0 +1,39 @@
+{
+  "_note": "Owner: C. Grow to ~200 realistic listings. min_price is the seller's PRIVATE reserve. Keep the demo's TI-84 OUT of here — the seller creates it live in the video.",
+  "users": [
+    { "id": "u_mei", "display_name": "Mei", "home_area": "HKUST campus" },
+    { "id": "u_jason", "display_name": "Jason", "home_area": "Hang Hau station" },
+    { "id": "u_priya", "display_name": "Priya", "home_area": "HKUST campus" },
+    { "id": "u_tom", "display_name": "Tom", "home_area": "Sai Kung" },
+    { "id": "u_ana", "display_name": "Ana", "home_area": "Tseung Kwan O" },
+    { "id": "u_ken", "display_name": "Ken", "home_area": "HKUST campus" }
+  ],
+  "listings": [
+    { "seller": "u_jason", "title": "Casio fx-991EX scientific calculator", "description": "Not graphing. Works perfectly, solar.", "category": "calculator", "condition": "like_new", "ask_price": 12, "min_price": 9, "location": "Hang Hau station" },
+    { "seller": "u_tom", "title": "TI-83 Plus graphing calculator, cracked screen", "description": "Screen cracked in corner, still usable.", "category": "calculator", "condition": "fair", "ask_price": 10, "min_price": 6, "location": "Sai Kung" },
+    { "seller": "u_ana", "title": "TI-Nspire CX graphing calculator", "description": "Color screen, charger included.", "category": "calculator", "condition": "good", "ask_price": 45, "min_price": 38, "location": "Tseung Kwan O" },
+    { "seller": "u_ken", "title": "Pocket tissues, 10 packs", "description": "Unopened multipack of pocket tissues.", "category": "tissue", "condition": "new", "quantity": 10, "ask_price": 2, "min_price": 1, "location": "HKUST campus" },
+    { "seller": "u_priya", "title": "Box of facial tissues", "description": "Half-used box, 3-ply.", "category": "tissue", "condition": "good", "ask_price": 1, "min_price": 0.5, "location": "HKUST campus" },
+    { "seller": "u_mei", "title": "Linear Algebra and Its Applications, 6th edition", "description": "Lay, Lay & McDonald. Light highlighting.", "category": "textbook", "condition": "good", "ask_price": 25, "min_price": 18, "location": "HKUST campus" },
+    { "seller": "u_jason", "title": "Introduction to Algorithms (CLRS), 4th edition", "description": "Hardcover, like new.", "category": "textbook", "condition": "like_new", "ask_price": 40, "min_price": 32, "location": "Hang Hau station" },
+    { "seller": "u_priya", "title": "Calculus: Early Transcendentals, Stewart 8th ed", "description": "Some notes in margins.", "category": "textbook", "condition": "fair", "ask_price": 15, "min_price": 10, "location": "HKUST campus" },
+    { "seller": "u_ken", "title": "USB-C 65W laptop charger", "description": "Works with MacBook and most USB-C laptops.", "category": "charger", "condition": "good", "ask_price": 18, "min_price": 12, "location": "HKUST campus" },
+    { "seller": "u_ana", "title": "iPhone Lightning cable 1m", "description": "Original Apple cable.", "category": "charger", "condition": "like_new", "ask_price": 5, "min_price": 3, "location": "Tseung Kwan O" },
+    { "seller": "u_tom", "title": "Compact folding umbrella", "description": "Black, auto open/close.", "category": "umbrella", "condition": "good", "ask_price": 6, "min_price": 4, "location": "Sai Kung" },
+    { "seller": "u_mei", "title": "Large golf umbrella", "description": "Windproof, fits two people.", "category": "umbrella", "condition": "like_new", "ask_price": 9, "min_price": 7, "location": "HKUST campus" },
+    { "seller": "u_jason", "title": "Sony WH-1000XM4 noise-cancelling headphones", "description": "Black, with case. Battery still great.", "category": "headphones", "condition": "good", "ask_price": 120, "min_price": 100, "location": "Hang Hau station" },
+    { "seller": "u_priya", "title": "Wired earbuds with mic", "description": "3.5mm jack, barely used.", "category": "headphones", "condition": "like_new", "ask_price": 4, "min_price": 2, "location": "HKUST campus" },
+    { "seller": "u_ken", "title": "Desk lamp with USB port", "description": "LED, 3 brightness levels.", "category": "furniture", "condition": "good", "ask_price": 10, "min_price": 7, "location": "HKUST campus" },
+    { "seller": "u_ana", "title": "IKEA LACK side table", "description": "White, small scratch on top.", "category": "furniture", "condition": "fair", "ask_price": 8, "min_price": 5, "location": "Tseung Kwan O" },
+    { "seller": "u_tom", "title": "Rice cooker 1L", "description": "Perfect for dorms.", "category": "kitchen", "condition": "good", "ask_price": 15, "min_price": 10, "location": "Sai Kung" },
+    { "seller": "u_mei", "title": "Electric kettle", "description": "1.7L, auto shut-off.", "category": "kitchen", "condition": "like_new", "ask_price": 12, "min_price": 8, "location": "HKUST campus" },
+    { "seller": "u_jason", "title": "Basketball, size 7", "description": "Indoor/outdoor, good grip.", "category": "sports", "condition": "good", "ask_price": 8, "min_price": 5, "location": "Hang Hau station" },
+    { "seller": "u_priya", "title": "Yoga mat", "description": "6mm, purple, washed.", "category": "sports", "condition": "good", "ask_price": 7, "min_price": 5, "location": "HKUST campus" },
+    { "seller": "u_ken", "title": "A4 printer paper, 500 sheets", "description": "Unopened ream.", "category": "stationery", "condition": "new", "ask_price": 4, "min_price": 3, "location": "HKUST campus" },
+    { "seller": "u_ana", "title": "Pack of 12 black ballpoint pens", "description": "Brand new.", "category": "stationery", "condition": "new", "quantity": 1, "ask_price": 3, "min_price": 2, "location": "Tseung Kwan O" },
+    { "seller": "u_tom", "title": "Portable phone power bank 10000mAh", "description": "USB-C and USB-A output.", "category": "charger", "condition": "good", "ask_price": 11, "min_price": 8, "location": "Sai Kung" },
+    { "seller": "u_mei", "title": "Lab coat, size M", "description": "Worn for one semester of chem lab.", "category": "clothing", "condition": "good", "ask_price": 6, "min_price": 4, "location": "HKUST campus" },
+    { "seller": "u_jason", "title": "Safety goggles", "description": "Anti-fog, for lab use.", "category": "lab", "condition": "like_new", "ask_price": 3, "min_price": 2, "location": "Hang Hau station" },
+    { "seller": "u_priya", "title": "HDMI cable 2m", "description": "4K capable.", "category": "charger", "condition": "good", "ask_price": 3, "min_price": 2, "location": "HKUST campus" }
+  ]
+}
