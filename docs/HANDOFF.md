@@ -30,8 +30,11 @@ Open http://127.0.0.1:3000/ to watch the dashboard update while smoke runs.
 
 Files: `src/app.ts`, `src/mcp/server.ts`, `scripts/smoke.ts`, `docs/DEMO_SCRIPT.md`
 
-- [ ] **Today:** find out whether we can connect a custom MCP server to Alexa+ (developer preview / office hours / docs in the hackathon Resources). Log every step in the friction log.
-- [ ] Deploy to AWS with HTTPS. Options: AgentCore Runtime, App Runner, or Lambda + Function URL. Set `HOST=0.0.0.0`, `ALLOWED_HOSTS=<your domain>`, `MCP_API_KEY`. Use a hosted Postgres with pgvector through `DATABASE_URL`.
+- [ ] **Today:** get Alexa AI CLI access. Step 0 in [ALEXA_SETUP.md](ALEXA_SETUP.md) requires Amazon to grant your AWS account a role, so ask in office hours or the Devpost forum. Log every step in the friction log.
+- [x] Container image and deploy guide ([DEPLOY.md](DEPLOY.md)): Cloudflare tunnel today, Lightsail for a stable URL.
+- [x] Account linking (`AUTH_MODE=oauth`) so Alexa+ can tell the buyer from the seller.
+- [x] Add-on listing assets: privacy and terms pages, icons, carousel image, listing text.
+- [ ] Deploy to Lightsail and point the add-on at it. Use a hosted Postgres with pgvector through `DATABASE_URL` once B has it.
 - [ ] Identity: replace the `X-User-Id` header with whatever Alexa+ gives us (account linking / OAuth). Until then, use `user_id` arguments.
 - [ ] **Fallback path, decide by Tue night:** if real Alexa+ isn't available, build a "simulated Alexa+" web page with push-to-talk voice in and out, plus an agent (Bedrock) that calls **our real MCP server**. That's allowed by the rules and still shows the MCP server working.
 - [ ] Tune the tool descriptions and `say` lines so Alexa sounds natural.
