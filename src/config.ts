@@ -18,6 +18,7 @@ export const config = {
 
   databaseUrl: env("DATABASE_URL"),
   pgliteDir: env("PGLITE_DIR", ".data/pglite"),
+  seedOnStart: env("SEED_ON_START") === "true",
 
   aiMode: env("AI_MODE", "mock") as "mock" | "bedrock",
   awsRegion: env("AWS_REGION", "us-east-1"),
