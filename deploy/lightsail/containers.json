@@ -1,0 +1,13 @@
+{
+  "app": {
+    "image": ":voice-market.app.latest",
+    "ports": { "3000": "HTTP" },
+    "environment": {
+      "HOST": "0.0.0.0",
+      "PORT": "3000",
+      "SEED_ON_START": "true",
+      "AI_MODE": "mock",
+      "ALLOWED_HOSTS": "REPLACE_WITH_SERVICE_HOSTNAME"
+    }
+  }
+}
