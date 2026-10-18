@@ -14,6 +14,7 @@ export const config = {
   port: Number(env("PORT", "3000")),
   host: env("HOST", "127.0.0.1"),
   allowedHosts: env("ALLOWED_HOSTS").split(",").map((s) => s.trim()).filter(Boolean),
+  allowedOrigins: env("ALLOWED_ORIGINS").split(",").map((s) => s.trim()).filter(Boolean),
   mcpApiKey: env("MCP_API_KEY"),
 
   databaseUrl: env("DATABASE_URL"),

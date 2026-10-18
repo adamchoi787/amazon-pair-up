@@ -19,6 +19,28 @@ export function createApp(deps: Deps, cfg: Config) {
     res.json({ ok: true, ai: deps.ai.mode });
   });
 
+  // One log line per MCP call, to watch the Alexa+ latency budget (< 500 ms round trip).
+  app.use("/mcp", (req, res, next) => {
+    const start = performance.now();
+    res.on("finish", () => {
+      const body = req.body as { method?: string; params?: { name?: string } } | undefined;
+      const what = [body?.method, body?.params?.name].filter(Boolean).join(" ") || req.method;
+      console.log(`[mcp] ${what} ${res.statusCode} ${Math.round(performance.now() - start)}ms`);
+    });
+    next();
+  });
+
+  // MCP spec 2025-11-25: servers must reject requests with an invalid Origin (DNS rebinding).
+  // Alexa+ calls server-to-server without an Origin; browsers must be explicitly allowed.
+  app.use("/mcp", (req, res, next) => {
+    const origin = req.header("origin");
+    if (origin && !cfg.allowedOrigins.includes(origin)) {
+      res.status(403).json({ jsonrpc: "2.0", error: { code: -32000, message: "Origin not allowed" }, id: null });
+      return;
+    }
+    next();
+  });
+
   app.post("/mcp", async (req, res) => {
     if (cfg.mcpApiKey && req.headers.authorization !== `Bearer ${cfg.mcpApiKey}`) {
       res.status(401).json({ jsonrpc: "2.0", error: { code: -32001, message: "Unauthorized" }, id: null });
