@@ -1,7 +1,9 @@
 # Tool contract (frozen, so change it only after telling the team)
 
 Endpoint: `POST /mcp`, Streamable HTTP, stateless, MCP protocol `2025-11-25`.
-Auth: `Authorization: Bearer $MCP_API_KEY` when set. Identity: `X-User-Id` header, or a `user_id` argument (temporary).
+Identity and auth depend on `AUTH_MODE`:
+- `oauth` (Alexa+): every call carries the linked account's `Authorization: Bearer <token>`. The user is taken **only** from the token, and `user_id` arguments are ignored. No token or a bad token returns 401 with `WWW-Authenticate: Bearer resource_metadata=...`.
+- `none` (local dev and tests): `X-User-Id` header or a `user_id` argument. `MCP_API_KEY` adds an optional shared Bearer secret.
 
 Every successful result is JSON (as text **and** `structuredContent`) with a `say` field, a short sentence Alexa can speak.
 Errors the user can fix come back as `isError: true` with `{ "say": "..." }`.
