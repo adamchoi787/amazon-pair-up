@@ -78,3 +78,57 @@ export async function findMatchesForIntent(
     .filter((r) => r.score >= opts.threshold)
     .slice(0, opts.limit);
 }
+
+export interface IntentMatchRow extends BuyIntentRow {
+  semantic: number;
+  keyword: number;
+  price_fit: number;
+  score: number;
+}
+
+// The same hard constraints and score as findMatchesForIntent, run from the
+// seller's side: which open buy intents does this (stored) listing satisfy?
+export async function findIntentsForListing(
+  db: Db,
+  listingId: string,
+  opts: { limit: number; threshold: number },
+): Promise<IntentMatchRow[]> {
+  const { rows } = await db.query<IntentMatchRow>(
+    `
+    WITH scored AS (
+      SELECT i.*,
+             GREATEST(0, 1 - (l.embedding <=> i.embedding))                 AS semantic,
+             CASE WHEN q.tsq_text = '' THEN 0
+                  ELSE ts_rank_cd(l.search_tsv, q.tsq_text::tsquery, 32) END AS keyword,
+             CASE WHEN l.ask_price <= i.max_price THEN 1
+                  ELSE i.max_price / NULLIF(l.ask_price, 0) END             AS price_fit,
+             CASE WHEN i.location IS NOT NULL AND l.location ILIKE '%' || i.location || '%'
+                  THEN 1 ELSE 0 END                                         AS loc
+      FROM listings l
+      JOIN buy_intents i ON TRUE
+      CROSS JOIN LATERAL (
+        SELECT replace(plainto_tsquery('english', concat_ws(' ', i.need, i.category))::text, '&', '|') AS tsq_text
+      ) q
+      WHERE l.id = $1
+        AND i.status = 'open'
+        AND i.buyer_id <> l.seller_id
+        AND l.quantity >= i.quantity
+        AND l.min_price <= i.max_price
+        AND ${rank("l.condition")} >= ${rank("i.min_condition")}
+        AND l.embedding IS NOT NULL
+        AND i.embedding IS NOT NULL
+    )
+    SELECT *,
+           (${WEIGHTS.semantic} * semantic + ${WEIGHTS.keyword} * keyword
+            + ${WEIGHTS.price} * price_fit + ${WEIGHTS.location} * loc)::float8 AS score
+    FROM scored
+    ORDER BY score DESC
+    LIMIT $2
+    `,
+    [listingId, opts.limit * 3],
+  );
+  return rows
+    .map((r) => ({ ...r, semantic: Number(r.semantic), keyword: Number(r.keyword), price_fit: Number(r.price_fit), score: Number(r.score) }))
+    .filter((r) => r.score >= opts.threshold)
+    .slice(0, opts.limit);
+}
