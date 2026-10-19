@@ -66,7 +66,9 @@ Notes:
   credentials with `bedrock:InvokeModel`. Lightsail containers have no IAM role, so pass an
   access key for a least-privilege IAM user as environment variables. **Never commit it.**
 - Secrets such as `MCP_API_KEY` and AWS keys go in the deployment's environment, not in git.
-- **Dashboard:** set `DASHBOARD_TOKEN` to a long random string to use `/api/dashboard` on a deployed server, and open the page as `https://<host>/#token=<token>`. Without it, the dashboard is off whenever `AUTH_MODE=oauth`.
+- **Dashboard:** set `DASHBOARD_TOKEN` to a long random string to use `/api/dashboard` on a deployed server, and open the page as `https://<host>/dashboard/#token=<token>`. Without it, the dashboard is off whenever `AUTH_MODE=oauth`.
+- **Web app:** served at `https://<host>/app/`. With `AUTH_MODE=oauth` and `PUBLIC_BASE_URL` set it signs people in as the built-in public client `voicemarket-web` (PKCE, redirect `<PUBLIC_BASE_URL>/app/`); the Alexa+ client variables are only needed for Alexa account linking.
+- **Assistant:** `AI_MODE=bedrock` with `BEDROCK_AGENT_MODEL_ID` (or `BEDROCK_INTENT_MODEL_ID`) runs the web app's assistant on Bedrock; otherwise the offline planner answers.
 - **Policy:** `DEAL_HOLD_HOURS`, `POSTS_PER_HOUR`, `MAX_OPEN_REQUESTS` and `MCP_CALLS_PER_MINUTE` have production defaults; see [.env.example](../.env.example).
 
 ## Configuration reference

@@ -30,7 +30,7 @@ the deal; Alexa+ is the voice and the agent; each person just says yes or no.
 ```bash
 npm install
 npm run reset        # create tables + load seed listings
-npm start            # MCP server on http://127.0.0.1:3000/mcp, dashboard on http://127.0.0.1:3000/
+npm start            # web app on http://127.0.0.1:3000/, MCP server at /mcp, operations dashboard at /dashboard/
 npm run smoke        # (second terminal) plays the TI-84 demo over real MCP
 npm test             # unit + end-to-end tests (in-memory Postgres + pgvector)
 ```
@@ -39,6 +39,30 @@ Local dev uses **PGlite** — real Postgres + **pgvector** embedded in Node,
 stored in `.data/`. Set `DATABASE_URL` to switch to a hosted Postgres.
 `AI_MODE=mock` (default) works offline; `AI_MODE=bedrock` uses Amazon Bedrock.
 See [.env.example](.env.example).
+
+## The web app
+
+`/app/` is a complete VoiceMarket client for phones, laptops and smart displays:
+talk or type, see each offer as a card, and confirm or decline with a tap.
+It works the way Alexa+ works with an MCP server:
+
+- **It is an MCP host.** The browser runs a real MCP client: `tools/list` to
+  discover tools, `tools/call` over Streamable HTTP with the signed-in user's
+  token, `resources/read` for the view.
+- **It renders MCP Apps.** Every result names the `ui://voicemarket/market.html`
+  view; the app draws it in a sandboxed iframe through the MCP Apps bridge, and the
+  card's Confirm / Decline / "Get this one" buttons call tools through the host.
+- **The reasoning step runs on the server** (`/api/agent`): Amazon Bedrock tool use
+  when `AI_MODE=bedrock` and a model is set, otherwise an offline planner that
+  covers the whole voice flow. Either way a deal is only confirmed after the
+  user's explicit yes.
+- **Sign-in** is OAuth 2.1 with PKCE as a public client (`AUTH_MODE=oauth`), or a
+  name-only sign-in in local development.
+- **Offers that arrive while you're away** show up as a badge and a card, and are
+  read out when voice is on.
+
+Voice uses the browser's speech recognition and synthesis (Chrome, Edge, Safari);
+typing works everywhere.
 
 ## Architecture
 
@@ -84,10 +108,12 @@ protect the market. Pairing rules, schemas, limits and privacy rules:
 ```
 src/
   index.ts               entry point
-  app.ts                 HTTP: /mcp (Streamable HTTP), /health, /api/dashboard, OAuth routes
+  app.ts                 HTTP: /mcp (Streamable HTTP), /api/agent, /api/me, /health, /api/dashboard, OAuth routes
   auth/oauth.ts          OAuth 2.1 account linking (PKCE, protected-resource metadata)
   mcp/server.ts          MCP tool definitions
   mcp/schemas.ts         output schemas for every tool
+  mcp/apps.ts            the MCP Apps view (ui://voicemarket/market.html)
+  agent/                 the web app's assistant step: Bedrock tool use, offline planner, confirm guard
   market/pairing.ts      pairing engine: pair on every post, atomic holds, release and re-pair
   market/matching.ts     hybrid pgvector + full-text search in both directions
   market/negotiation.ts  price settlement via pairing-core (Rust → WebAssembly)
@@ -95,7 +121,11 @@ src/
   market/views.ts        the only place rows become output (privacy redaction)
   ai/                    mock + Bedrock embeddings and intent extraction
   db/                    PGlite / Postgres client, schema, seeding
-public/index.html        live dashboard
+src/web/                 the web app: OAuth PKCE sign-in, MCP client, MCP Apps host, voice
+src/apps/                the MCP Apps view (deal card, options, deals, posts)
+public/app/              web app shell + built bundle (npm run build:web)
+public/mcp-apps/         built single-file MCP Apps view
+public/dashboard/        operations dashboard
 data/seed-listings.json  seed marketplace
 scripts/                 seed, smoke test, add-on assets
 docs/                    contract, award plan, Alexa+ setup, deploy, demo script, submission, friction log

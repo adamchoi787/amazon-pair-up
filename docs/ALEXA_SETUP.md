@@ -138,7 +138,7 @@ Test script:
 3. "Yes, negotiate." → expect **$17**
 4. "Yes, confirm it."
 
-Watch the server logs (`[mcp] tools/call …`) and the dashboard at `https://<host>/`.
+Watch the server logs (`[mcp] tools/call …`) and the dashboard at `https://<host>/dashboard/`.
 
 You don't need `alexa-ai submit` (certification) for the hackathon; testing in the
 development stage is enough for the demo.

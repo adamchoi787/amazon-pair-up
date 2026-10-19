@@ -33,6 +33,8 @@ export const config = {
   awsRegion: env("AWS_REGION", "us-east-1"),
   embeddingModelId: env("BEDROCK_EMBEDDING_MODEL_ID", "amazon.titan-embed-text-v2:0"),
   intentModelId: env("BEDROCK_INTENT_MODEL_ID"),
+  // The web app's assistant (tool use). Defaults to the intent model.
+  agentModelId: env("BEDROCK_AGENT_MODEL_ID") || env("BEDROCK_INTENT_MODEL_ID"),
   embeddingDim: Number(env("EMBEDDING_DIM", "1024")),
   matchThreshold: Number(env("MATCH_THRESHOLD", "0.35")),
 
@@ -50,13 +52,15 @@ export const config = {
 export type Config = typeof config;
 
 if (config.authMode === "oauth") {
-  const missing = (
-    [
-      ["PUBLIC_BASE_URL", config.publicBaseUrl],
-      ["OAUTH_CLIENT_ID", config.oauthClientId],
-      ["OAUTH_CLIENT_SECRET", config.oauthClientSecret],
-      ["OAUTH_REDIRECT_URIS", config.oauthRedirectUris.join(",")],
-    ] as const
-  ).filter(([, v]) => !v).map(([k]) => k);
-  if (missing.length) throw new Error(`AUTH_MODE=oauth requires: ${missing.join(", ")}`);
+  if (!config.publicBaseUrl) throw new Error("AUTH_MODE=oauth requires PUBLIC_BASE_URL");
+  // The web app's client is built in; the Alexa+ client is all-or-nothing.
+  const alexa = [
+    ["OAUTH_CLIENT_ID", config.oauthClientId],
+    ["OAUTH_CLIENT_SECRET", config.oauthClientSecret],
+    ["OAUTH_REDIRECT_URIS", config.oauthRedirectUris.join(",")],
+  ] as const;
+  const missing = alexa.filter(([, v]) => !v).map(([k]) => k);
+  if (missing.length && missing.length < alexa.length) {
+    throw new Error(`Alexa+ account linking needs all of: ${missing.join(", ")}`);
+  }
 }

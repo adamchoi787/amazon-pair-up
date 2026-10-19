@@ -99,6 +99,33 @@ All output goes through [views.ts](../src/market/views.ts); the tests fail on an
 ### Deal object
 `deal_id`, `listing_id`, `title`, `condition`, `your_role` (`buyer|seller`), `counterpart`, `price`, `ask_price`, `saved_vs_ask`, `currency`, `status` (`proposed|confirmed|declined|replaced|expired|withdrawn`), `buyer_confirmed`, `seller_confirmed`, `waiting_for` (`["buyer"|"seller"]`), `waiting_for_you`, `meetup: { place, availability }`, `on_hold_until` (while proposed), `created_at`, `updated_at`.
 
+## MCP Apps view
+
+Every tool except `withdraw_post` declares `_meta.ui.resourceUri = "ui://voicemarket/market.html"`
+in its definition (MCP Apps spec) and repeats it in each result's `_meta` (Alexa+
+client lifecycle). `resources/read` returns one self-contained HTML document
+(`text/html;profile=mcp-app`) that picks its layout from the result:
+
+| Result | Layout |
+|---|---|
+| `deal` / `next_deal`, or a new `listing` / `intent` | Deal card: price, savings, counterpart, meet-up, hold time; Confirm / Decline while it waits for the user; alternatives as a carousel |
+| `matches` | Options carousel with "Get this one" (`negotiate`) |
+| `deals` | The user's deals, those waiting for their yes first |
+| `listings` / `requests` | The user's posts with "Take down" (`withdraw_post`) |
+
+Inline lists show at most five items. Buttons call tools through the host.
+
+## Web app endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /app/` | The web app (an MCP host); `/` redirects here |
+| `GET /api/app-config` | How to sign in: `{ auth: "none" }` or the OAuth public client (`voicemarket-web`, PKCE, redirect `<PUBLIC_BASE_URL>/app/`) |
+| `GET /api/me` | The signed-in user's id and display name |
+| `POST /api/agent` | One assistant step. Body `{ messages }` in the Bedrock Converse shape; returns `{ message, stop, mode }` (`stop` is `tool_use` or `end_turn`). The app runs requested tools over `/mcp` itself and sends the results back. A `confirm_deal` call is only returned after the user's explicit yes. |
+
+Same identity, Origin and rate-limit rules as `/mcp`; same-origin browser calls are allowed.
+
 ## Conversation flow
 
 ```

@@ -22,14 +22,14 @@ npm start            # leave running
 npm run smoke        # in a second terminal → "Smoke test passed."
 ```
 
-Open http://127.0.0.1:3000/ to watch the dashboard update while smoke runs.
+Open http://127.0.0.1:3000/ for the web app, and http://127.0.0.1:3000/dashboard/ to watch posts and deals update while smoke runs.
 
 ## Who does what
 
 | You | Claude |
 |---|---|
 | AWS account, Bedrock model access and quotas | Server, pairing engine, schemas, tests |
-| Deployment credentials (never in git) | Demo web client and MCP Apps cards |
+| Deployment credentials (never in git) | Web app and MCP Apps view |
 | Classmate poll or interviews (real answers only) | Rust `pairing-core` crate (Open Source entry) |
 | Video recording and voice-over | Deployment config, CI, docs |
 | Devpost form, repo visibility, final submit | Drafts of description, feedback and friction entries for you to check |

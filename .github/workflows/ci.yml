@@ -16,3 +16,5 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - name: Committed browser bundles match the sources
+        run: npm run build:web && git diff --exit-code -- public/app/app.js public/mcp-apps

@@ -12,9 +12,13 @@ import { ensureUser } from "../market/service.js";
 //   - authorization code grant with PKCE S256, `resource` checked when sent
 //   - a refresh token with every access token (rotated on use)
 //   - bearer tokens only in the Authorization header
-// One pre-registered client (Alexa); no dynamic client registration.
-// The sign-in page is a demo login: users pick a display name (plus an
-// optional shared passcode). Swap in a real identity provider for production.
+// Pre-registered clients, no dynamic registration:
+//   - the VoiceMarket web app: a public client (PKCE, no secret) whose only
+//     redirect URI is this server's own /app/
+//   - Alexa+ account linking: a confidential client, when OAUTH_CLIENT_ID,
+//     OAUTH_CLIENT_SECRET and OAUTH_REDIRECT_URIS are set
+// The sign-in page is a name-based login (plus an optional shared passcode).
+// Swap in a real identity provider before running at scale.
 
 export const SCOPE = "marketplace";
 const CODE_TTL_S = 600;
@@ -25,6 +29,28 @@ type AuthConfig = Pick<
   Config,
   "publicBaseUrl" | "oauthClientId" | "oauthClientSecret" | "oauthRedirectUris" | "demoLoginPasscode"
 >;
+
+/** The VoiceMarket web app's client id (public client, PKCE only). */
+export const WEB_CLIENT_ID = "voicemarket-web";
+
+interface OAuthClient {
+  id: string;
+  /** Present for confidential clients only. */
+  secret?: string;
+  redirectUris: string[];
+  /** Shown on the sign-in page. */
+  purpose: "web" | "alexa";
+}
+
+export const webRedirectUri = (cfg: Pick<Config, "publicBaseUrl">) => `${cfg.publicBaseUrl}/app/`;
+
+function registeredClients(cfg: AuthConfig): OAuthClient[] {
+  const clients: OAuthClient[] = [{ id: WEB_CLIENT_ID, redirectUris: [webRedirectUri(cfg)], purpose: "web" }];
+  if (cfg.oauthClientId && cfg.oauthClientSecret) {
+    clients.push({ id: cfg.oauthClientId, secret: cfg.oauthClientSecret, redirectUris: cfg.oauthRedirectUris, purpose: "alexa" });
+  }
+  return clients;
+}
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 const newSecret = () => randomBytes(32).toString("base64url");
@@ -54,6 +80,8 @@ export async function userForAccessToken(db: Db, authorization: string | undefin
 export function oauthRouter(db: Db, cfg: AuthConfig): Router {
   const router = express.Router();
   router.use(express.urlencoded({ extended: false }));
+  const clients = registeredClients(cfg);
+  const findClient = (id: string | undefined) => clients.find((c) => c.id === id);
 
   const protectedResource = {
     resource: resourceUrl(cfg),
@@ -73,7 +101,7 @@ export function oauthRouter(db: Db, cfg: AuthConfig): Router {
       response_types_supported: ["code"],
       grant_types_supported: ["authorization_code", "refresh_token"],
       code_challenge_methods_supported: ["S256"],
-      token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post"],
+      token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post", "none"],
       scopes_supported: [SCOPE],
     });
   });
@@ -94,13 +122,14 @@ export function oauthRouter(db: Db, cfg: AuthConfig): Router {
       resource: get("resource"),
     };
     // Errors before the redirect URI is trusted are shown on the page, never redirected.
-    if (req.clientId !== cfg.oauthClientId) return { error: "Unknown client." };
-    if (!req.redirectUri || !cfg.oauthRedirectUris.includes(req.redirectUri)) return { error: "Redirect URI not registered." };
+    const client = findClient(req.clientId);
+    if (!client) return { error: "Unknown client." };
+    if (!req.redirectUri || !client.redirectUris.includes(req.redirectUri)) return { error: "Redirect URI not registered." };
     if (req.responseType !== "code") return { error: "Only response_type=code is supported.", req };
     if (!req.codeChallenge || req.codeChallengeMethod !== "S256") return { error: "PKCE with S256 is required.", req };
     if (req.resource && req.resource !== resourceUrl(cfg)) return { error: "Unknown resource.", req };
     if (req.scope.split(" ").some((s) => s !== SCOPE)) return { error: "Unsupported scope.", req };
-    return { req };
+    return { req, client };
   }
 
   router.get("/oauth/authorize", (req, res) => {
@@ -109,7 +138,7 @@ export function oauthRouter(db: Db, cfg: AuthConfig): Router {
       res.status(400).type("html").send(page("Can't link account", `<p>${esc(parsed.error)}</p>`));
       return;
     }
-    res.type("html").send(signInPage(req.query as Record<string, string>, !!cfg.demoLoginPasscode));
+    res.type("html").send(signInPage(req.query as Record<string, string>, parsed.client!.purpose, !!cfg.demoLoginPasscode));
   });
 
   router.post("/oauth/authorize", async (req, res) => {
@@ -119,13 +148,14 @@ export function oauthRouter(db: Db, cfg: AuthConfig): Router {
       return;
     }
     const r = parsed.req;
+    const purpose = parsed.client!.purpose;
     const name = String(req.body.display_name ?? "").trim().slice(0, 40);
     if (!name) {
-      res.status(400).type("html").send(signInPage(req.body, !!cfg.demoLoginPasscode, "Enter your name."));
+      res.status(400).type("html").send(signInPage(req.body, purpose, !!cfg.demoLoginPasscode, "Enter your name."));
       return;
     }
     if (cfg.demoLoginPasscode && !safeEqual(String(req.body.passcode ?? ""), cfg.demoLoginPasscode)) {
-      res.status(401).type("html").send(signInPage(req.body, true, "Wrong passcode."));
+      res.status(401).type("html").send(signInPage(req.body, purpose, true, "Wrong passcode."));
       return;
     }
 
@@ -150,15 +180,15 @@ export function oauthRouter(db: Db, cfg: AuthConfig): Router {
     const fail = (status: number, error: string, description?: string) =>
       res.status(status).json({ error, ...(description ? { error_description: description } : {}) });
 
-    const client = clientCredentials(req);
-    if (
-      !client ||
-      !safeEqual(client.id, cfg.oauthClientId) ||
-      !cfg.oauthClientSecret ||
-      !safeEqual(client.secret, cfg.oauthClientSecret)
-    ) {
-      return fail(401, "invalid_client");
-    }
+    // Confidential clients must present their secret; public clients must not
+    // present one (they are protected by PKCE and a same-origin redirect URI).
+    const creds = clientCredentials(req);
+    const client = findClient(creds?.id);
+    if (!creds || !client) return fail(401, "invalid_client");
+    const authenticated = client.secret
+      ? creds.secret !== undefined && safeEqual(creds.secret, client.secret)
+      : creds.secret === undefined;
+    if (!authenticated) return fail(401, "invalid_client");
 
     const grant = req.body.grant_type;
     if (grant === "authorization_code") {
@@ -210,7 +240,8 @@ function clientCredentials(req: Request) {
     return { id: decodeURIComponent(decoded.slice(0, i)), secret: decodeURIComponent(decoded.slice(i + 1)) };
   }
   const { client_id, client_secret } = req.body ?? {};
-  return typeof client_id === "string" && typeof client_secret === "string" ? { id: client_id, secret: client_secret } : null;
+  if (typeof client_id !== "string") return null;
+  return { id: client_id, secret: typeof client_secret === "string" ? client_secret : undefined };
 }
 
 async function issueTokens(db: Db, clientId: string, userId: string, scope: string) {
@@ -240,21 +271,24 @@ const esc = (s: unknown) =>
 
 const OAUTH_FIELDS = ["client_id", "redirect_uri", "response_type", "state", "code_challenge", "code_challenge_method", "scope", "resource"];
 
-function signInPage(params: Record<string, string>, needsPasscode: boolean, error?: string) {
+function signInPage(params: Record<string, string>, purpose: OAuthClient["purpose"], needsPasscode: boolean, error?: string) {
   const hidden = OAUTH_FIELDS.filter((k) => params[k] != null)
     .map((k) => `<input type="hidden" name="${k}" value="${esc(params[k])}">`)
     .join("");
+  const [title, intro, button] = purpose === "alexa"
+    ? ["Link VoiceMarket to Alexa", "Sign in so Alexa can buy and sell for you.", "Link account"]
+    : ["Sign in to VoiceMarket", "Sign in to buy and sell with people nearby, by voice.", "Sign in"];
   return page(
-    "Link VoiceMarket to Alexa",
-    `<p>Sign in so Alexa can buy and sell for you. Your private price limits are never shown to other people.</p>
+    title,
+    `<p>${intro} Your private price limits are never shown to other people.</p>
      ${error ? `<p class="err">${esc(error)}</p>` : ""}
      <form method="post" action="/oauth/authorize">
        ${hidden}
        <label>Your name<input name="display_name" value="${esc(params.display_name)}" autocomplete="name" required maxlength="40"></label>
        ${needsPasscode ? `<label>Demo passcode<input name="passcode" type="password" required></label>` : ""}
-       <button type="submit">Link account</button>
+       <button type="submit">${button}</button>
      </form>
-     <p class="muted">Demo sign-in for the hackathon prototype.</p>`,
+     <p class="muted">Signing in with a name you choose. Use the same name to get back to your posts and deals.</p>`,
   );
 }
 

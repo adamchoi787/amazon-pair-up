@@ -1,8 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import { z } from "zod";
 import { CONDITIONS } from "../ai/index.js";
 import * as market from "../market/service.js";
 import type { Deps } from "../market/service.js";
+import { registerViews, VIEWS, type ViewName } from "./apps.js";
 import { outputs } from "./schemas.js";
 
 // The tool surface Alexa+ (or any MCP host) sees. Descriptions say when to
@@ -46,15 +48,21 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
     },
   );
 
+  registerViews(server);
+  /** Tool metadata that points MCP Apps hosts (and Alexa+) at the tool's view. */
+  const ui = (view: ViewName) => ({ ui: { resourceUri: VIEWS[view].uri } });
+
   const who = (arg?: string) => {
     const userId = ctx.userId ?? arg;
     if (!userId) throw new market.MarketError("I don't know who's speaking. Please link your account.");
     return userId;
   };
 
-  server.registerTool(
+  registerAppTool(
+    server,
     "create_listing",
     {
+      _meta: ui("market"),
       title: "Sell an item",
       description:
         "Post an item the user wants to sell. If a buyer is already waiting for it, the server pairs them and " +
@@ -76,12 +84,14 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       outputSchema: outputs.create_listing,
       annotations: writes,
     },
-    (args) => run(() => market.createListing(deps, { ...args, user_id: who(args.user_id) })),
+    (args) => run(() => market.createListing(deps, { ...args, user_id: who(args.user_id) }), "market"),
   );
 
-  server.registerTool(
+  registerAppTool(
+    server,
     "create_buy_intent",
     {
+      _meta: ui("market"),
       title: "Buy an item",
       description:
         "Post what the user wants to buy. The server pairs the request with the best seller and negotiates inside both " +
@@ -102,12 +112,14 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       outputSchema: outputs.create_buy_intent,
       annotations: writes,
     },
-    (args) => run(() => market.createBuyIntent(deps, { ...args, user_id: who(args.user_id) })),
+    (args) => run(() => market.createBuyIntent(deps, { ...args, user_id: who(args.user_id) }), "market"),
   );
 
-  server.registerTool(
+  registerAppTool(
+    server,
     "find_matches",
     {
+      _meta: ui("market"),
       title: "More options",
       description:
         "Other listings for one of the user's buy requests, best first, e.g. when they ask for more options. " +
@@ -120,12 +132,14 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       outputSchema: outputs.find_matches,
       annotations: reads,
     },
-    (args) => run(() => market.findMatches(deps, who(args.user_id), args.intent_id, args.limit)),
+    (args) => run(() => market.findMatches(deps, who(args.user_id), args.intent_id, args.limit), "market"),
   );
 
-  server.registerTool(
+  registerAppTool(
+    server,
     "negotiate",
     {
+      _meta: ui("market"),
       title: "Get this one instead",
       description:
         "Negotiate a specific listing the user picked from the options. It replaces the offer the request already " +
@@ -134,12 +148,14 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       outputSchema: outputs.negotiate,
       annotations: writes,
     },
-    (args) => run(() => market.negotiateDeal(deps, who(args.user_id), args.intent_id, args.listing_id)),
+    (args) => run(() => market.negotiateDeal(deps, who(args.user_id), args.intent_id, args.listing_id), "market"),
   );
 
-  server.registerTool(
+  registerAppTool(
+    server,
     "confirm_deal",
     {
+      _meta: ui("market"),
       title: "Say yes to a deal",
       description:
         "Record the user's yes to a proposed deal. ONLY call after the user explicitly says yes. The deal closes, " +
@@ -148,12 +164,14 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       outputSchema: outputs.confirm_deal,
       annotations: writes,
     },
-    (args) => run(() => market.confirmDeal(deps, who(args.user_id), args.deal_id)),
+    (args) => run(() => market.confirmDeal(deps, who(args.user_id), args.deal_id), "market"),
   );
 
-  server.registerTool(
+  registerAppTool(
+    server,
     "decline_deal",
     {
+      _meta: ui("market"),
       title: "Say no to a deal",
       description:
         "Record the user's no to a proposed deal. Both posts go back on the market and are re-paired; the result " +
@@ -162,12 +180,14 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       outputSchema: outputs.decline_deal,
       annotations: { ...writes, destructiveHint: true },
     },
-    (args) => run(() => market.declineDeal(deps, who(args.user_id), args.deal_id)),
+    (args) => run(() => market.declineDeal(deps, who(args.user_id), args.deal_id), "market"),
   );
 
-  server.registerTool(
+  registerAppTool(
+    server,
     "get_deal_status",
     {
+      _meta: ui("market"),
       title: "My deals",
       description:
         "The user's deals, those waiting for their yes first, with price, counterpart and meet-up details. " +
@@ -176,12 +196,14 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       outputSchema: outputs.get_deal_status,
       annotations: reads,
     },
-    (args) => run(() => market.getDealStatus(deps, who(args.user_id), args.deal_id)),
+    (args) => run(() => market.getDealStatus(deps, who(args.user_id), args.deal_id), "market"),
   );
 
-  server.registerTool(
+  registerAppTool(
+    server,
     "list_my_posts",
     {
+      _meta: ui("market"),
       title: "My listings and requests",
       description:
         "The user's own items for sale and buy requests, newest first, with their status. Use for 'what am I " +
@@ -190,7 +212,7 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       outputSchema: outputs.list_my_posts,
       annotations: reads,
     },
-    (args) => run(() => market.listMyPosts(deps, who(args.user_id))),
+    (args) => run(() => market.listMyPosts(deps, who(args.user_id)), "market"),
   );
 
   server.registerTool(
@@ -215,12 +237,14 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
  * act on become speakable tool errors; anything unexpected is logged and the
  * user still hears a sentence, so Alexa never meets an empty result.
  */
-async function run(fn: () => Promise<object>) {
+async function run(fn: () => Promise<object>, view?: ViewName) {
   try {
     const result = (await fn()) as Record<string, unknown>;
     return {
       content: [{ type: "text" as const, text: JSON.stringify(result) }],
       structuredContent: result,
+      // Alexa+ renders the view named in the result; other hosts use the tool's metadata.
+      ...(view ? { _meta: { ui: { resourceUri: VIEWS[view].uri } } } : {}),
     };
   } catch (err) {
     const known = err instanceof market.MarketError;

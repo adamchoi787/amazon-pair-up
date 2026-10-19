@@ -60,7 +60,7 @@ text, images and video alone, so the video and description carry most of the wei
 | Requirement | Status | Gap |
 |---|---|---|
 | MCP server, spec 2025-11-25, Streamable HTTP, SDK called in code | ✅ on `main` | — |
-| Demo surface judges can see | ❌ | Build the web MCP client ("simulated Alexa+ add-on") |
+| Surface judges can see | ✅ web app at `/app/`: MCP host, MCP Apps cards, voice, Bedrock/offline agent | Deploy it |
 | Hosted endpoint live to Nov 20 | ⚠️ Lightsail guide on `a/alexa-addon`, nothing deployed | Deploy (Lambda or AgentCore Runtime) |
 | Pairing engine, one-turn deals, output schemas | ✅ on `main` | — |
 | OAuth, Origin check, container, add-on assets | ✅ on `main` | — |
@@ -79,7 +79,7 @@ text, images and video alone, so the video and description carry most of the wei
   results carry counterpart, meet-up place and time, savings and who still has to
   say yes; relevance gate (TI-84 0.96 vs non-graphing Casio 0.60); one hold per
   post, claimed atomically; decline re-pairs both sides.
-- MCP Apps UI resources: a pairing card with Confirm/Decline and a carousel of alternatives.
+- Done: MCP Apps view `ui://voicemarket/market.html` on every UI tool (definition and result `_meta`), rendered by the web app; confirm guard on the agent.
 - Done for production use: offers expire after `DEAL_HOLD_HOURS` and both posts
   re-pair (also on a background timer); users list and withdraw their posts;
   per-user posting limits (which also block budget probing) and per-caller HTTP

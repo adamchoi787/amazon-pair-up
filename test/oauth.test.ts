@@ -168,3 +168,36 @@ test("refresh tokens rotate and old ones stop working", async () => {
   assert.ok((await client.listTools()).tools.length > 0);
   await client.close();
 });
+
+test("the web app signs in as a public client: PKCE, its own origin, no secret", async () => {
+  const cfg = await (await fetch(`${base}/api/app-config`)).json();
+  assert.deepEqual(cfg, {
+    auth: "oauth", clientId: "voicemarket-web", redirectUri: `${PUBLIC}/app/`,
+    authorizeUrl: `${PUBLIC}/oauth/authorize`, tokenUrl: `${PUBLIC}/oauth/token`, resource: `${PUBLIC}/mcp`,
+  });
+
+  const { verifier, challenge } = pkce();
+  const params = { client_id: cfg.clientId, redirect_uri: cfg.redirectUri, response_type: "code", state: "w1", code_challenge: challenge, code_challenge_method: "S256", scope: "marketplace", resource: cfg.resource };
+  const elsewhere = await fetch(`${base}/oauth/authorize?${new URLSearchParams({ ...params, redirect_uri: "https://evil.example/app/" })}`);
+  assert.equal(elsewhere.status, 400, "the web client redirects only to this server's /app/");
+
+  const res = await fetch(`${base}/oauth/authorize`, { method: "POST", body: new URLSearchParams({ ...params, display_name: "Priya" }), redirect: "manual" });
+  assert.equal(res.status, 302);
+  const code = new URL(res.headers.get("location")!).searchParams.get("code")!;
+  const exchange = (extra: Record<string, string> = {}) => fetch(`${base}/oauth/token`, {
+    method: "POST",
+    body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: cfg.redirectUri, code_verifier: verifier, client_id: cfg.clientId, ...extra }),
+  });
+  assert.equal((await exchange({ client_secret: "guess" })).status, 401, "a public client never authenticates with a secret");
+  const ok = await exchange();
+  assert.equal(ok.status, 200);
+  const tokens = await ok.json();
+
+  const me = await (await fetch(`${base}/api/me`, { headers: { Authorization: `Bearer ${tokens.access_token}` } })).json();
+  assert.deepEqual(me, { userId: "u_priya", name: "Priya" });
+
+  const refreshed = await fetch(`${base}/oauth/token`, { method: "POST", body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: tokens.refresh_token, client_id: cfg.clientId }) });
+  assert.equal(refreshed.status, 200, "public clients refresh with rotation");
+  const alexaWithoutSecret = await token({ grant_type: "refresh_token", refresh_token: tokens.refresh_token, client_id: CLIENT.id }, "");
+  assert.equal(alexaWithoutSecret.status, 401, "the confidential client still needs its secret");
+});

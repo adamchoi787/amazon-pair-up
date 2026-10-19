@@ -1,0 +1,46 @@
+:root {
+  --bg: #ffffff; --fg: #15171a; --muted: #5d6470; --line: #e3e6ea; --card: #f7f8fa;
+  --accent: #0b6bcb; --accent-fg: #ffffff; --good: #1b7f3b; --warn: #a15c00; --danger: #c62828;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #0f1114; --fg: #eef0f3; --muted: #9aa3ae; --line: #262a30; --card: #171a1f;
+  --accent: #4ea1ff; --accent-fg: #06121f; --good: #55c27a; --warn: #f0a33c; --danger: #ff6b6b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+/* Transparent, so the card sits on whatever surface the host draws. */
+/* The host sizes the frame to the content (autoResize), so the view itself never scrolls. */
+html, body { margin: 0; background: transparent; color: var(--fg); overflow: hidden; }
+body { font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding: 2px; }
+#root { display: flex; flex-direction: column; gap: 12px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+.card.compact { padding: 12px 14px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+h2 { font-size: 22px; line-height: 1.25; margin: 10px 0 4px; }
+h3 { font-size: 17px; margin: 8px 0 2px; }
+h4 { font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 6px 2px 0; }
+.price { font-size: 34px; font-weight: 700; letter-spacing: -.01em; }
+.small-price { font-size: 22px; }
+p { margin: 4px 0; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.meet { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.chip { display: inline-block; font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--line); }
+.chip.accent { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.chip.good { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+.chip.warn { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+.actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+button { font: inherit; font-weight: 600; min-height: 48px; padding: 0 18px; border-radius: 12px; border: 1px solid var(--line); cursor: pointer; flex: 1 1 auto; }
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+button.secondary { background: transparent; color: var(--fg); }
+button.danger { background: var(--danger); color: #fff; border-color: transparent; }
+button:disabled { opacity: .55; cursor: progress; }
+button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.carousel { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 78%); gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 4px; }
+.carousel > .card { scroll-snap-align: start; display: flex; flex-direction: column; }
+.carousel button { margin-top: auto; }
+@media (min-width: 640px) { .carousel { grid-auto-columns: minmax(200px, 1fr); } }
+.note { font-size: 14px; color: var(--muted); padding: 2px 4px; }
+.more { font-size: 14px; color: var(--muted); padding: 0 4px; }
