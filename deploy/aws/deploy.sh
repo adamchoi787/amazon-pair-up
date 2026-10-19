@@ -9,6 +9,10 @@
 # inference profile ids, default us.amazon.nova-lite-v1:0), INSTANCE_TYPE.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+# Git Bash on Windows rewrites arguments that look like paths ("/amazonpairup/…")
+# before calling aws.exe; keep them as written, and hand the CLI native temp paths.
+export MSYS_NO_PATHCONV=1
+native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
 
 PROFILE=${AWS_PROFILE:-amazonpairup}
 REGION=${AWS_REGION:-us-east-1}
@@ -61,8 +65,8 @@ step "Release"
 RELEASE="$(date -u +%Y%m%d%H%M%S)-$(git rev-parse --short HEAD)"
 KEY="releases/$RELEASE.tgz"
 TMP=$(mktemp -d)
-git archive --format=tar.gz -o "$TMP/release.tgz" HEAD
-awsx s3 cp --only-show-errors "$TMP/release.tgz" "s3://$BUCKET/$KEY"
+git archive --format=tar.gz -o "$(native "$TMP/release.tgz")" HEAD
+awsx s3 cp --only-show-errors "$(native "$TMP/release.tgz")" "s3://$BUCKET/$KEY"
 echo "uploaded $KEY"
 
 ENV_FILE=$(cat <<EOF
@@ -91,11 +95,11 @@ node -e '
     `bash /tmp/amazonpairup-install.sh ${bucket} ${key} ${release} ${b64(env + "\n")}`,
   ];
   require("fs").writeFileSync(out, JSON.stringify({ commands, executionTimeout: ["1200"] }));
-' deploy/aws/remote-install.sh "$BUCKET" "$KEY" "$RELEASE" "$ENV_FILE" "$TMP/params.json"
+' deploy/aws/remote-install.sh "$BUCKET" "$KEY" "$RELEASE" "$ENV_FILE" "$(native "$TMP/params.json")"
 
 step "Installing on $INSTANCE"
 COMMAND=$(awsx ssm send-command --instance-ids "$INSTANCE" --document-name AWS-RunShellScript \
-  --comment "amazonpairup $RELEASE" --parameters "file://$TMP/params.json" --query Command.CommandId --output text)
+  --comment "amazonpairup $RELEASE" --parameters "file://$(native "$TMP/params.json")" --query Command.CommandId --output text)
 rm -rf "$TMP"
 for _ in $(seq 1 240); do
   state=$(awsx ssm get-command-invocation --command-id "$COMMAND" --instance-id "$INSTANCE" --query Status --output text 2>/dev/null || echo Pending)

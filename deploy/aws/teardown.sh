@@ -5,6 +5,7 @@
 #
 #   AWS_PROFILE=amazonpairup AWS_REGION=us-east-1 deploy/aws/teardown.sh
 set -euo pipefail
+export MSYS_NO_PATHCONV=1  # Git Bash on Windows: keep "/amazonpairup/…" as written
 PROFILE=${AWS_PROFILE:-amazonpairup}
 REGION=${AWS_REGION:-us-east-1}
 STACK=${STACK:-amazonpairup}
