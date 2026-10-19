@@ -76,4 +76,27 @@ CREATE TABLE IF NOT EXISTS events (
   detail      JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- OAuth 2.1 account linking (src/auth/oauth.ts). Only SHA-256 hashes of codes
+-- and tokens are stored, never the raw values.
+CREATE TABLE IF NOT EXISTS oauth_codes (
+  code_hash       TEXT PRIMARY KEY,
+  client_id       TEXT NOT NULL,
+  user_id         TEXT NOT NULL REFERENCES users(id),
+  redirect_uri    TEXT NOT NULL,
+  code_challenge  TEXT NOT NULL,
+  scope           TEXT NOT NULL,
+  resource        TEXT,
+  expires_at      TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS oauth_tokens (
+  token_hash      TEXT PRIMARY KEY,
+  kind            TEXT NOT NULL,                  -- access | refresh
+  client_id       TEXT NOT NULL,
+  user_id         TEXT NOT NULL REFERENCES users(id),
+  scope           TEXT NOT NULL,
+  expires_at      TIMESTAMPTZ NOT NULL,
+  revoked         BOOLEAN NOT NULL DEFAULT FALSE
+);
 `;

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VoiceMarket Privacy</title>
+<style>
+  :root { --bg:#f7f7f5; --fg:#1d1d1b; --muted:#6b6b66; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#141413; --fg:#ededea; --muted:#9a9a94; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui, sans-serif; }
+  main { max-width:680px; margin:auto; padding:32px 16px; }
+  h1 { font-size:24px; } h2 { font-size:18px; margin-top:28px; } .muted { color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>VoiceMarket privacy policy</h1>
+<p class="muted">Hackathon prototype · Last updated October 18, 2026</p>
+
+<p>VoiceMarket is a prototype second-hand marketplace you use through Alexa+. It was built for the Amazon Developer Hackathon 2026 and isn't a commercial service.</p>
+
+<h2>What we store</h2>
+<ul>
+  <li><strong>Account:</strong> the display name you enter when you link VoiceMarket to Alexa, and an internal user id.</li>
+  <li><strong>Listings:</strong> items you sell, including the asking price and the private minimum price you set.</li>
+  <li><strong>Buy requests:</strong> what you're looking for, including the private maximum price you set, and the words of your request.</li>
+  <li><strong>Deals:</strong> agreed prices, confirmation status and meet-up area.</li>
+  <li><strong>Activity log:</strong> a record of marketplace actions, used to run and debug the service.</li>
+</ul>
+
+<h2>Private price limits</h2>
+<p>Your minimum selling price and maximum buying price are used only on our server to decide whether a deal is possible and at what price. They are never shown to other users.</p>
+
+<h2>Sign-in tokens</h2>
+<p>When you link your account, Alexa receives tokens that let it act on the marketplace for you. We store only one-way hashes of these tokens.</p>
+
+<h2>Processing</h2>
+<p>Text of listings and requests may be processed by Amazon Web Services (Amazon Bedrock) to understand requests and find matches. We don't sell your data or use it for advertising.</p>
+
+<h2>Retention and deletion</h2>
+<p>This is a prototype, and demo data may be reset at any time. To have your data deleted, unlink VoiceMarket in the Alexa app and contact us through the project repository.</p>
+
+<h2>Contact</h2>
+<p>Questions: open an issue at the project's GitHub repository.</p>
+</main>
+</body>
+</html>

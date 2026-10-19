@@ -90,7 +90,9 @@ src/
 public/index.html     judge dashboard                                            [C]
 data/seed-listings.json  seed marketplace                                        [C]
 scripts/seed.ts, scripts/smoke.ts
-docs/                 team handoff, contract, demo script, submission, friction log
+docs/                 team handoff, contract, Alexa+ setup, deploy, demo script, submission, friction log
+src/auth/oauth.ts     OAuth 2.1 account linking for Alexa+                       [A]
+Dockerfile, deploy/   container image and Lightsail config                      [A]
 ```
 
 ## Team

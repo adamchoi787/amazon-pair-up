@@ -1,0 +1,12 @@
+{
+  "containerName": "app",
+  "containerPort": 3000,
+  "healthCheck": {
+    "path": "/health",
+    "intervalSeconds": 10,
+    "timeoutSeconds": 5,
+    "healthyThreshold": 2,
+    "unhealthyThreshold": 2,
+    "successCodes": "200"
+  }
+}
