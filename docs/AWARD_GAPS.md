@@ -80,10 +80,12 @@ text, images and video alone, so the video and description carry most of the wei
   say yes; relevance gate (TI-84 0.96 vs non-graphing Casio 0.60); one hold per
   post, claimed atomically; decline re-pairs both sides.
 - MCP Apps UI resources: a pairing card with Confirm/Decline and a carousel of alternatives.
-- Reserve-price probing: repeated requests with different budgets can narrow a
-  seller's minimum. Add per-user request rate limits.
-- Fragile Bedrock JSON parsing in intent extraction.
-- CI running typecheck and tests.
+- Done for production use: offers expire after `DEAL_HOLD_HOURS` and both posts
+  re-pair (also on a background timer); users list and withdraw their posts;
+  per-user posting limits (which also block budget probing) and per-caller HTTP
+  rate limits; bounded inputs; token-protected dashboard; field-by-field
+  validation of Bedrock output with a local fallback; unexpected errors still
+  return a spoken sentence; CI on every push.
 
 **Design**
 - The two-sided flow on screen: two simulated devices (seller and buyer) side by

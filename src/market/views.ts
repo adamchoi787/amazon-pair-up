@@ -79,6 +79,7 @@ export function dealView(d: DealWithParties, viewerId: string) {
     waiting_for: waitingFor,
     waiting_for_you: role !== "observer" && waitingFor.includes(role),
     meetup: { place: d.meetup, availability: d.availability },
+    on_hold_until: d.status === "proposed" && d.expires_at ? new Date(d.expires_at).toISOString() : null,
     created_at: new Date(d.created_at).toISOString(),
     updated_at: new Date(d.updated_at).toISOString(),
   };

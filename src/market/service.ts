@@ -1,31 +1,67 @@
 import type { Ai, Condition } from "../ai/index.js";
-import type { Config } from "../config.js";
 import { toVector, type Db } from "../db/client.js";
 import { logEvent, shortId } from "./events.js";
 import { findIntentsForListing, findMatchesForIntent } from "./matching.js";
 import { negotiate } from "./negotiation.js";
-import { isExpired, pairIntent, pairListing, propose, release } from "./pairing.js";
+import {
+  expireHolds, isExpired, pairIntent, pairListing, propose, release, repairAfter, type PairingSettings,
+} from "./pairing.js";
 import { num, type BuyIntentRow, type DealRow, type ListingRow } from "./types.js";
 import { dealView, intentView, listingView, type DealView, type DealWithParties } from "./views.js";
 
 // Business operations. MCP tools (src/mcp/server.ts) are thin wrappers around
-// these, so the web demo and the tests call the same functions.
+// these, so the web app and the tests call the same functions.
+
+/** Marketplace policy. Only the threshold is required; the rest have production defaults. */
+export interface MarketSettings {
+  matchThreshold: number;
+  dealHoldHours?: number;
+  postsPerHour?: number;
+  maxOpenRequests?: number;
+}
 
 export interface Deps {
   db: Db;
   ai: Ai;
-  cfg: Pick<Config, "matchThreshold">;
+  cfg: MarketSettings;
 }
 
 export class MarketError extends Error {}
 
 const ALTERNATIVES = 4;
 
+const pairing = (cfg: MarketSettings): PairingSettings => ({
+  threshold: cfg.matchThreshold,
+  holdHours: cfg.dealHoldHours ?? 24,
+});
+
+/** Expire unanswered holds before acting, so every answer reflects the live market. */
+const sweep = (deps: Deps) => expireHolds(deps.db, pairing(deps.cfg));
+
 export async function ensureUser(db: Db, userId: string, displayName?: string) {
   await db.query(
     `INSERT INTO users (id, display_name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`,
     [userId, displayName ?? userId],
   );
+}
+
+/** Per-user posting limits. They also stop a buyer from probing a seller's minimum with many budgets. */
+async function checkPostingLimits(deps: Deps, userId: string, kind: "listing" | "request") {
+  const { db, cfg } = deps;
+  const { rows } = await db.query<{ recent: number; open_requests: number }>(
+    `SELECT
+       (SELECT count(*) FROM listings    WHERE seller_id = $1 AND created_at > now() - interval '1 hour')
+     + (SELECT count(*) FROM buy_intents WHERE buyer_id  = $1 AND created_at > now() - interval '1 hour') AS recent,
+       (SELECT count(*) FROM buy_intents WHERE buyer_id = $1 AND status IN ('open', 'matched')) AS open_requests`,
+    [userId],
+  );
+  if (Number(rows[0].recent) >= (cfg.postsPerHour ?? 30)) {
+    throw new MarketError("You've posted a lot in the last hour. Please try again a little later.");
+  }
+  const maxOpen = cfg.maxOpenRequests ?? 10;
+  if (kind === "request" && Number(rows[0].open_requests) >= maxOpen) {
+    throw new MarketError(`You already have ${countWord(maxOpen).toLowerCase()} open requests. Cancel one first, then ask again.`);
+  }
 }
 
 // ---------- Sell side ----------
@@ -49,8 +85,10 @@ export interface CreateListingInput {
 export async function createListing(deps: Deps, input: CreateListingInput) {
   const { db, ai, cfg } = deps;
   const minPrice = input.min_price ?? input.ask_price;
-  if (minPrice > input.ask_price) throw new MarketError("Minimum price can't be above the asking price.");
+  if (minPrice > input.ask_price) throw new MarketError("Your minimum can't be above the asking price.");
+  await sweep(deps);
   await ensureUser(db, input.user_id);
+  await checkPostingLimits(deps, input.user_id, "listing");
 
   const id = shortId("lst");
   const embedding = await ai.embed(
@@ -70,9 +108,9 @@ export async function createListing(deps: Deps, input: CreateListingInput) {
   const waiting = (await findIntentsForListing(db, id, { limit: 5, threshold: cfg.matchThreshold })).length;
   await logEvent(db, "listing_created", input.user_id, id, { title: input.title, ask: input.ask_price, waiting_buyers: waiting });
 
-  const pairing = await pairListing(db, rows[0], cfg.matchThreshold, "seller");
+  const paired = await pairListing(db, rows[0], pairing(cfg), "seller");
   const listing = listingView(await getListing(db, id), input.user_id);
-  const deal = pairing ? dealView(await getDealWithParties(db, pairing.deal.id), input.user_id) : null;
+  const deal = paired ? dealView(await getDealWithParties(db, paired.deal.id), input.user_id) : null;
   const ask = fmt(input.ask_price, listing.currency);
 
   let say: string;
@@ -118,7 +156,9 @@ export async function createBuyIntent(deps: Deps, input: CreateBuyIntentInput) {
   if (maxPrice == null) throw new MarketError("What's the most you'd pay? I keep that private from sellers.");
   const neededBy = parseDeadline(input.needed_by ?? extracted?.needed_by);
 
+  await sweep(deps);
   await ensureUser(db, input.user_id);
+  await checkPostingLimits(deps, input.user_id, "request");
   const id = shortId("int");
   const category = extracted?.category ?? null;
   const embedding = await ai.embed([need, category].filter(Boolean).join(". "));
@@ -135,10 +175,10 @@ export async function createBuyIntent(deps: Deps, input: CreateBuyIntentInput) {
   );
   await logEvent(db, "intent_created", input.user_id, id, { need, source: input.source ?? "voice" });
 
-  const pairing = await pairIntent(db, rows[0], cfg.matchThreshold, "buyer");
+  const paired = await pairIntent(db, rows[0], pairing(cfg), "buyer");
   const intentRow = await getIntent(db, id);
   const alternatives = await findMatchesForIntent(db, intentRow, { limit: ALTERNATIVES, threshold: cfg.matchThreshold });
-  const deal = pairing ? dealView(await getDealWithParties(db, pairing.deal.id), input.user_id) : null;
+  const deal = paired ? dealView(await getDealWithParties(db, paired.deal.id), input.user_id) : null;
 
   return {
     intent: intentView(intentRow, input.user_id),
@@ -153,6 +193,7 @@ export async function createBuyIntent(deps: Deps, input: CreateBuyIntentInput) {
 /** Browse other listings for a request (the paired one is held, so it isn't repeated). */
 export async function findMatches(deps: Deps, userId: string, intentId: string, limit = 3) {
   const { db, cfg } = deps;
+  await sweep(deps);
   const intent = await getOwnIntent(db, userId, intentId);
   const matches = await findMatchesForIntent(db, intent, { limit, threshold: cfg.matchThreshold });
   await logEvent(db, "matches_found", userId, intentId, { count: matches.length, top: matches[0]?.id });
@@ -171,12 +212,13 @@ export async function findMatches(deps: Deps, userId: string, intentId: string, 
 /** The buyer picks a specific listing: negotiate it, replacing any deal the request already holds. */
 export async function negotiateDeal(deps: Deps, userId: string, intentId: string, listingId: string) {
   const { db, cfg } = deps;
+  await sweep(deps);
   const intent = await getOwnIntent(db, userId, intentId);
   if (intent.status === "fulfilled" || intent.status === "cancelled") throw new MarketError("That request is already closed.");
   if (isExpired(intent)) throw new MarketError("That request's deadline has passed. Want to post a new one?");
   const listing = await getListing(db, listingId);
 
-  const held = await proposedDealFor(db, intentId);
+  const held = await proposedDealOn(db, "buy_intent_id", intentId);
   if (held?.listing_id === listingId) {
     const deal = dealView(await getDealWithParties(db, held.id), userId);
     return { deal, say: buyerOfferLine(deal, "already") };
@@ -198,10 +240,10 @@ export async function negotiateDeal(deps: Deps, userId: string, intentId: string
     await release(db, held, "replaced");
     await logEvent(db, "deal_switched", userId, held.id, { to_listing: listingId });
   }
-  const created = await propose(db, listing, await getIntent(db, intentId), "browse");
-  if (held) await pairListing(db, await getListing(db, held.listing_id), cfg.matchThreshold, "repair");
+  const created = await propose(db, listing, await getIntent(db, intentId), pairing(cfg), "browse");
+  if (held) await pairListing(db, await getListing(db, held.listing_id), pairing(cfg), "repair");
   if (!created) {
-    await pairIntent(db, await getIntent(db, intentId), cfg.matchThreshold, "repair");
+    await pairIntent(db, await getIntent(db, intentId), pairing(cfg), "repair");
     throw new MarketError("Someone just took that one. Ask me for your deals to see what I found instead.");
   }
   const deal = dealView(await getDealWithParties(db, created.id), userId);
@@ -210,11 +252,12 @@ export async function negotiateDeal(deps: Deps, userId: string, intentId: string
 
 export async function confirmDeal(deps: Deps, userId: string, dealId: string) {
   const { db } = deps;
+  await sweep(deps);
   const d = await getDealWithParties(db, dealId);
   const isBuyer = userId === d.buyer_id;
   const isSeller = userId === d.seller_id;
   if (!isBuyer && !isSeller) throw new MarketError("You're not part of this deal.");
-  if (d.status !== "proposed") throw new MarketError(`This deal is already ${d.status}.`);
+  if (d.status !== "proposed") throw new MarketError(closedDealLine(d.status));
 
   const buyer = d.buyer_confirmed || isBuyer;
   const seller = d.seller_confirmed || isSeller;
@@ -243,15 +286,14 @@ export async function confirmDeal(deps: Deps, userId: string, dealId: string) {
 /** Say no to a deal. Both posts go back on the market and get re-paired with their next-best match. */
 export async function declineDeal(deps: Deps, userId: string, dealId: string) {
   const { db, cfg } = deps;
+  await sweep(deps);
   const d = await getDealWithParties(db, dealId);
   const isBuyer = userId === d.buyer_id;
   if (!isBuyer && userId !== d.seller_id) throw new MarketError("You're not part of this deal.");
-  if (d.status !== "proposed" || !(await release(db, d, "declined"))) throw new MarketError(`This deal is already ${d.status}.`);
+  if (d.status !== "proposed" || !(await release(db, d, "declined"))) throw new MarketError(closedDealLine(d.status));
   await logEvent(db, "deal_declined", userId, dealId, { by: isBuyer ? "buyer" : "seller" });
 
-  // The decliner's own post is re-paired first, so their next offer is the best one left.
-  const intentNext = await pairIntent(db, await getIntent(db, d.buy_intent_id), cfg.matchThreshold, "repair");
-  const listingNext = await pairListing(db, await getListing(db, d.listing_id), cfg.matchThreshold, "repair");
+  const { intentNext, listingNext } = await repairAfter(db, d, pairing(cfg));
   const own = isBuyer ? intentNext : listingNext;
   const next = own ? dealView(await getDealWithParties(db, own.deal.id), userId) : null;
 
@@ -270,6 +312,7 @@ export async function declineDeal(deps: Deps, userId: string, dealId: string) {
 /** The user's deals, the ones waiting for their yes first. */
 export async function getDealStatus(deps: Deps, userId: string, dealId?: string) {
   const { db } = deps;
+  await sweep(deps);
   const { rows } = await db.query<DealWithParties>(
     `${DEAL_WITH_PARTIES} WHERE (l.seller_id = $1 OR i.buyer_id = $1) AND ($2::text IS NULL OR d.id = $2)
      ORDER BY d.created_at DESC LIMIT 10`,
@@ -288,7 +331,72 @@ export async function getDealStatus(deps: Deps, userId: string, dealId?: string)
   };
 }
 
-// ---------- Dashboard (for judges / demo) ----------
+// ---------- Managing posts ----------
+
+/** The user's own listings and requests, newest first. */
+export async function listMyPosts(deps: Deps, userId: string) {
+  const { db } = deps;
+  await sweep(deps);
+  const [listings, requests] = await Promise.all([
+    db.query<ListingRow>(`SELECT * FROM listings WHERE seller_id = $1 ORDER BY created_at DESC LIMIT 20`, [userId]),
+    db.query<BuyIntentRow>(`SELECT * FROM buy_intents WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 20`, [userId]),
+  ]);
+  const live = listings.rows.filter((l) => l.status === "active" || l.status === "pending");
+  const open = requests.rows.filter((i) => i.status === "open" || i.status === "matched");
+  const parts = [
+    live.length ? `${countWord(live.length).toLowerCase()} item${live.length > 1 ? "s" : ""} for sale: ${live.slice(0, 3).map((l) => l.title).join(", ")}` : "",
+    open.length ? `${countWord(open.length).toLowerCase()} open request${open.length > 1 ? "s" : ""}: ${open.slice(0, 3).map((i) => i.need).join(", ")}` : "",
+  ].filter(Boolean);
+  return {
+    listings: listings.rows.map((l) => listingView(l, userId)),
+    requests: requests.rows.map((i) => intentView(i, userId)),
+    say: parts.length ? `You have ${parts.join("; and ")}.` : "You don't have anything listed or requested right now.",
+  };
+}
+
+/** Take down a listing or cancel a request. A deal it held is released and the other side re-paired. */
+export async function withdrawPost(deps: Deps, userId: string, postId: string) {
+  const { db, cfg } = deps;
+  await sweep(deps);
+  if (postId.startsWith("lst_")) {
+    const l = await getListing(db, postId);
+    if (l.seller_id !== userId) throw new MarketError("That listing belongs to someone else.");
+    if (l.status === "sold") throw new MarketError("That item is already sold.");
+    if (l.status === "withdrawn") throw new MarketError("That listing is already down.");
+    const held = await proposedDealOn(db, "listing_id", postId);
+    if (held) await release(db, held, "withdrawn", { listing: "withdrawn" });
+    await db.query(`UPDATE listings SET status = 'withdrawn' WHERE id = $1 AND status IN ('active', 'pending')`, [postId]);
+    await logEvent(db, "listing_withdrawn", userId, postId, { released_deal: held?.id ?? null });
+    if (held) await repairAfter(db, held, pairing(cfg));
+    return {
+      post_id: postId,
+      kind: "listing" as const,
+      status: "withdrawn" as const,
+      released_deal_id: held?.id ?? null,
+      say: `I've taken down ${l.title}.` + (held ? ` The buyer it was on hold for goes back to their other options.` : ""),
+    };
+  }
+  if (postId.startsWith("int_")) {
+    const i = await getOwnIntent(db, userId, postId);
+    if (i.status === "fulfilled") throw new MarketError("That request is already fulfilled.");
+    if (i.status === "cancelled") throw new MarketError("That request is already cancelled.");
+    const held = await proposedDealOn(db, "buy_intent_id", postId);
+    if (held) await release(db, held, "withdrawn", { intent: "cancelled" });
+    await db.query(`UPDATE buy_intents SET status = 'cancelled' WHERE id = $1 AND status IN ('open', 'matched')`, [postId]);
+    await logEvent(db, "intent_cancelled", userId, postId, { released_deal: held?.id ?? null });
+    if (held) await repairAfter(db, held, pairing(cfg));
+    return {
+      post_id: postId,
+      kind: "request" as const,
+      status: "cancelled" as const,
+      released_deal_id: held?.id ?? null,
+      say: `I've cancelled your request for ${i.need}.` + (held ? ` The item goes back to the seller's other buyers.` : ""),
+    };
+  }
+  throw new MarketError("I can't find that post.");
+}
+
+// ---------- Dashboard ----------
 
 export async function dashboard(db: Db) {
   const [listings, intents, deals, events] = await Promise.all([
@@ -336,9 +444,24 @@ function buyerOfferLine(deal: DealView, mode: "found" | "negotiated" | "next" | 
 
 function statusLine(d: DealView) {
   const what = `${d.title}, ${fmt(d.price, d.currency)}`;
-  if (d.status === "confirmed") return `${what}: confirmed with ${d.counterpart}${d.meetup.place ? `, meet-up at ${d.meetup.place}` : ""}.`;
-  if (d.status === "declined") return `${what}: cancelled.`;
-  return d.waiting_for_you ? `${what}: waiting for your yes.` : `${what}: waiting for the ${d.waiting_for.join(" and ")}.`;
+  switch (d.status) {
+    case "confirmed": return `${what}: confirmed with ${d.counterpart}${d.meetup.place ? `, meet-up at ${d.meetup.place}` : ""}.`;
+    case "proposed": return d.waiting_for_you ? `${what}: waiting for your yes.` : `${what}: waiting for the ${d.waiting_for.join(" and ")}.`;
+    case "expired": return `${what}: expired without an answer.`;
+    case "withdrawn": return `${what}: taken off the market.`;
+    case "replaced": return `${what}: replaced by another option.`;
+    default: return `${what}: cancelled.`;
+  }
+}
+
+function closedDealLine(status: string) {
+  return {
+    confirmed: "That deal is already confirmed.",
+    declined: "That deal was already cancelled.",
+    replaced: "That offer was replaced by another option.",
+    expired: "That offer expired. Want me to look again?",
+    withdrawn: "That item or request was taken down.",
+  }[status] ?? `That deal is ${status}.`;
 }
 
 const COUNT_WORDS = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
@@ -352,8 +475,8 @@ function parseDeadline(value: string | undefined) {
   return t.toISOString();
 }
 
-async function proposedDealFor(db: Db, intentId: string) {
-  const { rows } = await db.query<DealRow>(`SELECT * FROM deals WHERE buy_intent_id = $1 AND status = 'proposed'`, [intentId]);
+async function proposedDealOn(db: Db, column: "listing_id" | "buy_intent_id", id: string) {
+  const { rows } = await db.query<DealRow>(`SELECT * FROM deals WHERE ${column} = $1 AND status = 'proposed'`, [id]);
   return rows[0] ?? null;
 }
 

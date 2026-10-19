@@ -72,9 +72,12 @@ flowchart TB
 | `negotiate` | Take a different option instead; replaces the current offer |
 | `confirm_deal` / `decline_deal` | Each side's yes or no; a no re-pairs both posts |
 | `get_deal_status` | Deals waiting for your yes first, with counterpart and meet-up details |
+| `list_my_posts` / `withdraw_post` | Your items and requests; take one down, releasing any deal it held |
 
-Every tool declares an output schema and annotations. Pairing rules, schemas
-and privacy rules: [docs/TOOL_CONTRACT.md](docs/TOOL_CONTRACT.md).
+Every tool declares an output schema and annotations. Offers nobody answers expire
+and both posts are paired again; per-user posting limits and per-caller rate limits
+protect the market. Pairing rules, schemas, limits and privacy rules:
+[docs/TOOL_CONTRACT.md](docs/TOOL_CONTRACT.md).
 
 ## Repo map
 

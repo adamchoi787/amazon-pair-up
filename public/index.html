@@ -40,7 +40,9 @@ const money = (v, c) => (c === "USD" ? "$" : c + " ") + Number(v).toFixed(Number
 const time = (t) => new Date(t).toLocaleTimeString();
 async function refresh() {
   try {
-    const d = await (await fetch("/api/dashboard")).json();
+    // Deployed dashboards need DASHBOARD_TOKEN: open the page as /#token=<token>.
+    const token = new URLSearchParams(location.hash.slice(1)).get("token");
+    const d = await (await fetch("/api/dashboard", { headers: token ? { Authorization: `Bearer ${token}` } : {} })).json();
     $("deals").innerHTML = d.deals.map((x) => `<li><span class="price">${money(x.price, x.currency)}</span> ${esc(x.title)}
       <span class="tag ${x.status}">${esc(x.status)}</span><div class="muted">buyer ${esc(x.buyer_id)} · seller ${esc(x.seller_id)} · ${esc(x.meetup ?? "")}</div></li>`).join("") || "<li class=muted>No deals yet</li>";
     $("intents").innerHTML = d.intents.map((x) => `<li>${esc(x.need)} <span class="tag">${esc(x.source)}</span> <span class="tag">${esc(x.status)}</span>

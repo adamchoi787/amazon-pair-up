@@ -3,6 +3,7 @@ import { createApp } from "./app.js";
 import { config } from "./config.js";
 import { openDb } from "./db/client.js";
 import { isEmpty, seedMarketplace } from "./db/seed.js";
+import { expireHolds } from "./market/pairing.js";
 
 const db = await openDb(config);
 const ai = createAi(config);
@@ -12,6 +13,23 @@ if (config.seedOnStart && (await isEmpty(deps))) {
 }
 const app = createApp(deps, config);
 
+// Every operation already expires stale holds first; this timer also frees
+// items, and re-pairs them, when nobody is calling.
+let sweeping = false;
+const sweeper = setInterval(async () => {
+  if (sweeping) return;
+  sweeping = true;
+  try {
+    const n = await expireHolds(db, { threshold: config.matchThreshold, holdHours: config.dealHoldHours });
+    if (n) console.log(`[market] expired ${n} unanswered deal${n > 1 ? "s" : ""} and re-paired their posts`);
+  } catch (err) {
+    console.error("[market] hold sweep failed", err);
+  } finally {
+    sweeping = false;
+  }
+}, 60_000);
+sweeper.unref();
+
 app.listen(config.port, config.host, () => {
   console.log(`voice-market MCP server on http://${config.host}:${config.port}/mcp`);
   console.log(`  db: ${config.databaseUrl ? "postgres" : `pglite (${config.pgliteDir})`}  ai: ${ai.mode}`);
@@ -19,6 +37,7 @@ app.listen(config.port, config.host, () => {
 });
 
 const shutdown = async () => {
+  clearInterval(sweeper);
   await db.close();
   process.exit(0);
 };

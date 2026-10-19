@@ -1,8 +1,10 @@
 import express from "express";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { timingSafeEqual } from "node:crypto";
 import { oauthRouter, sendUnauthorized, userForAccessToken } from "./auth/oauth.js";
 import type { Config } from "./config.js";
+import { rateLimit } from "./http/rateLimit.js";
 import { dashboard, type Deps } from "./market/service.js";
 import { createMcpServer } from "./mcp/server.js";
 
@@ -43,6 +45,8 @@ export function createApp(deps: Deps, cfg: Config) {
     }
     next();
   });
+
+  app.use("/mcp", rateLimit(cfg.mcpCallsPerMinute));
 
   app.post("/mcp", async (req, res) => {
     let userId: string | undefined;
@@ -85,11 +89,26 @@ export function createApp(deps: Deps, cfg: Config) {
   app.get("/mcp", notAllowed);
   app.delete("/mcp", notAllowed);
 
-  // Live dashboard for the demo. Private limits are never included.
-  app.get("/api/dashboard", async (_req, res) => {
-    res.json(await dashboard(deps.db));
+  // Live operations dashboard: every post and deal, without private limits.
+  // Open in local development (AUTH_MODE=none); otherwise it needs DASHBOARD_TOKEN
+  // as a Bearer token, and it is off when no token is configured.
+  app.get("/api/dashboard", async (req, res) => {
+    if (cfg.authMode !== "none" || cfg.dashboardToken) {
+      const given = req.header("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1] ?? "";
+      if (!cfg.dashboardToken || !sameSecret(given, cfg.dashboardToken)) {
+        res.status(cfg.dashboardToken ? 401 : 404).json({ error: cfg.dashboardToken ? "unauthorized" : "not found" });
+        return;
+      }
+    }
+    res.set("Cache-Control", "no-store").json(await dashboard(deps.db));
   });
   app.use(express.static("public"));
 
   return app;
+}
+
+function sameSecret(a: string, b: string) {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
 }

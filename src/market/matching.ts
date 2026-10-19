@@ -6,7 +6,7 @@ import type { BuyIntentRow, ListingRow } from "./types.js";
 //   1. hard constraints  — available, not your own, enough quantity, condition >= wanted,
 //                          a deal is possible (seller min <= buyer max; evaluated
 //                          server-side, never exposed), request not expired, and
-//                          the pair was not declined before
+//                          the pair was not declined or left to expire before
 //   2. semantic score    — pgvector cosine similarity of the stored embeddings
 //   3. keyword score     — Postgres full-text rank (OR of the request's words)
 //   4. price fit         — 1 if the ask is within budget, decays above it
@@ -75,7 +75,7 @@ export async function findMatchesForIntent(
         AND ${rank("l.condition")} >= ${rank("$6")}
         AND l.embedding IS NOT NULL
         AND NOT EXISTS (SELECT 1 FROM deals d
-                        WHERE d.listing_id = l.id AND d.buy_intent_id = $1 AND d.status = 'declined')
+                        WHERE d.listing_id = l.id AND d.buy_intent_id = $1 AND d.status IN ('declined', 'expired'))
     )
     SELECT *, ${SCORE} AS score, ${RELEVANCE} AS relevance
     FROM scored
@@ -120,7 +120,7 @@ export async function findIntentsForListing(
         AND i.embedding IS NOT NULL
         AND (i.needed_by IS NULL OR i.needed_by > now())
         AND NOT EXISTS (SELECT 1 FROM deals d
-                        WHERE d.listing_id = l.id AND d.buy_intent_id = i.id AND d.status = 'declined')
+                        WHERE d.listing_id = l.id AND d.buy_intent_id = i.id AND d.status IN ('declined', 'expired'))
     )
     SELECT *, ${SCORE} AS score, ${RELEVANCE} AS relevance
     FROM scored

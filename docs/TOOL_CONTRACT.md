@@ -7,7 +7,8 @@ Identity and auth depend on `AUTH_MODE`:
 
 Every successful result is JSON (as text **and** `structuredContent`) with a `say` field: one sentence Alexa can speak as is.
 Every tool declares an `outputSchema` ([src/mcp/schemas.ts](../src/mcp/schemas.ts)) and annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint: false`).
-Errors the user can fix come back as `isError: true` with `{ "say": "..." }`.
+Errors come back as `isError: true` with `{ "say": "..." }`: a sentence the user can act on, or a short apology when something unexpected failed (details go to the server log).
+Inputs are bounded (text lengths, prices up to 100,000, quantities up to 1,000).
 
 ## How pairing works
 
@@ -29,7 +30,16 @@ the same call. A post with no counterpart waits and is paired when one arrives.
   counterpart. A declined pair is never proposed again.
 - **Switching:** `negotiate` on another listing replaces the request's offer
   (old deal `replaced`); the released item is offered to other waiting buyers.
+- **Holds expire:** an offer nobody answers within `DEAL_HOLD_HOURS` (default 24)
+  expires; both posts go back on the market and are paired again. An expired
+  pair, like a declined one, is not proposed again. Every deal shows `on_hold_until`.
 - **Deadlines:** a request whose `needed_by` has passed stops pairing.
+- **Withdrawing:** a listing taken down or a request cancelled releases the deal it
+  held, and the other person is paired again.
+- **Limits:** `POSTS_PER_HOUR` per user (default 30), `MAX_OPEN_REQUESTS` (default
+  10), and `MCP_CALLS_PER_MINUTE` per caller (default 120, HTTP 429 beyond it).
+  The posting limits also stop a buyer from narrowing a seller's minimum by
+  trying many budgets.
 - **Closing:** a deal is `confirmed` once both sides have said yes (`auto_accept`
   pre-confirms the seller). The listing becomes `sold`, the request `fulfilled`.
 
@@ -76,8 +86,15 @@ All output goes through [views.ts](../src/market/views.ts); the tests fail on an
 `deal_id` (optional)
 → `{ deals, waiting_for_you, say }`. Deals waiting for the user's yes come first.
 
+### `list_my_posts`
+→ `{ listings, requests, say }`. The user's own posts, newest first (up to 20 each), with their status.
+
+### `withdraw_post`
+`post_id`* (a `lst_…` listing or `int_…` request id)
+→ `{ post_id, kind: "listing"|"request", status: "withdrawn"|"cancelled", released_deal_id | null, say }`.
+
 ### Deal object
-`deal_id`, `listing_id`, `title`, `condition`, `your_role` (`buyer|seller`), `counterpart`, `price`, `ask_price`, `saved_vs_ask`, `currency`, `status` (`proposed|confirmed|declined|replaced`), `buyer_confirmed`, `seller_confirmed`, `waiting_for` (`["buyer"|"seller"]`), `waiting_for_you`, `meetup: { place, availability }`, `created_at`, `updated_at`.
+`deal_id`, `listing_id`, `title`, `condition`, `your_role` (`buyer|seller`), `counterpart`, `price`, `ask_price`, `saved_vs_ask`, `currency`, `status` (`proposed|confirmed|declined|replaced|expired|withdrawn`), `buyer_confirmed`, `seller_confirmed`, `waiting_for` (`["buyer"|"seller"]`), `waiting_for_you`, `meetup: { place, availability }`, `on_hold_until` (while proposed), `created_at`, `updated_at`.
 
 ## Conversation flow
 

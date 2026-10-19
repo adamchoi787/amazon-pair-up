@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS deals (
   buy_intent_id   TEXT NOT NULL REFERENCES buy_intents(id),
   price           NUMERIC(10,2) NOT NULL,
   currency        TEXT NOT NULL,
-  status          TEXT NOT NULL DEFAULT 'proposed', -- proposed | confirmed | declined | replaced
+  status          TEXT NOT NULL DEFAULT 'proposed', -- proposed | confirmed | declined | replaced | expired | withdrawn
   buyer_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
   seller_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
   meetup          TEXT,
@@ -67,7 +67,17 @@ CREATE TABLE IF NOT EXISTS deals (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Append-only audit trail; powers the judge dashboard.
+-- Added after the first release; kept as ALTERs so existing databases upgrade in place.
+ALTER TABLE deals ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS deals_open_idx ON deals (status, expires_at);
+CREATE INDEX IF NOT EXISTS deals_listing_idx ON deals (listing_id, status);
+CREATE INDEX IF NOT EXISTS deals_intent_idx ON deals (buy_intent_id, status);
+CREATE INDEX IF NOT EXISTS listings_seller_idx ON listings (seller_id, created_at);
+CREATE INDEX IF NOT EXISTS listings_status_idx ON listings (status);
+CREATE INDEX IF NOT EXISTS intents_buyer_idx ON buy_intents (buyer_id, created_at);
+CREATE INDEX IF NOT EXISTS intents_status_idx ON buy_intents (status);
+
+-- Append-only audit trail; powers the dashboard.
 CREATE TABLE IF NOT EXISTS events (
   id          BIGSERIAL PRIMARY KEY,
   kind        TEXT NOT NULL,

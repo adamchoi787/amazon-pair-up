@@ -47,6 +47,7 @@ export interface DealRow {
   meetup: string | null;
   created_at: string | Date;
   updated_at: string | Date;
+  expires_at: string | Date | null;
 }
 
 export const num = (v: string | number | null | undefined) => (v == null ? null : Number(v));

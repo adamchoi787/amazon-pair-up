@@ -35,6 +35,16 @@ export const config = {
   intentModelId: env("BEDROCK_INTENT_MODEL_ID"),
   embeddingDim: Number(env("EMBEDDING_DIM", "1024")),
   matchThreshold: Number(env("MATCH_THRESHOLD", "0.35")),
+
+  // Marketplace policy
+  dealHoldHours: Number(env("DEAL_HOLD_HOURS", "24")),
+  postsPerHour: Number(env("POSTS_PER_HOUR", "30")),
+  maxOpenRequests: Number(env("MAX_OPEN_REQUESTS", "10")),
+  mcpCallsPerMinute: Number(env("MCP_CALLS_PER_MINUTE", "120")),
+
+  // /api/dashboard shows every post and deal. Open in AUTH_MODE=none (local);
+  // otherwise it needs this token, and stays off when the token is unset.
+  dashboardToken: env("DASHBOARD_TOKEN"),
 };
 
 export type Config = typeof config;

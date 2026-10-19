@@ -57,12 +57,14 @@ export const dealOut = z.object({
   ask_price: money,
   saved_vs_ask: z.number().describe("Asking price minus agreed price"),
   currency: z.string(),
-  status: z.enum(["proposed", "confirmed", "declined", "replaced"]).describe("replaced = the buyer chose another option"),
+  status: z.enum(["proposed", "confirmed", "declined", "replaced", "expired", "withdrawn"])
+    .describe("replaced = the buyer chose another option; expired = nobody answered in time; withdrawn = a post was taken down"),
   buyer_confirmed: z.boolean(),
   seller_confirmed: z.boolean(),
   waiting_for: z.array(party).describe("Who still has to say yes"),
   waiting_for_you: z.boolean(),
   meetup: z.object({ place: z.string().nullable(), availability: z.string().nullable() }),
+  on_hold_until: z.string().nullable().describe("While proposed: when the offer expires if nobody answers"),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -99,6 +101,18 @@ export const outputs = {
   get_deal_status: {
     deals: z.array(dealOut),
     waiting_for_you: z.number().int(),
+    say,
+  },
+  list_my_posts: {
+    listings: z.array(listingOut),
+    requests: z.array(intentOut),
+    say,
+  },
+  withdraw_post: {
+    post_id: z.string(),
+    kind: z.enum(["listing", "request"]),
+    status: z.enum(["withdrawn", "cancelled"]),
+    released_deal_id: z.string().nullable().describe("The proposed deal this post was holding, now released"),
     say,
   },
 };

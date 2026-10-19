@@ -231,3 +231,57 @@ test("only the two parties can see or act on a deal", async () => {
   assert.equal(peek._isError, true);
   for (const c of [seller, buyer, stranger]) await c.close();
 });
+
+test("an unanswered offer expires, frees the item and pairs the next buyer", async () => {
+  const seller = await clientAs("seller_stand");
+  const slow = await clientAs("buyer_slow");
+  const quick = await clientAs("buyer_quick");
+  await slow.call("create_buy_intent", { need: "monitor stand", max_price: 20 });
+  const posted = await seller.call("create_listing", { title: "Monitor stand", category: "stand", ask_price: 15, min_price: 12 });
+  assert.equal(posted.deal.counterpart, "buyer_slow");
+  assert.ok(posted.deal.on_hold_until, "offers say when they expire");
+  const quickReq = await quick.call("create_buy_intent", { need: "monitor stand", max_price: 20 });
+  assert.equal(quickReq.deal, null, "the stand is on hold for the first buyer");
+
+  await db.query(`UPDATE deals SET expires_at = now() - interval '1 minute' WHERE id = $1`, [posted.deal.deal_id]);
+  const inbox = await quick.call("get_deal_status", {});
+  assert.equal(inbox.deals[0].listing_id, posted.listing.listing_id, "freed item goes to the next buyer");
+  assert.equal(inbox.deals[0].waiting_for_you, true);
+
+  const late = await slow.call("confirm_deal", { deal_id: posted.deal.deal_id });
+  assert.equal(late._isError, true);
+  assert.match(late.say, /expired/);
+  const slowStatus = await slow.call("get_deal_status", { deal_id: posted.deal.deal_id });
+  assert.equal(slowStatus.deals[0].status, "expired");
+  for (const c of [seller, slow, quick]) await c.close();
+});
+
+test("users can list and withdraw their own posts; held deals are released", async () => {
+  const seller = await clientAs("seller_chair");
+  const buyer = await clientAs("buyer_chair");
+  const other = await clientAs("seller_chair_2");
+  const { listing } = await seller.call("create_listing", { title: "Folding chair", category: "chair", ask_price: 9, min_price: 7 });
+  const backup = await other.call("create_listing", { title: "Folding chair, blue", category: "chair", ask_price: 10, min_price: 8 });
+  const req = await buyer.call("create_buy_intent", { need: "folding chair", max_price: 10 });
+  assert.equal(req.deal.listing_id, listing.listing_id);
+
+  const mine = await seller.call("list_my_posts", {});
+  assert.deepEqual(mine.listings.map((l: { listing_id: string }) => l.listing_id), [listing.listing_id]);
+  assert.match(mine.say, /one item for sale: Folding chair/);
+
+  const stolen = await buyer.call("withdraw_post", { post_id: listing.listing_id });
+  assert.equal(stolen._isError, true, "only the owner can withdraw");
+
+  const down = await seller.call("withdraw_post", { post_id: listing.listing_id });
+  assert.equal(down.status, "withdrawn");
+  assert.equal(down.released_deal_id, req.deal.deal_id);
+  const inbox = await buyer.call("get_deal_status", {});
+  assert.equal(inbox.deals[0].listing_id, backup.listing.listing_id, "buyer is paired with the other chair");
+  assert.equal(inbox.deals.find((d: { deal_id: string }) => d.deal_id === req.deal.deal_id).status, "withdrawn");
+
+  const cancel = await buyer.call("withdraw_post", { post_id: req.intent.intent_id });
+  assert.equal(cancel.status, "cancelled");
+  const { rows } = await db.query<{ status: string }>(`SELECT status FROM listings WHERE id = $1`, [backup.listing.listing_id]);
+  assert.equal(rows[0].status, "active", "the blue chair is back on the market");
+  for (const c of [seller, buyer, other]) await c.close();
+});
