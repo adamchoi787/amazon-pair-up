@@ -65,7 +65,7 @@ text, images and video alone, so the video and description carry most of the wei
 | Pairing engine, one-turn deals, output schemas | ✅ on `main` | — |
 | OAuth, Origin check, container, add-on assets | ✅ on `main` | — |
 | AWS Builder "documented integrations" | ⚠️ Bedrock code exists, never run live | Run Bedrock; add AgentCore/Strands; write the AWS section |
-| Open Source entry | ❌ | `pairing-core` crate in its own repo (below) |
+| Open Source entry | ⚠️ `pairing-core` built and used by the server (separate local repo, next to this one) | Create the public GitHub repo and push before submitting |
 | Friction log | ❌ empty | Record real entries as they happen |
 | Product feedback per tool | ❌ | Draft from real experience |
 | Video under 3 min | ❌ | Record Thu |
@@ -162,7 +162,7 @@ Code on Bedrock documented as the development workflow if we use it.
 | Day (HKT) | Claude | You |
 |---|---|---|
 | **Mon 19** | ✅ Merge branches; pairing engine; one-turn buyer flow; honest, rich schemas | Confirm Bedrock access and quotas in your AWS account; note any friction |
-| **Tue 20** | `pairing-core` Rust crate + WASM, wired into the server; MCP Apps cards | Start a classmate poll |
+| **Tue 20** | ✅ `pairing-core` Rust crate + WASM, wired into the server; web app and MCP Apps cards | Start a classmate poll |
 | **Wed 21** | Two-device demo page with the Strands agent; deploy to AWS (Lambda or AgentCore Runtime); Agent Skill; CI; seed data 150+ | Deployment credentials; friction entries |
 | **Thu 22** | Fixes; README, description, AWS section and feedback drafts; video script | **Record the video** (feature freeze 12:00) |
 | **Fri 23** | Final checks of the deployed URL | Upload the video; fill in the Devpost form; submit by 21:00 |

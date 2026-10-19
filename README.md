@@ -49,7 +49,7 @@ flowchart TB
   subgraph S["VoiceMarket MCP server"]
     I[Intent extraction<br/>Bedrock LLM] --> P[Pairing engine<br/>runs on every post, both sides]
     P --> H[Hybrid search<br/>pgvector + full-text, relevance gate]
-    P --> N[Negotiation<br/>deterministic, private limits]
+    P --> N[Settlement: pairing-core<br/>Rust → WebAssembly, private limits]
     N --> D[Proposed deal<br/>both sides confirm]
   end
   S --> DB[(Postgres + pgvector<br/>users · listings · requests · deals · events)]
@@ -90,7 +90,7 @@ src/
   mcp/schemas.ts         output schemas for every tool
   market/pairing.ts      pairing engine: pair on every post, atomic holds, release and re-pair
   market/matching.ts     hybrid pgvector + full-text search in both directions
-  market/negotiation.ts  deterministic price settlement
+  market/negotiation.ts  price settlement via pairing-core (Rust → WebAssembly)
   market/service.ts      business operations behind each tool
   market/views.ts        the only place rows become output (privacy redaction)
   ai/                    mock + Bedrock embeddings and intent extraction
@@ -99,6 +99,7 @@ public/index.html        live dashboard
 data/seed-listings.json  seed marketplace
 scripts/                 seed, smoke test, add-on assets
 docs/                    contract, award plan, Alexa+ setup, deploy, demo script, submission, friction log
+vendor/pairing-core/     prebuilt pairing-core module (refresh: node scripts/sync-pairing-core.mjs)
 Dockerfile, deploy/      container image and Lightsail config
 ```
 

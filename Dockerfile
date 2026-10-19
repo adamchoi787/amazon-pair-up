@@ -5,6 +5,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY package.json package-lock.json ./
+# pairing-core (Rust settlement core, prebuilt WebAssembly) is a local file dependency.
+COPY vendor ./vendor
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY src ./src

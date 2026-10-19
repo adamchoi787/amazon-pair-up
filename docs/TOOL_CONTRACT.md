@@ -24,8 +24,11 @@ the same call. A post with no counterpart waits and is paired when one arrives.
   held by at most one proposed deal. Both are claimed in one SQL statement, so
   concurrent posts can never double-book an item.
 - **Price:** the midpoint of the overlap between the seller's minimum and the
-  lower of the asking price and the buyer's budget, rounded to $0.50 below $10
-  and $1 above ([negotiation.ts](../src/market/negotiation.ts)).
+  lower of the asking price and the buyer's budget, rounded to $0.50 when that
+  midpoint is below $10 and to $1 from $10 up, in integer cents. Settlement runs
+  in pairing-core, a Rust library compiled to WebAssembly
+  ([negotiation.ts](../src/market/negotiation.ts), `vendor/pairing-core`); raising
+  any limit never lowers the price.
 - **No:** `decline_deal` releases both posts and re-pairs each with its next best
   counterpart. A declined pair is never proposed again.
 - **Switching:** `negotiate` on another listing replaces the request's offer
