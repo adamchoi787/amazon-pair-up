@@ -60,6 +60,14 @@ test("the dashboard is open locally and needs a token once one is set", async ()
   assert.equal((await fetch(`${guarded}/api/dashboard`, { headers: { Authorization: "Bearer s3cret-token" } })).status, 200);
 });
 
+test("behind a CDN, only requests with the origin secret reach the app", async () => {
+  const base = await serve({ originSecret: "edge-secret-123" });
+  assert.equal((await fetch(`${base}/app/`)).status, 403);
+  assert.equal((await fetch(`${base}/app/`, { headers: { "X-Origin-Verify": "nope" } })).status, 403);
+  assert.equal((await fetch(`${base}/app/`, { headers: { "X-Origin-Verify": "edge-secret-123" } })).status, 200);
+  assert.equal((await fetch(`${base}/health`)).status, 200, "health checks need no secret");
+});
+
 test("posting limits stop floods and budget probing", async () => {
   const deps: Deps = { db, ai: createMockAi(DIM), cfg: { matchThreshold: 0.35, postsPerHour: 3, maxOpenRequests: 2 } };
   await createBuyIntent(deps, { user_id: "prober", need: "rice cooker", max_price: 10 });

@@ -32,6 +32,13 @@ export function createApp(deps: Deps, cfg: Config) {
   // only shrinks the transfer (the MCP Apps view is ~0.5 MB of HTML, ~4× smaller gzipped).
   app.use(compression({ threshold: 1024 }));
 
+  if (cfg.originSecret) {
+    app.use((req, res, next) => {
+      if (req.path === "/health" || sameSecret(req.header("x-origin-verify") ?? "", cfg.originSecret)) return next();
+      res.status(403).json({ error: "forbidden" });
+    });
+  }
+
   app.get("/health", (_req, res) => {
     res.json({ ok: true, ai: deps.ai.mode, auth: cfg.authMode, agent: agentMode(cfg) });
   });

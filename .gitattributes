@@ -2,3 +2,4 @@
 # Built bundles: never convert line endings (they can sit inside string literals).
 public/app/app.js -text
 public/mcp-apps/*.html -text
+*.sh text eol=lf

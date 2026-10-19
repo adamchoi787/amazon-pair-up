@@ -1,22 +1,77 @@
-# Deploying the MCP server
+# Deploying VoiceMarket
 
-Alexa+ needs a **public HTTPS URL** that serves Streamable HTTP at `/mcp`, and it
-expects round trips **under 500 ms**. There are two paths:
-
-| | When | Cost | URL |
+| Path | When | Cost | URL |
 |---|---|---|---|
-| **A. Cloudflare quick tunnel** | Today, for testing in the Alexa+ simulator from a laptop | Free | Changes every run |
-| **B. AWS Lightsail container** | Stable demo URL for the video and judges (AWS Builder) | About $7/month (nano) | Stable `*.amazonlightsail.com` |
+| **AWS (production)** | The live app for judges and users, through Nov 20 | About $18/month | `https://<id>.cloudfront.net/app/` |
+| **Cloudflare quick tunnel** | Sharing a laptop server for a few minutes | Free | Changes every run |
+| **AWS Lightsail container** | Older single-container path | About $7/month | `*.amazonlightsail.com` |
 
-Both paths run the same server. Check any deployment with:
+## AWS (production)
+
+```
+Browser / MCP clients (Alexa+, Claude, the web app)
+        │ HTTPS (HTTP/3, HSTS and security headers)
+   CloudFront ── adds X-Origin-Verify; the app rejects requests without it
+        │
+   EC2 t4g.small, Amazon Linux 2023, Node 22, systemd
+     ├─ VoiceMarket (MCP server, web app, agent) on port 8080
+     ├─ embedded Postgres + pgvector on an encrypted gp3 volume, daily snapshots (7 kept)
+     ├─ IAM role → Amazon Bedrock (Titan Text Embeddings V2, Amazon Nova Lite)
+     └─ Systems Manager for deploys; no SSH, no key pair, IMDSv2 only
+```
+
+Everything is in [deploy/aws/voicemarket.yaml](../deploy/aws/voicemarket.yaml) (CloudFormation).
+No AWS access keys exist on the server: Bedrock, S3 and Parameter Store are reached
+through the instance role. The origin and dashboard secrets live in Parameter Store.
+
+**Once:**
+
+1. Install the AWS CLI (`winget install -e --id Amazon.AWSCLI` on Windows) and run
+   `aws configure --profile voicemarket` with an IAM user or SSO role that can create
+   CloudFormation, EC2, IAM, S3, SSM, CloudFront and DLM resources. Region `us-east-1`.
+2. In the Bedrock console (us-east-1) check that **Titan Text Embeddings V2** and
+   **Amazon Nova Lite** are available.
+3. Check Bedrock from your machine with the exact calls the server makes:
+   ```bash
+   AWS_PROFILE=voicemarket AWS_REGION=us-east-1 npx tsx scripts/check-bedrock.ts
+   ```
+
+**Deploy (first time and every release):**
 
 ```bash
-npm run smoke -- https://<your-host>/mcp
+AWS_PROFILE=voicemarket AWS_REGION=us-east-1 deploy/aws/deploy.sh
+```
+
+The script creates or updates the stack, uploads the committed code (`git HEAD`),
+installs it on the instance through SSM, switches releases atomically, waits for
+`/health`, and prints the app URL. The first run takes about 10 minutes (CloudFront).
+Settings: `AGENT_MODEL` / `INTENT_MODEL` (Bedrock model or inference profile ids,
+default `us.amazon.nova-lite-v1:0`), `INSTANCE_TYPE`, `STACK`.
+
+**Operate:**
+
+- Logs: Systems Manager → Session Manager → the instance → `journalctl -u voicemarket -f`.
+- Dashboard: `https://<id>.cloudfront.net/dashboard/#token=<value of /voicemarket/dashboard-token>`.
+- Rollback: the last three releases stay in `/opt/voicemarket/releases`; point
+  `/opt/voicemarket/current` at one and `systemctl restart voicemarket`.
+- Tear down: `deploy/aws/teardown.sh` (asks for the stack name; lists leftover snapshots).
+
+**Trade-offs:** one instance keeps the database consistent and costs little; an
+instance failure is recovered automatically by the CloudWatch alarm, and the data
+volume is snapshotted daily. CloudFront reaches the instance over HTTP on the AWS
+network; with a custom domain, an ACM certificate on the origin makes that hop TLS
+too. To scale out, move `DATABASE_URL` to RDS PostgreSQL with pgvector and run more
+instances behind the same distribution.
+
+Check any deployment with:
+
+```bash
+curl https://<id>.cloudfront.net/health
 ```
 
 ---
 
-## A. Cloudflare quick tunnel (local machine)
+## Cloudflare quick tunnel (local machine)
 
 ```bash
 brew install cloudflared
@@ -34,7 +89,7 @@ ALLOWED_HOSTS=<random>.trycloudflare.com,127.0.0.1,localhost npm start
 Your MCP URL is `https://<random>.trycloudflare.com/mcp`. Your laptop has to stay
 awake and the tunnel has to stay running.
 
-## B. AWS Lightsail container service
+## AWS Lightsail container service
 
 Prerequisites: AWS CLI v2 configured with `aws configure`, Docker, and the
 `lightsailctl` plugin (`brew install aws/tap/lightsailctl`).

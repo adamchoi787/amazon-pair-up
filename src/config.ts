@@ -47,6 +47,10 @@ export const config = {
   // /api/dashboard shows every post and deal. Open in AUTH_MODE=none (local);
   // otherwise it needs this token, and stays off when the token is unset.
   dashboardToken: env("DASHBOARD_TOKEN"),
+
+  // Behind a CDN: requests must carry X-Origin-Verify with this value (the CDN
+  // adds it), so the origin can't be reached around the CDN. /health is exempt.
+  originSecret: env("ORIGIN_SECRET"),
 };
 
 export type Config = typeof config;
