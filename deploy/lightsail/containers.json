@@ -1,6 +1,6 @@
 {
   "app": {
-    "image": ":voice-market.app.latest",
+    "image": ":amazon-pairup.app.latest",
     "ports": { "3000": "HTTP" },
     "environment": {
       "HOST": "0.0.0.0",

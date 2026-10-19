@@ -33,10 +33,10 @@ const reads = { readOnlyHint: true, idempotentHint: true, openWorldHint: false }
 
 export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
   const server = new McpServer(
-    { name: "voice-market", title: "VoiceMarket", version: "0.3.0" },
+    { name: "amazon-pairup", title: "AmazonPairUp", version: "0.3.0" },
     {
       instructions:
-        "VoiceMarket pairs people who want to buy something with people who want to sell it, by voice. " +
+        "AmazonPairUp pairs people who want to buy something with people who want to sell it, by voice. " +
         "Both sides post: create_listing for sellers, create_buy_intent for buyers. Whenever either side posts, the server " +
         "pairs it with the best counterpart and negotiates a price inside both people's private limits in the same call, " +
         "returning a proposed deal. Read the offer and ask the user; call confirm_deal only after an explicit yes, and " +

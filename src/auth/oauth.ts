@@ -13,7 +13,7 @@ import { ensureUser } from "../market/service.js";
 //   - a refresh token with every access token (rotated on use)
 //   - bearer tokens only in the Authorization header
 // Pre-registered clients, no dynamic registration:
-//   - the VoiceMarket web app: a public client (PKCE, no secret) whose only
+//   - the AmazonPairUp web app: a public client (PKCE, no secret) whose only
 //     redirect URI is this server's own /app/
 //   - Alexa+ account linking: a confidential client, when OAUTH_CLIENT_ID,
 //     OAUTH_CLIENT_SECRET and OAUTH_REDIRECT_URIS are set
@@ -30,8 +30,8 @@ type AuthConfig = Pick<
   "publicBaseUrl" | "oauthClientId" | "oauthClientSecret" | "oauthRedirectUris" | "demoLoginPasscode"
 >;
 
-/** The VoiceMarket web app's client id (public client, PKCE only). */
-export const WEB_CLIENT_ID = "voicemarket-web";
+/** The AmazonPairUp web app's client id (public client, PKCE only). */
+export const WEB_CLIENT_ID = "amazonpairup-web";
 
 interface OAuthClient {
   id: string;
@@ -276,8 +276,8 @@ function signInPage(params: Record<string, string>, purpose: OAuthClient["purpos
     .map((k) => `<input type="hidden" name="${k}" value="${esc(params[k])}">`)
     .join("");
   const [title, intro, button] = purpose === "alexa"
-    ? ["Link VoiceMarket to Alexa", "Sign in so Alexa can buy and sell for you.", "Link account"]
-    : ["Sign in to VoiceMarket", "Sign in to buy and sell with people nearby, by voice.", "Sign in"];
+    ? ["Link AmazonPairUp to Alexa", "Sign in so Alexa can buy and sell for you.", "Link account"]
+    : ["Sign in to AmazonPairUp", "Sign in to buy and sell with people nearby, by voice.", "Sign in"];
   return page(
     title,
     `<p>${intro} Your private price limits are never shown to other people.</p>

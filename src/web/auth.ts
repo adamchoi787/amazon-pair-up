@@ -10,8 +10,8 @@ export type AppConfig =
 interface Tokens { access: string; refresh: string; expiresAt: number }
 interface Session { name: string; tokens?: Tokens; userId?: string }
 
-const KEY = "voicemarket.session";
-const PENDING = "voicemarket.pkce";
+const KEY = "amazonpairup.session";
+const PENDING = "amazonpairup.pkce";
 
 const store = {
   get<T>(k: string, s: Storage = localStorage): T | null {

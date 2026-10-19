@@ -59,8 +59,8 @@ def carousel():
     ImageDraw.Draw(mask).rounded_rectangle([0, 0, 179, 179], radius=40, fill=255)
     img.paste(big, ((w - 180) // 2, 110), mask)
     d.rounded_rectangle([(w - 180) // 2, 110, (w + 180) // 2 - 1, 289], radius=40, outline=(255, 255, 255, 90), width=2)
-    d.text((w / 2, 360), "VoiceMarket", font=font(56), fill=WHITE, anchor="mm")
-    d.text((w / 2, 410), "Buy and sell second-hand, just by asking", font=font(22, False), fill=WHITE, anchor="mm")
+    d.text((w / 2, 360), "AmazonPairUp", font=font(56), fill=WHITE, anchor="mm")
+    d.text((w / 2, 410), "Buy and sell with people nearby, just by asking", font=font(22, False), fill=WHITE, anchor="mm")
     phrases = [
         "“Sell my TI-84 for $20.”",
         "“I need a graphing calculator,",

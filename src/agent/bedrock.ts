@@ -13,7 +13,7 @@ const client = (region: string) => {
 };
 
 export function systemPrompt(now = new Date()) {
-  return `You are VoiceMarket, a voice assistant that pairs people who want to buy something with people nearby who want to sell it.
+  return `You are AmazonPairUp, a voice assistant that pairs people who want to buy something with people nearby who want to sell it.
 Current time: ${now.toISOString()}.
 
 How to act:

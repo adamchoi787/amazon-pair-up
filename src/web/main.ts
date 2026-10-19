@@ -4,7 +4,7 @@ import { renderView, themeNow, type ViewHandle } from "./host.js";
 import { Mcp, resultData } from "./mcp.js";
 import { canListen, canSpeak, listen, speak, stopSpeaking } from "./voice.js";
 
-// VoiceMarket web app. It is an MCP host, like Alexa+: it discovers the
+// AmazonPairUp web app. It is an MCP host, like Alexa+: it discovers the
 // server's tools, runs them over Streamable HTTP with the user's credentials,
 // and renders their MCP Apps views. The reasoning step (Bedrock tool use, or
 // the offline planner) runs on the server at /api/agent.
@@ -342,14 +342,14 @@ function updateVoiceToggle() {
 
 function readPref(k: string, d: boolean) {
   try {
-    const v = localStorage.getItem(`voicemarket.${k}`);
+    const v = localStorage.getItem(`amazonpairup.${k}`);
     return v == null ? d : v === "1";
   } catch {
     return d;
   }
 }
 function writePref(k: string, v: boolean) {
-  try { localStorage.setItem(`voicemarket.${k}`, v ? "1" : "0"); } catch { /* not stored */ }
+  try { localStorage.setItem(`amazonpairup.${k}`, v ? "1" : "0"); } catch { /* not stored */ }
 }
 
 void boot();

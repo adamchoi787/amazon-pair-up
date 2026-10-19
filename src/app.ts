@@ -15,7 +15,7 @@ import { createMcpServer } from "./mcp/server.js";
 //                   request), protocol 2025-11-25. Alexa+ and the web app both call it.
 //   /api/agent      one reasoning step for the web app's assistant (Bedrock tool use,
 //                   or the offline planner); the web app runs the tools itself over /mcp
-//   /app/           the VoiceMarket web app
+//   /app/           the AmazonPairUp web app
 //   /dashboard/     operations view (see DASHBOARD_TOKEN)
 // Stateless suits Lambda / AgentCore / App Runner and needs no sticky sessions.
 

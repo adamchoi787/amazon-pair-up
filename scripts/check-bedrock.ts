@@ -1,6 +1,6 @@
 // Preflight for Bedrock: runs the exact calls the server makes, with your local
 // AWS profile, before anything is deployed.
-//   AWS_PROFILE=voicemarket AWS_REGION=us-east-1 npx tsx scripts/check-bedrock.ts
+//   AWS_PROFILE=amazonpairup AWS_REGION=us-east-1 npx tsx scripts/check-bedrock.ts
 // Optional: BEDROCK_AGENT_MODEL_ID / BEDROCK_INTENT_MODEL_ID (default us.amazon.nova-lite-v1:0).
 import { bedrockTurn } from "../src/agent/bedrock.js";
 import { toolSpecs } from "../src/agent/tools.js";

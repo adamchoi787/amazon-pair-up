@@ -79,7 +79,7 @@ text, images and video alone, so the video and description carry most of the wei
   results carry counterpart, meet-up place and time, savings and who still has to
   say yes; relevance gate (TI-84 0.96 vs non-graphing Casio 0.60); one hold per
   post, claimed atomically; decline re-pairs both sides.
-- Done: MCP Apps view `ui://voicemarket/market.html` on every UI tool (definition and result `_meta`), rendered by the web app; confirm guard on the agent.
+- Done: MCP Apps view `ui://amazonpairup/market.html` on every UI tool (definition and result `_meta`), rendered by the web app; confirm guard on the agent.
 - Done for production use: offers expire after `DEAL_HOLD_HOURS` and both posts
   re-pair (also on a background timer); users list and withdraw their posts;
   per-user posting limits (which also block budget probing) and per-caller HTTP
@@ -104,7 +104,7 @@ text, images and video alone, so the video and description carry most of the wei
 - Two agents negotiating inside private limits, with buy requests that wait
   across sessions until a seller appears. This matches the rules' "agentic
   workflow" and "state across sessions" examples.
-- An Agent Skill (SKILL.md) that teaches any agent host how to use VoiceMarket.
+- An Agent Skill (SKILL.md) that teaches any agent host how to use AmazonPairUp.
 - MCP Apps as above.
 
 ## Redesign: where the pairing idea needs it

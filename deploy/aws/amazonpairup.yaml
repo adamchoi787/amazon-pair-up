@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  VoiceMarket: one Graviton EC2 instance (Node 22, embedded Postgres + pgvector on an
+  AmazonPairUp: one Graviton EC2 instance (Node 22, embedded Postgres + pgvector on an
   encrypted EBS volume with daily snapshots) behind CloudFront for HTTPS. Bedrock access
   through an IAM role, deploys through Systems Manager; no SSH, no access keys.
   Deploy with deploy/aws/deploy.sh.
@@ -60,7 +60,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
       Policies:
-        - PolicyName: voicemarket
+        - PolicyName: amazonpairup
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -81,7 +81,7 @@ Resources:
               - Sid: Secrets
                 Effect: Allow
                 Action: ssm:GetParameter
-                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/voicemarket/*
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/amazonpairup/*
 
   InstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -92,7 +92,7 @@ Resources:
   AppSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: VoiceMarket app port (CloudFront adds a secret header the app checks)
+      GroupDescription: AmazonPairUp app port (CloudFront adds a secret header the app checks)
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: !Ref AppPort
@@ -125,11 +125,11 @@ Resources:
               DeleteOnTermination: true
         TagSpecifications:
           - ResourceType: instance
-            Tags: [{ Key: Name, Value: voicemarket }]
+            Tags: [{ Key: Name, Value: amazonpairup }]
           - ResourceType: volume
             Tags:
-              - { Key: Name, Value: voicemarket-data }
-              - { Key: voicemarket-backup, Value: daily }
+              - { Key: Name, Value: amazonpairup-data }
+              - { Key: amazonpairup-backup, Value: daily }
         UserData:
           Fn::Base64: !Sub |
             #!/bin/bash
@@ -143,20 +143,20 @@ Resources:
             curl -fsSLO "https://nodejs.org/dist/latest-v22.x/$TARBALL"
             grep " $TARBALL\$" SHASUMS256.txt | sha256sum -c -
             tar -xJf "$TARBALL" -C /usr/local --strip-components=1
-            useradd --system --home-dir /var/lib/voicemarket --shell /sbin/nologin voicemarket || true
-            install -d -o voicemarket -g voicemarket -m 750 /var/lib/voicemarket
-            install -d -m 755 /opt/voicemarket/releases
-            cat > /etc/systemd/system/voicemarket.service <<'UNIT'
+            useradd --system --home-dir /var/lib/amazonpairup --shell /sbin/nologin amazonpairup || true
+            install -d -o amazonpairup -g amazonpairup -m 750 /var/lib/amazonpairup
+            install -d -m 755 /opt/amazonpairup/releases
+            cat > /etc/systemd/system/amazonpairup.service <<'UNIT'
             [Unit]
-            Description=VoiceMarket
+            Description=AmazonPairUp
             After=network-online.target
             Wants=network-online.target
 
             [Service]
-            User=voicemarket
-            Group=voicemarket
-            WorkingDirectory=/opt/voicemarket/current
-            EnvironmentFile=/etc/voicemarket.env
+            User=amazonpairup
+            Group=amazonpairup
+            WorkingDirectory=/opt/amazonpairup/current
+            EnvironmentFile=/etc/amazonpairup.env
             ExecStart=/usr/local/bin/node --import tsx src/index.ts
             Restart=always
             RestartSec=3
@@ -165,13 +165,13 @@ Resources:
             ProtectSystem=strict
             ProtectHome=true
             PrivateTmp=true
-            ReadWritePaths=/var/lib/voicemarket
+            ReadWritePaths=/var/lib/amazonpairup
 
             [Install]
             WantedBy=multi-user.target
             UNIT
             systemctl daemon-reload
-            echo "voicemarket base image ready (port ${AppPort})"
+            echo "amazonpairup base image ready (port ${AppPort})"
 
   Instance:
     Type: AWS::EC2::Instance
@@ -190,7 +190,7 @@ Resources:
   RecoveryAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmDescription: Recover the VoiceMarket instance when the host fails its status check
+      AlarmDescription: Recover the AmazonPairUp instance when the host fails its status check
       Namespace: AWS/EC2
       MetricName: StatusCheckFailed_System
       Dimensions: [{ Name: InstanceId, Value: !Ref Instance }]
@@ -217,12 +217,12 @@ Resources:
   DailySnapshots:
     Type: AWS::DLM::LifecyclePolicy
     Properties:
-      Description: VoiceMarket daily EBS snapshots, kept for 7 days
+      Description: AmazonPairUp daily EBS snapshots, kept for 7 days
       State: ENABLED
       ExecutionRoleArn: !GetAtt SnapshotRole.Arn
       PolicyDetails:
         ResourceTypes: [VOLUME]
-        TargetTags: [{ Key: voicemarket-backup, Value: daily }]
+        TargetTags: [{ Key: amazonpairup-backup, Value: daily }]
         Schedules:
           - Name: daily
             CopyTags: true
@@ -235,7 +235,7 @@ Resources:
     Properties:
       DistributionConfig:
         Enabled: true
-        Comment: VoiceMarket
+        Comment: AmazonPairUp
         HttpVersion: http2and3
         IPV6Enabled: true
         PriceClass: PriceClass_All

@@ -1,4 +1,4 @@
-# VoiceMarket — a voice-first C2C marketplace for Alexa+
+# AmazonPairUp — a voice-first C2C marketplace for Alexa+
 
 > People who have something and people who need something just say so.
 > Alexa+ pairs each buyer with a seller, negotiates inside limits each side set
@@ -14,7 +14,7 @@ Trading directly with another person today means photos, forms, haggling in
 chat and arranging a meet-up. That effort decides what gets traded: a spare
 calculator or an unopened pack of tissues rarely finds the neighbour who needs it.
 
-VoiceMarket pairs buyers and sellers directly and does the work in between.
+AmazonPairUp pairs buyers and sellers directly and does the work in between.
 Both sides post what they have or what they need, new or used:
 
 - **Seller:** "Alexa, sell my TI-84 for $20. I'll take anything above $15."
@@ -42,14 +42,14 @@ See [.env.example](.env.example).
 
 ## The web app
 
-`/app/` is a complete VoiceMarket client for phones, laptops and smart displays:
+`/app/` is a complete AmazonPairUp client for phones, laptops and smart displays:
 talk or type, see each offer as a card, and confirm or decline with a tap.
 It works the way Alexa+ works with an MCP server:
 
 - **It is an MCP host.** The browser runs a real MCP client: `tools/list` to
   discover tools, `tools/call` over Streamable HTTP with the signed-in user's
   token, `resources/read` for the view.
-- **It renders MCP Apps.** Every result names the `ui://voicemarket/market.html`
+- **It renders MCP Apps.** Every result names the `ui://amazonpairup/market.html`
   view; the app draws it in a sandboxed iframe through the MCP Apps bridge, and the
   card's Confirm / Decline / "Get this one" buttons call tools through the host.
 - **The reasoning step runs on the server** (`/api/agent`): Amazon Bedrock tool use
@@ -70,7 +70,7 @@ typing works everywhere.
 flowchart TB
   U[Buyer / Seller] -- voice --> A[Alexa+<br/>interface + agent]
   A -- "MCP tools (Streamable HTTP)" --> S
-  subgraph S["VoiceMarket MCP server"]
+  subgraph S["AmazonPairUp MCP server"]
     I[Intent extraction<br/>Bedrock LLM] --> P[Pairing engine<br/>runs on every post, both sides]
     P --> H[Hybrid search<br/>pgvector + full-text, relevance gate]
     P --> N[Settlement: pairing-core<br/>Rust → WebAssembly, private limits]
@@ -112,7 +112,7 @@ src/
   auth/oauth.ts          OAuth 2.1 account linking (PKCE, protected-resource metadata)
   mcp/server.ts          MCP tool definitions
   mcp/schemas.ts         output schemas for every tool
-  mcp/apps.ts            the MCP Apps view (ui://voicemarket/market.html)
+  mcp/apps.ts            the MCP Apps view (ui://amazonpairup/market.html)
   agent/                 the web app's assistant step: Bedrock tool use, offline planner, confirm guard
   market/pairing.ts      pairing engine: pair on every post, atomic holds, release and re-pair
   market/matching.ts     hybrid pgvector + full-text search in both directions

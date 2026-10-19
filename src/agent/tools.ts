@@ -17,7 +17,7 @@ export function toolSpecs(deps: Deps): Promise<ToolSpec[]> {
   cached ??= (async () => {
     const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
     await createMcpServer(deps).connect(serverSide);
-    const client = new Client({ name: "voicemarket-agent", version: "1.0.0" });
+    const client = new Client({ name: "amazonpairup-agent", version: "1.0.0" });
     await client.connect(clientSide);
     const { tools } = await client.listTools();
     await client.close();

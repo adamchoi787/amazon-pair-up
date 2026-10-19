@@ -1,4 +1,4 @@
-# VoiceMarket MCP server. Runs TypeScript directly with tsx (no build step).
+# AmazonPairUp MCP server. Runs TypeScript directly with tsx (no build step).
 FROM node:22-slim
 
 WORKDIR /app

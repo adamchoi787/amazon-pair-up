@@ -16,14 +16,14 @@ secret() { aws ssm get-parameter --region "$REGION" --name "$1" --with-decryptio
 umask 027
 {
   echo "$ENV_B64" | base64 -d
-  echo "ORIGIN_SECRET=$(secret /voicemarket/origin-secret)"
-  echo "DASHBOARD_TOKEN=$(secret /voicemarket/dashboard-token)"
-} > /etc/voicemarket.env.new
-chown root:voicemarket /etc/voicemarket.env.new
-mv -f /etc/voicemarket.env.new /etc/voicemarket.env
+  echo "ORIGIN_SECRET=$(secret /amazonpairup/origin-secret)"
+  echo "DASHBOARD_TOKEN=$(secret /amazonpairup/dashboard-token)"
+} > /etc/amazonpairup.env.new
+chown root:amazonpairup /etc/amazonpairup.env.new
+mv -f /etc/amazonpairup.env.new /etc/amazonpairup.env
 
 # Release
-DIR=/opt/voicemarket/releases/$RELEASE
+DIR=/opt/amazonpairup/releases/$RELEASE
 rm -rf "$DIR" && mkdir -p "$DIR"
 aws s3 cp --region "$REGION" --only-show-errors "s3://$BUCKET/$KEY" /tmp/release.tgz
 tar -xzf /tmp/release.tgz -C "$DIR" && rm -f /tmp/release.tgz
@@ -32,21 +32,21 @@ HOME=/root PATH=/usr/local/bin:$PATH npm ci --omit=dev --no-audit --no-fund --lo
 chmod -R a+rX "$DIR"
 
 # Switch atomically and restart
-ln -sfn "$DIR" /opt/voicemarket/current.next
-mv -Tf /opt/voicemarket/current.next /opt/voicemarket/current
-systemctl enable voicemarket >/dev/null 2>&1
-systemctl restart voicemarket
+ln -sfn "$DIR" /opt/amazonpairup/current.next
+mv -Tf /opt/amazonpairup/current.next /opt/amazonpairup/current
+systemctl enable amazonpairup >/dev/null 2>&1
+systemctl restart amazonpairup
 
-PORT=$(grep -E '^PORT=' /etc/voicemarket.env | cut -d= -f2)
+PORT=$(grep -E '^PORT=' /etc/amazonpairup.env | cut -d= -f2)
 for _ in $(seq 1 90); do
   if curl -fsS "http://127.0.0.1:${PORT:-8080}/health"; then
     echo
     echo "release $RELEASE is live"
-    ls -1dt /opt/voicemarket/releases/* | tail -n +4 | xargs -r rm -rf
+    ls -1dt /opt/amazonpairup/releases/* | tail -n +4 | xargs -r rm -rf
     exit 0
   fi
   sleep 2
 done
 echo "release $RELEASE did not become healthy; recent logs:" >&2
-journalctl -u voicemarket -n 80 --no-pager >&2
+journalctl -u amazonpairup -n 80 --no-pager >&2
 exit 1

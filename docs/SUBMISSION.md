@@ -18,7 +18,7 @@ Deadline **Oct 23, 12:00pm PDT (Oct 24, 3:00am HKT)**. Submit by Fri 21:00 HKT.
 
 ## Description draft
 
-**VoiceMarket** is an agentic C2C marketplace for Alexa+ that pairs buyers and
+**AmazonPairUp** is an agentic C2C marketplace for Alexa+ that pairs buyers and
 sellers directly. Both sides just talk: "Sell my TI-84 for $20, I'll take
 anything above $15" or "I need a graphing calculator today, max $18". Our
 self-hosted MCP server (spec 2025-11-25, Streamable HTTP) turns speech into

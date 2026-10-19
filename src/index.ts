@@ -31,7 +31,7 @@ const sweeper = setInterval(async () => {
 sweeper.unref();
 
 app.listen(config.port, config.host, () => {
-  console.log(`voice-market MCP server on http://${config.host}:${config.port}/mcp`);
+  console.log(`amazon-pairup MCP server on http://${config.host}:${config.port}/mcp`);
   console.log(`  db: ${config.databaseUrl ? "postgres" : `pglite (${config.pgliteDir})`}  ai: ${ai.mode}`);
   console.log(`  dashboard: http://${config.host}:${config.port}/`);
 });

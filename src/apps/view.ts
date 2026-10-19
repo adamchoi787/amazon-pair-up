@@ -1,6 +1,6 @@
 import { App, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 
-// The VoiceMarket MCP Apps view. One view for every tool; the layout follows
+// The AmazonPairUp MCP Apps view. One view for every tool; the layout follows
 // the shape of the tool result:
 //   deal     an offer (or a new post), with Confirm / Decline when it waits for this user
 //   options  other listings for a request, with "Get this one"
@@ -29,7 +29,7 @@ type Data = Record<string, unknown> & {
   intent_id?: string; matches?: Listing[]; alternatives?: Listing[]; listings?: Listing[]; requests?: Intent[]; waiting_buyers?: number;
 };
 
-const app = new App({ name: "VoiceMarket", version: "1.0.0" }, {}, { autoResize: true });
+const app = new App({ name: "AmazonPairUp", version: "1.0.0" }, {}, { autoResize: true });
 const root = document.getElementById("root")!;
 let data: Data | null = null;
 let busy = false;

@@ -112,7 +112,7 @@ test("authorize rejects unregistered redirect URIs and missing PKCE", async () =
   assert.equal((await fetch(`${base}/oauth/authorize?${plain}`)).status, 400);
   const ok = await fetch(`${base}/oauth/authorize?${authorizeParams(challenge)}`);
   assert.equal(ok.status, 200);
-  assert.match(await ok.text(), /Link VoiceMarket to Alexa/);
+  assert.match(await ok.text(), /Link AmazonPairUp to Alexa/);
 });
 
 test("code exchange enforces PKCE, client secret and single use", async () => {
@@ -172,7 +172,7 @@ test("refresh tokens rotate and old ones stop working", async () => {
 test("the web app signs in as a public client: PKCE, its own origin, no secret", async () => {
   const cfg = await (await fetch(`${base}/api/app-config`)).json();
   assert.deepEqual(cfg, {
-    auth: "oauth", clientId: "voicemarket-web", redirectUri: `${PUBLIC}/app/`,
+    auth: "oauth", clientId: "amazonpairup-web", redirectUri: `${PUBLIC}/app/`,
     authorizeUrl: `${PUBLIC}/oauth/authorize`, tokenUrl: `${PUBLIC}/oauth/token`, resource: `${PUBLIC}/mcp`,
   });
 

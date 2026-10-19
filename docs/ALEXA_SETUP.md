@@ -1,4 +1,4 @@
-# Connecting VoiceMarket to Alexa+
+# Connecting AmazonPairUp to Alexa+
 
 Alexa+ talks to our server through an **MCP add-on** that you create and deploy
 with the Alexa AI CLI. The steps below follow the official docs:
@@ -15,7 +15,7 @@ surprise in [FRICTION_LOG.md](FRICTION_LOG.md).
 
 **Status:** the MCP Toolkit, CLI and web simulator are in preview with select
 partners, so hackathon entrants demo through their own MCP client (Devpost FAQ).
-Our demo runs on the VoiceMarket web client; this guide is ready for when add-on
+Our demo runs on the AmazonPairUp web client; this guide is ready for when add-on
 access opens.
 
 ## What the server already provides
@@ -67,7 +67,7 @@ Start with a tunnel; it's the fastest path ([DEPLOY.md](DEPLOY.md) section A). R
 AUTH_MODE=oauth \
 PUBLIC_BASE_URL=https://<host> \
 ALLOWED_HOSTS=<host>,127.0.0.1,localhost \
-OAUTH_CLIENT_ID=voicemarket-alexa \
+OAUTH_CLIENT_ID=amazonpairup-alexa \
 OAUTH_CLIENT_SECRET=<long random string> \
 OAUTH_REDIRECT_URIS=<filled in after step 4> \
 DEMO_LOGIN_PASSCODE=<optional> \
@@ -80,7 +80,7 @@ To generate a client secret, run `openssl rand -base64 32`. Keep it out of git a
 
 ```bash
 mkdir -p ~/alexa-addons && cd ~/alexa-addons
-alexa-ai new mcp --name "VoiceMarket" --locale en-US --mcp-server-url "https://<host>/mcp"
+alexa-ai new mcp --name "AmazonPairUp" --locale en-US --mcp-server-url "https://<host>/mcp"
 ```
 
 Answer **yes** when it asks whether the add-on requires account linking. Keep the
@@ -147,23 +147,23 @@ development stage is enough for the demo.
 
 ## Listing text (respect the character limits)
 
-**Name** (30 max): `VoiceMarket`
+**Name** (30 max): `AmazonPairUp`
 
 **Short description** (123 max):
 > Buy and sell with people nearby, by voice. Alexa pairs buyers with sellers and negotiates inside your private limits.
 
 **Full description** (4000 max):
-> VoiceMarket pairs people who want to buy something with people who want to sell it, and you use it just by talking.
+> AmazonPairUp pairs people who want to buy something with people who want to sell it, and you use it just by talking.
 >
 > Selling: tell Alexa what you have, your asking price and, if you like, the lowest price you'd accept. Your minimum is never shown to buyers.
 >
-> Buying: tell Alexa what you need and the most you'd pay. VoiceMarket finds the best seller by meaning and keywords, checks condition, quantity and price, and negotiates a fair price inside both people's limits in the same moment. If nobody has it yet, your request waits and Alexa pairs you as soon as someone lists one.
+> Buying: tell Alexa what you need and the most you'd pay. AmazonPairUp finds the best seller by meaning and keywords, checks condition, quantity and price, and negotiates a fair price inside both people's limits in the same moment. If nobody has it yet, your request waits and Alexa pairs you as soon as someone lists one.
 >
 > Each side says yes before a deal closes, and both get the meet-up details right away.
 >
 > Because it takes a single sentence, even small everyday items, like a $2 pack of tissues, are worth trading.
 >
-> VoiceMarket is a prototype built for the Amazon Developer Hackathon 2026. Payment happens in person at the meet-up.
+> AmazonPairUp is a prototype built for the Amazon Developer Hackathon 2026. Payment happens in person at the meet-up.
 
 **Example phrases** (3–4, 200 max each):
 1. `Alexa, sell my TI-84 calculator for 20 dollars, I'll take anything above 15`

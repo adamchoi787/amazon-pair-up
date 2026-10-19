@@ -1,5 +1,5 @@
 // Builds the browser code:
-//   src/web/main.ts  → public/app/app.js            (the VoiceMarket web app)
+//   src/web/main.ts  → public/app/app.js            (the AmazonPairUp web app)
 //   src/apps/view.ts → public/mcp-apps/market.html  (single-file MCP Apps view)
 // The output is committed so the server runs without a build step; CI rebuilds
 // and fails if the committed files are out of date.
@@ -26,7 +26,7 @@ mkdirSync("public/mcp-apps", { recursive: true });
 writeFileSync(
   "public/mcp-apps/market.html",
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
-    `<title>VoiceMarket</title><style>${css}</style></head><body><div id="root"></div>` +
+    `<title>AmazonPairUp</title><style>${css}</style></head><body><div id="root"></div>` +
     `<script type="module">${js}</script></body></html>\n`,
 );
 

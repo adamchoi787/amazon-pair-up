@@ -1,5 +1,5 @@
 {
-  "name": "voice-market-mcp",
+  "name": "amazon-pairup",
   "version": "0.1.0",
   "description": "Voice-first C2C marketplace for Alexa+: an MCP server that pairs buyers and sellers from natural-language requests and negotiates the deal.",
   "license": "MIT",

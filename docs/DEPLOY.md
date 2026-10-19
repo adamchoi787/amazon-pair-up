@@ -1,4 +1,4 @@
-# Deploying VoiceMarket
+# Deploying AmazonPairUp
 
 | Path | When | Cost | URL |
 |---|---|---|---|
@@ -14,32 +14,32 @@ Browser / MCP clients (Alexa+, Claude, the web app)
    CloudFront ── adds X-Origin-Verify; the app rejects requests without it
         │
    EC2 t4g.small, Amazon Linux 2023, Node 22, systemd
-     ├─ VoiceMarket (MCP server, web app, agent) on port 8080
+     ├─ AmazonPairUp (MCP server, web app, agent) on port 8080
      ├─ embedded Postgres + pgvector on an encrypted gp3 volume, daily snapshots (7 kept)
      ├─ IAM role → Amazon Bedrock (Titan Text Embeddings V2, Amazon Nova Lite)
      └─ Systems Manager for deploys; no SSH, no key pair, IMDSv2 only
 ```
 
-Everything is in [deploy/aws/voicemarket.yaml](../deploy/aws/voicemarket.yaml) (CloudFormation).
+Everything is in [deploy/aws/amazonpairup.yaml](../deploy/aws/amazonpairup.yaml) (CloudFormation).
 No AWS access keys exist on the server: Bedrock, S3 and Parameter Store are reached
 through the instance role. The origin and dashboard secrets live in Parameter Store.
 
 **Once:**
 
 1. Install the AWS CLI (`winget install -e --id Amazon.AWSCLI` on Windows) and run
-   `aws configure --profile voicemarket` with an IAM user or SSO role that can create
+   `aws configure --profile amazonpairup` with an IAM user or SSO role that can create
    CloudFormation, EC2, IAM, S3, SSM, CloudFront and DLM resources. Region `us-east-1`.
 2. In the Bedrock console (us-east-1) check that **Titan Text Embeddings V2** and
    **Amazon Nova Lite** are available.
 3. Check Bedrock from your machine with the exact calls the server makes:
    ```bash
-   AWS_PROFILE=voicemarket AWS_REGION=us-east-1 npx tsx scripts/check-bedrock.ts
+   AWS_PROFILE=amazonpairup AWS_REGION=us-east-1 npx tsx scripts/check-bedrock.ts
    ```
 
 **Deploy (first time and every release):**
 
 ```bash
-AWS_PROFILE=voicemarket AWS_REGION=us-east-1 deploy/aws/deploy.sh
+AWS_PROFILE=amazonpairup AWS_REGION=us-east-1 deploy/aws/deploy.sh
 ```
 
 The script creates or updates the stack, uploads the committed code (`git HEAD`),
@@ -50,10 +50,10 @@ default `us.amazon.nova-lite-v1:0`), `INSTANCE_TYPE`, `STACK`.
 
 **Operate:**
 
-- Logs: Systems Manager → Session Manager → the instance → `journalctl -u voicemarket -f`.
-- Dashboard: `https://<id>.cloudfront.net/dashboard/#token=<value of /voicemarket/dashboard-token>`.
-- Rollback: the last three releases stay in `/opt/voicemarket/releases`; point
-  `/opt/voicemarket/current` at one and `systemctl restart voicemarket`.
+- Logs: Systems Manager → Session Manager → the instance → `journalctl -u amazonpairup -f`.
+- Dashboard: `https://<id>.cloudfront.net/dashboard/#token=<value of /amazonpairup/dashboard-token>`.
+- Rollback: the last three releases stay in `/opt/amazonpairup/releases`; point
+  `/opt/amazonpairup/current` at one and `systemctl restart amazonpairup`.
 - Tear down: `deploy/aws/teardown.sh` (asks for the stack name; lists leftover snapshots).
 
 **Trade-offs:** one instance keeps the database consistent and costs little; an
@@ -96,23 +96,23 @@ Prerequisites: AWS CLI v2 configured with `aws configure`, Docker, and the
 
 ```bash
 # 1. Create the service once (nano = 0.25 vCPU / 512 MB)
-aws lightsail create-container-service --service-name voice-market --power nano --scale 1
+aws lightsail create-container-service --service-name amazon-pairup --power nano --scale 1
 
 # 2. Build and push the image. Apple Silicon must build for amd64.
-docker build --platform linux/amd64 -t voice-market:latest .
-aws lightsail push-container-image --service-name voice-market --label app --image voice-market:latest
+docker build --platform linux/amd64 -t amazon-pairup:latest .
+aws lightsail push-container-image --service-name amazon-pairup --label app --image amazon-pairup:latest
 
 # 3. Find the public hostname and put it in deploy/lightsail/containers.json → ALLOWED_HOSTS
-aws lightsail get-container-services --service-name voice-market --query 'containerServices[0].url'
+aws lightsail get-container-services --service-name amazon-pairup --query 'containerServices[0].url'
 
 # 4. Deploy
-aws lightsail create-container-service-deployment --service-name voice-market \
+aws lightsail create-container-service-deployment --service-name amazon-pairup \
   --containers file://deploy/lightsail/containers.json \
   --public-endpoint file://deploy/lightsail/public-endpoint.json
 ```
 
 Notes:
-- The image name in `containers.json` (`:voice-market.app.latest`) refers to the image
+- The image name in `containers.json` (`:amazon-pairup.app.latest`) refers to the image
   pushed in step 2. If the push prints a different name, use that one.
 - **Data:** with no `DATABASE_URL`, the container uses embedded PGlite, which is wiped on every
   redeploy and re-seeded by `SEED_ON_START`. That's fine for demos. For data that has to
@@ -122,7 +122,7 @@ Notes:
   access key for a least-privilege IAM user as environment variables. **Never commit it.**
 - Secrets such as `MCP_API_KEY` and AWS keys go in the deployment's environment, not in git.
 - **Dashboard:** set `DASHBOARD_TOKEN` to a long random string to use `/api/dashboard` on a deployed server, and open the page as `https://<host>/dashboard/#token=<token>`. Without it, the dashboard is off whenever `AUTH_MODE=oauth`.
-- **Web app:** served at `https://<host>/app/`. With `AUTH_MODE=oauth` and `PUBLIC_BASE_URL` set it signs people in as the built-in public client `voicemarket-web` (PKCE, redirect `<PUBLIC_BASE_URL>/app/`); the Alexa+ client variables are only needed for Alexa account linking.
+- **Web app:** served at `https://<host>/app/`. With `AUTH_MODE=oauth` and `PUBLIC_BASE_URL` set it signs people in as the built-in public client `amazonpairup-web` (PKCE, redirect `<PUBLIC_BASE_URL>/app/`); the Alexa+ client variables are only needed for Alexa account linking.
 - **Assistant:** `AI_MODE=bedrock` with `BEDROCK_AGENT_MODEL_ID` (or `BEDROCK_INTENT_MODEL_ID`) runs the web app's assistant on Bedrock; otherwise the offline planner answers.
 - **Policy:** `DEAL_HOLD_HOURS`, `POSTS_PER_HOUR`, `MAX_OPEN_REQUESTS` and `MCP_CALLS_PER_MINUTE` have production defaults; see [.env.example](../.env.example).
 

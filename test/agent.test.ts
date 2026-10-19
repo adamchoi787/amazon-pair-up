@@ -159,7 +159,7 @@ test("a spoken sale and purchase, end to end through the web app's loop", async 
   const offer = await buyer.say("I need a graphing calculator today, maximum $18");
   assert.equal(offer, "Found it: TI-84 graphing calculator for $17, $3 below asking. Meet-up: HKUST campus. Should I confirm it?");
   const card = buyer.cards.at(-1)!;
-  assert.equal(card.view, "ui://voicemarket/market.html", "the result names its MCP Apps view");
+  assert.equal(card.view, "ui://amazonpairup/market.html", "the result names its MCP Apps view");
   assert.equal((card.data.deal as { price: number }).price, 17);
 
   assert.equal(await buyer.say("what does it cost?"), "Say things like: sell my TI-84 for 20 dollars, I'll take anything above 15. Or: I need a graphing calculator, maximum 18 dollars.".replace("Say", "You can say"));
@@ -177,15 +177,15 @@ test("a buyer who forgets the budget is asked, and the answer completes the requ
   await buyer.close();
 });
 
-test("tools declare the VoiceMarket MCP Apps view, and the view is served", async () => {
+test("tools declare the AmazonPairUp MCP Apps view, and the view is served", async () => {
   const s = await session("u_viewer");
-  const withUi = s.tools.filter((t) => (t._meta as { ui?: { resourceUri?: string } } | undefined)?.ui?.resourceUri === "ui://voicemarket/market.html");
+  const withUi = s.tools.filter((t) => (t._meta as { ui?: { resourceUri?: string } } | undefined)?.ui?.resourceUri === "ui://amazonpairup/market.html");
   assert.deepEqual(withUi.map((t) => t.name).sort(), ["confirm_deal", "create_buy_intent", "create_listing", "decline_deal", "find_matches", "get_deal_status", "list_my_posts", "negotiate"]);
   const client = new Client({ name: "res", version: "0" });
   await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), { requestInit: { headers: { "X-User-Id": "u_viewer" } } }));
   const { resources } = await client.listResources();
-  assert.deepEqual(resources.map((r) => [r.uri, r.mimeType]), [["ui://voicemarket/market.html", "text/html;profile=mcp-app"]]);
-  const { contents } = await client.readResource({ uri: "ui://voicemarket/market.html" });
+  assert.deepEqual(resources.map((r) => [r.uri, r.mimeType]), [["ui://amazonpairup/market.html", "text/html;profile=mcp-app"]]);
+  const { contents } = await client.readResource({ uri: "ui://amazonpairup/market.html" });
   assert.match((contents[0] as { text: string }).text, /^<!doctype html>.*<script type="module">/s);
   for (const c of [client, s]) await c.close();
 });
