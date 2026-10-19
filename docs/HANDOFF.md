@@ -52,9 +52,9 @@ Files: `src/market/*`, `src/db/*`
 Files: `src/ai/*`, `data/seed-listings.json`, `public/index.html`
 
 - [ ] Get Bedrock access in the AWS account (Titan Text Embeddings V2 + one LLM). Run with `AI_MODE=bedrock` and set `BEDROCK_INTENT_MODEL_ID`. Check that `npm run smoke` still passes.
-- [ ] Grow the seed data to ~150–200 realistic listings: campus life, electronics, textbooks, plenty of $1–$5 items for the long-tail story. Add distractors near the demo items.
+- [ ] Grow the seed data to ~150–200 realistic listings, new and used, from several sellers: campus life, electronics, textbooks, plenty of $1–$5 items for the long-tail story. Add distractors near the demo items.
 - [ ] Dashboard polish for the video: highlight the newest deal, show "saved $3 vs asking", and show the 🔒 private limits clearly.
-- [ ] **Bee go/no-go by Wed:** does anyone have a Bee device or the Bee Apple Watch app? If yes: read real Bee data with the Bee CLI or MCP, then call `create_buy_intent` with `source: "bee_context"` and `raw_request` set to the context. If no: Bee goes on a roadmap slide only. **Never fake Bee data.**
+- [ ] **Bee go/no-go by Wed:** does anyone have a Bee device or the Bee Apple Watch app? If yes: read real Bee data with the Bee CLI or MCP, then call `create_buy_intent` with `source: "bee_context"` and `raw_request` set to the context. If no: Bee goes on a roadmap slide.
 - [ ] Gather the friction logs and product feedback into the submission (see [SUBMISSION.md](SUBMISSION.md)).
 
 ---

@@ -24,7 +24,7 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
     { name: "voice-market", version: "0.1.0" },
     {
       instructions:
-        "Second-hand marketplace for voice. Sellers state an asking price and an optional private minimum; " +
+        "Voice-first person-to-person marketplace that pairs buyers with sellers. Sellers state an asking price and an optional private minimum; " +
         "buyers state what they need and a private maximum. You may negotiate only within those limits and " +
         "MUST ask the buyer to confirm before calling confirm_deal. Never ask the server for, or reveal, the other party's limit. " +
         "Each result has a 'say' field: a short sentence suitable to speak back.",
@@ -87,7 +87,7 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
     "find_matches",
     {
       title: "Find matching items",
-      description: "Search listings for a buy intent using semantic + keyword search and hard constraints. Returns the best options.",
+      description: "Pair a buy intent with sellers' listings using semantic + keyword search and hard constraints. Returns the best options.",
       inputSchema: {
         user_id: userIdArg,
         intent_id: z.string(),

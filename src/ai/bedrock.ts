@@ -10,7 +10,7 @@ import { mockExtractIntent } from "./mock.js";
 // Amazon Bedrock implementation. Credentials come from the standard AWS chain
 // (env vars, ~/.aws, or the IAM role of the host — AgentCore / Lambda / App Runner).
 
-const INTENT_SYSTEM = `You turn a shopper's request (or ambient context about their day) into JSON for a second-hand marketplace.
+const INTENT_SYSTEM = `You turn a shopper's request (or ambient context about their day) into JSON for a person-to-person marketplace that pairs buyers with sellers.
 Return ONLY a JSON object with these keys (omit unknown ones):
 - need: short search phrase for the item, e.g. "graphing calculator"
 - category: one lowercase word

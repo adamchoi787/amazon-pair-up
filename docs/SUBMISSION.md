@@ -18,19 +18,21 @@ Deadline **Oct 23, 12:00pm PDT (Oct 24, 3:00am HKT)**. Submit by Fri 21:00 HKT.
 
 ## Description draft
 
-**VoiceMarket** is an agentic second-hand marketplace for Alexa+. Buyers and
-sellers just talk: "Sell my TI-84 for $20, I'll take anything above $15" or
-"I need a graphing calculator today, max $18". Our self-hosted MCP server
-(spec 2025-11-25, Streamable HTTP) turns speech into structured listings and
-buy intents with Amazon Bedrock. It finds matches with hybrid search: pgvector
-semantic similarity, Postgres full-text search, and hard constraints on
-condition, quantity and price feasibility. It then negotiates a price
-inside limits each side set privately. Alexa+ presents the deal and the user
-confirms with one word. Private limits never leave the server.
+**VoiceMarket** is an agentic C2C marketplace for Alexa+ that pairs buyers and
+sellers directly. Both sides just talk: "Sell my TI-84 for $20, I'll take
+anything above $15" or "I need a graphing calculator today, max $18". Our
+self-hosted MCP server (spec 2025-11-25, Streamable HTTP) turns speech into
+structured listings and buy intents with Amazon Bedrock. It pairs each buyer
+with the best-fitting seller using hybrid search: pgvector semantic similarity,
+Postgres full-text search, and hard constraints on condition, quantity and
+price feasibility. It then negotiates a price inside limits each side set
+privately. Alexa+ presents the deal and each person confirms with one word.
+Private limits never leave the server.
 
-Because listing, searching and negotiating take a single sentence, very small
-items like a $2 pack of tissues finally make sense to trade.
+Because posting, pairing and negotiating take a single sentence, anything
+people have and others need becomes worth trading, from used textbooks to a $2
+pack of tissues.
 
-*(Optional)* With Bee connected, real-world context such as "exam tomorrow,
+With Bee connected, real-world context such as "exam tomorrow,
 calculator broke" becomes a proactive buy intent, so Alexa can suggest a deal
 before the user asks.

@@ -1,27 +1,29 @@
-# VoiceMarket — an agentic marketplace for Alexa+
+# VoiceMarket — a voice-first C2C marketplace for Alexa+
 
-> Buyers and sellers describe what they want out loud. Alexa+ finds the match,
-> negotiates inside limits each side set privately, and asks for a final "yes".
+> People who have something and people who need something just say so.
+> Alexa+ pairs each buyer with a seller, negotiates inside limits each side set
+> privately, and asks both for a final "yes".
 
 **Track:** Alexa+ (self-hosted MCP server, spec 2025-11-25, Streamable HTTP)
 **Mini challenge:** AWS Builder (Amazon Bedrock embeddings + intent extraction, AWS hosting)
-**Optional:** Bee "Proactive Context Mode" (only with live Bee data)
+**Bee:** "Proactive Context Mode" turns real-world context into buy intents
 
 ## The idea in one minute
 
-Selling a used calculator today means photos, forms, haggling in chat and
-arranging a meet-up. Most people don't bother — and nobody would ever list a
-$2 pack of tissues.
+Trading directly with another person today means photos, forms, haggling in
+chat and arranging a meet-up. That effort decides what gets traded: a spare
+calculator or an unopened pack of tissues rarely finds the neighbour who needs it.
 
-VoiceMarket removes all of that:
+VoiceMarket pairs buyers and sellers directly and does the work in between.
+Both sides post what they have or what they need, new or used:
 
 - **Seller:** "Alexa, sell my TI-84 for $20. I'll take anything above $15."
 - **Buyer:** "Alexa, I need a graphing calculator today, max $18."
 - **Alexa:** "I found a TI-84 on campus and got it down to $17. Confirm?" — "Yes." — Done.
 
-Neither side ever sees the other's limit. Our MCP server does the
-understanding, searching, matching and negotiating; Alexa+ is the voice and the
-agent; the human only says yes or no.
+Neither side ever sees the other's limit. Our MCP server understands both
+requests, pairs the buyer with the best-fitting seller, negotiates and records
+the deal; Alexa+ is the voice and the agent; each person just says yes or no.
 
 ## Run it (2 minutes, no database or AWS needed)
 
@@ -50,16 +52,14 @@ flowchart TB
     N --> D[Deal + confirmation]
   end
   S --> DB[(Postgres + pgvector<br/>users · listings · intents · deals · events)]
-  B[Bee context<br/>optional] -. intent enrichment .-> I
+  B[Bee context] -. intent enrichment .-> I
 ```
-
-Bee sits **beside** the flow, not in front of it. Everything works without it.
 
 | Layer | Role |
 |---|---|
 | Alexa+ | Interface and agent: conversation, confirmation |
-| MCP server (this repo) | Marketplace intelligence: intents, matching, negotiation, deals |
-| Bee | Optional ambient context → proactive buy intents |
+| MCP server (this repo) | Pairing intelligence: listings, buy intents, matching, negotiation, deals |
+| Bee | Ambient context → proactive buy intents |
 
 ## MCP tools
 
@@ -67,7 +67,7 @@ Bee sits **beside** the flow, not in front of it. Everything works without it.
 |---|---|
 | `create_listing` | Sell: item, public ask, **private minimum**, meet-up area |
 | `create_buy_intent` | Buy: need + **private budget**; free text is parsed for missing fields |
-| `find_matches` | Hybrid semantic + keyword search under hard constraints |
+| `find_matches` | Pairs a buy intent with sellers' listings: hybrid semantic + keyword search under hard constraints |
 | `negotiate` | Settles a price inside both limits, creates a proposed deal |
 | `confirm_deal` / `decline_deal` | Human-in-the-loop final decision |
 | `get_deal_status` | Deals and meet-up details |
