@@ -62,7 +62,7 @@ function afterTools(messages: AgentMessage[], results: ToolResultBlock[]): Step 
 // ---------- on the user's words ----------
 
 const DECLINE = /^\s*(no|nope|nah|decline|pass|not (that|this)( one)?|cancel (it|that|the deal))\b/i;
-const WITHDRAW = /\b(take down|remove|withdraw|delete|cancel)\b.*\b(listing|request|post|my|the)\b/i;
+export const WITHDRAW = /\b(take down|remove|withdraw|delete|cancel)\b.*\b(listing|request|post|my|the)\b/i;
 const MY_POSTS = /\b(what am i (selling|looking for)|my (listings|posts|requests|items)|what (have|did) i (list|post)(ed)?)\b/i;
 const STATUS = /\b(news|status|my deals?|any (offers|deals|buyers|sellers|updates)|anyone|anybody|meet-?up|did (anyone|someone|anybody)|who (bought|is buying)|inbox|what'?s new)\b/i;
 const MORE = /\b((more|other) (options|ones|choices)|what else|anything else|show me (more|others|alternatives)|alternatives)\b/i;

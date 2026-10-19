@@ -212,3 +212,20 @@ test("the web app is served at /app/ and the root sends people there", async () 
   assert.equal((await fetch(`${base}/app/app.js`)).status, 200);
   assert.deepEqual(await (await fetch(`${base}/api/app-config`)).json(), { auth: "none" });
 });
+
+test("tool results that carry a spoken sentence become the reply directly", async () => {
+  const { sayFromResults } = await import("../src/agent/index.js");
+  const said: AgentMessage[] = [
+    user("I need a lamp, max $10"),
+    { role: "assistant", content: [{ toolUse: { toolUseId: "a", name: "create_buy_intent", input: {} } }] },
+    { role: "user", content: [{ toolResult: { toolUseId: "a", content: [{ json: { say: "Found it: Desk lamp for $8." } }] } }] },
+  ];
+  assert.equal(sayFromResults(said), "Found it: Desk lamp for $8.");
+  assert.equal(sayFromResults([user("hi")]), null, "nothing to say before any tool ran");
+  const takeDown: AgentMessage[] = [
+    user("take down my lamp listing"),
+    { role: "assistant", content: [{ toolUse: { toolUseId: "b", name: "list_my_posts", input: {} } }] },
+    { role: "user", content: [{ toolResult: { toolUseId: "b", content: [{ json: { say: "You have one item for sale." } }] } }] },
+  ];
+  assert.equal(sayFromResults(takeDown), null, "the model continues to withdraw_post");
+});

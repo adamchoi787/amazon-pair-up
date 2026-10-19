@@ -12,15 +12,17 @@ import { mockExtractIntent } from "./mock.js";
 // (env vars, ~/.aws, or the IAM role of the host — AgentCore / Lambda / App Runner).
 
 const INTENT_SYSTEM = `You turn a shopper's request (or ambient context about their day) into JSON for a person-to-person marketplace that pairs buyers with sellers.
-Return ONLY a JSON object with these keys (omit unknown ones):
-- need: short search phrase for the item, e.g. "graphing calculator"
-- category: one lowercase word
+Return ONLY a JSON object. Include a key only when the request states it; every other key is left out:
+- need: short search phrase for the item, e.g. "graphing calculator" (always include)
+- category: the item's kind as one lowercase word, the most specific common noun, e.g. "calculator", "textbook", "umbrella"
 - max_price: number, the most they will pay
-- min_condition: one of ${CONDITIONS.join(", ")}
-- quantity: integer
-- needed_by: ISO 8601 datetime, resolved against the current time given
-- location: where they want to meet / pick up
-Never invent a budget that was not stated.`;
+- min_condition: one of ${CONDITIONS.join(", ")}, only if they mention condition ("like new", "in good condition", "works")
+- quantity: integer, only if they ask for more than one
+- needed_by: ISO 8601 datetime, only if they mention a time ("today" means 23:59 local time today), resolved against the current time given
+- location: a named place they want to meet or pick up, only if they name one
+Examples:
+"I need a graphing calculator today, maximum $18" → {"need":"graphing calculator","category":"calculator","max_price":18,"needed_by":"<today 23:59>"}
+"looking for 3 packs of tissues on campus, under 5 dollars" → {"need":"tissues","category":"tissue","max_price":5,"quantity":3,"location":"campus"}`;
 
 // Model output is untrusted: keep each field only if it is valid on its own.
 const FIELDS = {

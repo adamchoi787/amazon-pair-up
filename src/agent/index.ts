@@ -1,9 +1,11 @@
 import type { Config } from "../config.js";
 import type { Deps } from "../market/service.js";
 import { bedrockTurn } from "./bedrock.js";
-import { planOffline } from "./offline.js";
+import { planOffline, WITHDRAW } from "./offline.js";
 import { toolSpecs } from "./tools.js";
-import { agentRequest, isExplicitYes, isToolUse, lastUserText, type AgentTurn, type Block } from "./types.js";
+import {
+  agentRequest, isExplicitYes, isToolResult, isToolUse, lastUserText, type AgentMessage, type AgentTurn, type Block,
+} from "./types.js";
 
 // One step of the web app's assistant. The browser is the MCP host: it sends
 // the conversation here, runs any tool calls this returns over /mcp with the
@@ -25,7 +27,11 @@ export async function handleAgentTurn(deps: Deps, cfg: Config, body: unknown): P
 
   const mode = agentMode(cfg);
   let step: { content: Block[]; stop: "tool_use" | "end_turn" };
-  if (mode === "bedrock") {
+  const spoken = mode === "bedrock" ? sayFromResults(messages) : null;
+  if (spoken) {
+    // The tool already phrased the outcome for speech: say it, skip a model round trip.
+    step = { content: [{ text: spoken }], stop: "end_turn" };
+  } else if (mode === "bedrock") {
     try {
       step = await bedrockTurn(cfg, messages, await toolSpecs(deps));
     } catch (err) {
@@ -38,6 +44,28 @@ export async function handleAgentTurn(deps: Deps, cfg: Config, body: unknown): P
   }
   const content = requireExplicitYes(step.content, lastUserText(messages));
   return { message: { role: "assistant", content }, stop: content.some(isToolUse) ? step.stop : "end_turn", mode };
+}
+
+/**
+ * When the conversation ends in tool results that each carry a spoken 'say',
+ * those sentences are the reply. The model still gets the next step when it
+ * has more to do: a listing lookup on the way to taking a post down.
+ */
+export function sayFromResults(messages: AgentMessage[]): string | null {
+  const results = messages[messages.length - 1].content.filter(isToolResult);
+  if (!results.length) return null;
+  const toolOf = (id: string) => {
+    for (const m of messages) for (const b of m.content) if (isToolUse(b) && b.toolUse.toolUseId === id) return b.toolUse.name;
+    return undefined;
+  };
+  if (results.some((r) => toolOf(r.toolResult.toolUseId) === "list_my_posts") && WITHDRAW.test(lastUserText(messages))) return null;
+  const says: string[] = [];
+  for (const r of results) {
+    const json = r.toolResult.content.find((c): c is { json: Record<string, unknown> } => "json" in c)?.json;
+    if (typeof json?.say !== "string" || !json.say) return null;
+    says.push(json.say);
+  }
+  return says.join(" ");
 }
 
 /**
