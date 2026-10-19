@@ -19,7 +19,7 @@ Errors the user can fix come back as `isError: true` with `{ "say": "..." }`.
 
 ### `create_listing`
 `title`*, `ask_price`*, `min_price`, `description`, `category`, `condition` (`new|like_new|good|fair|for_parts`), `quantity`, `auto_accept` (default true), `location`, `availability`
-→ `{ listing, say }`
+→ `{ listing, waiting_buyers, buyer_intents: [intent + score], say }`. The server pairs from the seller's side as well: `waiting_buyers` counts the open buy intents (up to 5) this listing satisfies, using the same constraints and scoring as `find_matches`. Each intent in `buyer_intents` leaves out the buyer's budget. When buyers are waiting, `say` ends with a line such as "Two people are already looking for this."
 
 ### `create_buy_intent`
 `need` and/or `raw_request`*, `max_price` (required if not in `raw_request`), `min_condition`, `quantity`, `needed_by` (ISO), `location`, `source` (`voice|bee_context`)
@@ -43,7 +43,7 @@ Errors the user can fix come back as `isError: true` with `{ "say": "..." }`.
 ## Conversation flow Alexa+ should follow
 
 ```
-seller speaks → create_listing
+seller speaks → create_listing → Alexa: "Listed. Two people are already looking for this."
 buyer speaks  → create_buy_intent → find_matches → (offer best) → negotiate
              → Alexa: "Got it for $17, confirm?" → user "yes" → confirm_deal
 ```

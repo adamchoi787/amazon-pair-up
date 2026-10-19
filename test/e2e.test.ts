@@ -86,6 +86,34 @@ test("no overlap returns a speakable refusal without numbers", async () => {
   await buyer.close();
 });
 
+test("seller-side pairing: buyers who posted first are waiting, budgets stay private", async () => {
+  const early = await clientAs("buyer_early");
+  const late = await clientAs("buyer_late");
+  const cheap = await clientAs("buyer_cheap");
+  const seller = await clientAs("seller_umbrella");
+
+  const a = await early.call("create_buy_intent", { need: "umbrella", max_price: 16.25, location: "HKUST campus" });
+  const b = await late.call("create_buy_intent", { need: "rain umbrella", max_price: 13.75 });
+  await cheap.call("create_buy_intent", { need: "umbrella", max_price: 6.5 }); // below the seller's reserve
+
+  const res = await seller.call("create_listing", {
+    title: "Compact travel umbrella", category: "umbrella", ask_price: 12, min_price: 10, location: "HKUST campus",
+  });
+  assert.equal(res.waiting_buyers, 2, "both buyers within reach of the reserve are waiting");
+  const ids = res.buyer_intents.map((i: { intent_id: string }) => i.intent_id);
+  assert.deepEqual(new Set(ids), new Set([a.intent.intent_id, b.intent.intent_id]));
+  assert.equal(ids[0], a.intent.intent_id, "same-area buyer ranks first");
+  assert.match(res.say, /Two people are already looking for this\./);
+  assert.ok(!res._raw.includes("max_price"), "seller never sees buyer budgets");
+  for (const budget of ["16.25", "13.75", "6.5"]) assert.ok(!res._raw.includes(budget), `budget ${budget} hidden`);
+
+  // The buyer side still pairs as before.
+  const found = await early.call("find_matches", { intent_id: a.intent.intent_id });
+  assert.equal(found.matches[0].listing_id, res.listing.listing_id);
+
+  for (const c of [early, late, cheap, seller]) await c.close();
+});
+
 test("missing budget asks for it instead of guessing", async () => {
   const buyer = await clientAs("buyer3");
   const res = await buyer.call("create_buy_intent", { raw_request: "I need an umbrella" });

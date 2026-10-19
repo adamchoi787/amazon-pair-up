@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Ai, Condition } from "../ai/index.js";
 import type { Config } from "../config.js";
 import { toVector, type Db } from "../db/client.js";
-import { findMatchesForIntent } from "./matching.js";
+import { findIntentsForListing, findMatchesForIntent } from "./matching.js";
 import { negotiate } from "./negotiation.js";
 import { num, type BuyIntentRow, type DealRow, type ListingRow } from "./types.js";
 import { dealView, intentView, listingView } from "./views.js";
@@ -71,15 +71,29 @@ export async function createListing(deps: Deps, input: CreateListingInput) {
       input.availability ?? null, toVector(embedding),
     ],
   );
-  await logEvent(db, "listing_created", input.user_id, id, { title: input.title, ask: input.ask_price });
+  // Pair from the seller's side too: buyers who posted first are waiting for this.
+  const waiting = await findIntentsForListing(db, id, { limit: 5, threshold: deps.cfg.matchThreshold });
+  await logEvent(db, "listing_created", input.user_id, id, {
+    title: input.title, ask: input.ask_price, waiting_buyers: waiting.length,
+  });
   const listing = listingView(rows[0], input.user_id);
   return {
     listing,
+    waiting_buyers: waiting.length,
+    buyer_intents: waiting.map((i) => ({ ...intentView(i, input.user_id), score: +i.score.toFixed(3) })),
     say: `Listed ${input.title} for ${fmt(input.ask_price, listing.currency)}. ` +
       (input.min_price != null
         ? `I'll accept offers down to ${fmt(minPrice, listing.currency)} without asking you, and buyers will never see that number.`
-        : `I'll only accept the asking price.`),
+        : `I'll only accept the asking price.`) +
+      (waiting.length ? ` ${waitingLine(waiting.length)}` : ""),
   };
+}
+
+const COUNT_WORDS = ["Zero", "One", "Two", "Three", "Four", "Five"];
+
+function waitingLine(count: number) {
+  const n = COUNT_WORDS[count] ?? String(count);
+  return count === 1 ? `${n} person is already looking for this.` : `${n} people are already looking for this.`;
 }
 
 // ---------- Buy side ----------
