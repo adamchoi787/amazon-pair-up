@@ -6,7 +6,7 @@ import type { Config } from "./config.js";
 import { dashboard, type Deps } from "./market/service.js";
 import { createMcpServer } from "./mcp/server.js";
 
-// Owner: A (integration). Streamable HTTP, stateless: a fresh McpServer +
+// Streamable HTTP, stateless: a fresh McpServer +
 // transport per request. Stateless suits Lambda / AgentCore / App Runner and
 // needs no sticky sessions. Protocol version negotiated by the SDK (2025-11-25).
 
@@ -85,7 +85,7 @@ export function createApp(deps: Deps, cfg: Config) {
   app.get("/mcp", notAllowed);
   app.delete("/mcp", notAllowed);
 
-  // Judge/demo dashboard (owner: C). Private limits are never included.
+  // Live dashboard for the demo. Private limits are never included.
   app.get("/api/dashboard", async (_req, res) => {
     res.json(await dashboard(deps.db));
   });

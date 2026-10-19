@@ -27,7 +27,7 @@ before(async () => {
     oauthClientId: CLIENT.id, oauthClientSecret: CLIENT.secret, oauthRedirectUris: [REDIRECT],
     demoLoginPasscode: "",
   };
-  const app = createApp({ db, ai: createMockAi(64), cfg: { matchThreshold: 0.2 } }, cfg);
+  const app = createApp({ db, ai: createMockAi(64), cfg: { matchThreshold: 0.35 } }, cfg);
   await new Promise<void>((resolve) => {
     server = app.listen(0, "127.0.0.1", () => resolve());
   });

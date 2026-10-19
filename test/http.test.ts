@@ -17,7 +17,7 @@ let base: string;
 before(async () => {
   db = await openDb({ databaseUrl: "", pgliteDir: "", embeddingDim: DIM }, { inMemory: true });
   const cfg = { ...config, host: "127.0.0.1", allowedOrigins: ["https://simulator.example"], mcpApiKey: "" };
-  const app = createApp({ db, ai: createMockAi(DIM), cfg: { matchThreshold: 0.2 } }, cfg);
+  const app = createApp({ db, ai: createMockAi(DIM), cfg: { matchThreshold: 0.35 } }, cfg);
   await new Promise<void>((resolve) => {
     server = app.listen(0, "127.0.0.1", () => resolve());
   });

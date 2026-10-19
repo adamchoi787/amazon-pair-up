@@ -11,20 +11,22 @@ async function connectAs(userId: string) {
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
   const client = new Client({ name: `smoke-${userId}`, version: "0.0.1" });
   await client.connect(new StreamableHTTPClientTransport(url, { requestInit: { headers } }));
+  await client.listTools(); // lets the SDK validate every result against its outputSchema
   return client;
 }
 
-async function call(client: Client, who: string, name: string, args: Record<string, unknown>) {
+async function call(client: Client, who: string, name: string, args: Record<string, unknown>, hidden: string[] = []) {
   const res = await client.callTool({ name, arguments: args });
-  const body = JSON.parse((res.content as { text: string }[])[0].text);
+  const text = (res.content as { text: string }[])[0].text;
+  const body = JSON.parse(text);
   console.log(`\n${who} → ${name}\n  Alexa: "${body.say}"`);
   if (res.isError) throw new Error(body.say);
+  for (const field of hidden) if (text.includes(field)) throw new Error(`PRIVACY LEAK: ${who} saw ${field}`);
   return body;
 }
 
 const seller = await connectAs("demo_seller");
 const buyer = await connectAs("demo_buyer");
-
 const { tools } = await buyer.listTools();
 console.log(`Connected. Protocol OK. Tools: ${tools.map((t) => t.name).join(", ")}`);
 
@@ -37,22 +39,20 @@ const { listing } = await call(seller, "Seller", "create_listing", {
   ask_price: 20,
   min_price: 15,
   location: "HKUST campus",
+  availability: "weekdays after 5pm",
 });
 
 // "Alexa, I need a graphing calculator today, maximum $18."
-const { intent } = await call(buyer, "Buyer", "create_buy_intent", {
+const { deal, alternatives } = await call(buyer, "Buyer", "create_buy_intent", {
   raw_request: "I need a graphing calculator today, maximum $18",
-});
-const { matches } = await call(buyer, "Buyer", "find_matches", { intent_id: intent.intent_id });
-for (const m of matches) console.log(`   • ${m.title} — ask ${m.ask_price} (score ${m.score})`);
-
-const pick = matches.find((m: { listing_id: string }) => m.listing_id === listing.listing_id) ?? matches[0];
-const { deal } = await call(buyer, "Buyer", "negotiate", { intent_id: intent.intent_id, listing_id: pick.listing_id });
-if ("your_min_price" in pick || JSON.stringify(deal).includes("min_price")) throw new Error("PRIVACY LEAK");
+}, ["min_price"]);
+if (!deal || deal.listing_id !== listing.listing_id) throw new Error("Expected the TI-84 to be paired in one turn");
+for (const m of alternatives) console.log(`   other option: ${m.title}, ask ${m.ask_price} (score ${m.score})`);
 
 // Buyer: "Yes."
-await call(buyer, "Buyer", "confirm_deal", { deal_id: deal.deal_id });
-await call(seller, "Seller", "get_deal_status", {});
+await call(buyer, "Buyer", "confirm_deal", { deal_id: deal.deal_id }, ["min_price"]);
+// Seller: "Did anyone buy my calculator?"
+await call(seller, "Seller", "get_deal_status", {}, ["max_price"]);
 
 await seller.close();
 await buyer.close();

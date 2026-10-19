@@ -4,20 +4,29 @@ import type { Ai, Condition, ExtractedIntent } from "./types.js";
 // Offline stand-in for Bedrock. Good enough to develop and demo the flow;
 // swap AI_MODE=bedrock for real semantic quality.
 
-// Tiny synonym map so the mock "understands" the demo scenarios. Extend freely.
+// Tiny concept map so the mock "understands" the demo scenarios. A word can
+// carry several concepts; the first concept that is a category comes first.
+// Extend freely.
 const SYNONYMS: Record<string, string[]> = {
-  calculator: ["ti-84", "ti84", "graphing", "casio", "scientific", "calc"],
+  calculator: ["ti-84", "ti84", "ti-83", "ti83", "nspire", "graphing", "casio", "scientific", "calc"],
+  graphing: ["ti-84", "ti84", "ti-83", "ti83", "nspire", "graphing", "graph"],
+  scientific: ["casio", "scientific", "fx-991ex"],
   tissue: ["tissues", "napkin", "napkins", "kleenex", "paper"],
   textbook: ["book", "textbook", "textbooks", "edition"],
   charger: ["cable", "usb-c", "adapter", "charging"],
   umbrella: ["umbrellas", "rain"],
   headphones: ["earbuds", "headset", "airpods"],
 };
-const CANON = new Map<string, string>();
+const SUBCONCEPTS = new Set(["graphing", "scientific"]);
+const CANON = new Map<string, string[]>();
 for (const [canon, words] of Object.entries(SYNONYMS)) {
-  CANON.set(canon, canon);
-  for (const w of words) CANON.set(w, canon);
+  for (const w of [canon, ...words]) CANON.set(w, [...(CANON.get(w) ?? []), canon]);
 }
+const categoryOf = (tok: string) => CANON.get(tok)?.find((c) => !SUBCONCEPTS.has(c));
+
+// A word right after a negation ("not graphing", "no charger") describes what
+// the item is not, so it carries no meaning for matching.
+const NEGATIONS = new Set(["not", "no", "non", "without"]);
 
 const tokenize = (text: string) =>
   text.toLowerCase().match(/[a-z0-9][a-z0-9-]*/g) ?? [];
@@ -29,10 +38,11 @@ function bucket(feature: string, dim: number): [number, number] {
 
 export function mockEmbed(text: string, dim: number): number[] {
   const v = new Array<number>(dim).fill(0);
-  for (const tok of tokenize(text)) {
+  const tokens = tokenize(text);
+  for (const [n, tok] of tokens.entries()) {
+    if (NEGATIONS.has(tok) || NEGATIONS.has(tokens[n - 1] ?? "")) continue;
     const features = [`w:${tok}`];
-    const canon = CANON.get(tok);
-    if (canon) features.push(`c:${canon}`, `c:${canon}`); // concepts weigh double
+    for (const canon of CANON.get(tok) ?? []) features.push(`c:${canon}`, `c:${canon}`); // concepts weigh double
     for (let i = 0; i + 3 <= tok.length; i++) features.push(`g:${tok.slice(i, i + 3)}`);
     for (const f of features) {
       const [i, s] = bucket(f, dim);
@@ -78,8 +88,8 @@ export function mockExtractIntent(text: string, now = new Date()): ExtractedInte
   if (loc) out.location = loc[1];
 
   for (const tok of tokenize(t)) {
-    const canon = CANON.get(tok);
-    if (canon) { out.category = canon; break; }
+    const category = categoryOf(tok);
+    if (category) { out.category = category; break; }
   }
 
   // Strip filler so "need" is a clean search phrase.

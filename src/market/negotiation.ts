@@ -1,5 +1,3 @@
-// Owner: B (marketplace engine).
-//
 // Deterministic, explainable negotiation. The LLM never decides a price — it
 // only phrases the outcome. Inputs are both parties' delegated limits; output
 // is a price both have pre-authorised, or "no deal" without leaking either limit.

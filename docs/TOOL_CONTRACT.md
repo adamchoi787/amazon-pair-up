@@ -1,12 +1,37 @@
-# Tool contract (frozen, so change it only after telling the team)
+# Tool contract
 
 Endpoint: `POST /mcp`, Streamable HTTP, stateless, MCP protocol `2025-11-25`.
 Identity and auth depend on `AUTH_MODE`:
 - `oauth` (Alexa+): every call carries the linked account's `Authorization: Bearer <token>`. The user is taken **only** from the token, and `user_id` arguments are ignored. No token or a bad token returns 401 with `WWW-Authenticate: Bearer resource_metadata=...`.
 - `none` (local dev and tests): `X-User-Id` header or a `user_id` argument. `MCP_API_KEY` adds an optional shared Bearer secret.
 
-Every successful result is JSON (as text **and** `structuredContent`) with a `say` field, a short sentence Alexa can speak.
+Every successful result is JSON (as text **and** `structuredContent`) with a `say` field: one sentence Alexa can speak as is.
+Every tool declares an `outputSchema` ([src/mcp/schemas.ts](../src/mcp/schemas.ts)) and annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint: false`).
 Errors the user can fix come back as `isError: true` with `{ "say": "..." }`.
+
+## How pairing works
+
+Listings and buy requests are both standing posts. Whenever either side posts,
+the server pairs it with the best counterpart a deal is possible with,
+negotiates a price inside both private limits, and opens a **proposed** deal in
+the same call. A post with no counterpart waits and is paired when one arrives.
+
+- **Relevance gate:** two posts count as a match only when their relevance
+  (semantic + keyword, 0..1) reaches `MATCH_THRESHOLD`. Price fit and meet-up
+  area then rank the relevant ones. Ties go to the earlier post.
+- **One hold at a time:** a listing (`pending`) and a request (`matched`) are each
+  held by at most one proposed deal. Both are claimed in one SQL statement, so
+  concurrent posts can never double-book an item.
+- **Price:** the midpoint of the overlap between the seller's minimum and the
+  lower of the asking price and the buyer's budget, rounded to $0.50 below $10
+  and $1 above ([negotiation.ts](../src/market/negotiation.ts)).
+- **No:** `decline_deal` releases both posts and re-pairs each with its next best
+  counterpart. A declined pair is never proposed again.
+- **Switching:** `negotiate` on another listing replaces the request's offer
+  (old deal `replaced`); the released item is offered to other waiting buyers.
+- **Deadlines:** a request whose `needed_by` has passed stops pairing.
+- **Closing:** a deal is `confirmed` once both sides have said yes (`auto_accept`
+  pre-confirms the seller). The listing becomes `sold`, the request `fulfilled`.
 
 ## Privacy rules
 
@@ -14,38 +39,58 @@ Errors the user can fix come back as `isError: true` with `{ "say": "..." }`.
 |---|---|
 | listing `ask_price` | everyone |
 | listing `min_price` | seller only, as `your_min_price` |
-| intent `max_price` | buyer only, as `your_max_price` |
+| request `max_price` | buyer only, as `your_max_price` |
+| agreed deal `price` | both parties |
+| counterpart display name, meet-up place and availability | both parties of a deal |
 | negotiation failure | nobody gets numbers ("can't meet your budget") |
+
+All output goes through [views.ts](../src/market/views.ts); the tests fail on any leak.
 
 ## Tools
 
 ### `create_listing`
-`title`*, `ask_price`*, `min_price`, `description`, `category`, `condition` (`new|like_new|good|fair|for_parts`), `quantity`, `auto_accept` (default true), `location`, `availability`
-→ `{ listing, waiting_buyers, buyer_intents: [intent + score], say }`. The server pairs from the seller's side as well: `waiting_buyers` counts the open buy intents (up to 5) this listing satisfies, using the same constraints and scoring as `find_matches`. Each intent in `buyer_intents` leaves out the buyer's budget. When buyers are waiting, `say` ends with a line such as "Two people are already looking for this."
+`title`*, `ask_price`*, `min_price` (default `ask_price`), `description`, `category`, `condition` (`new|like_new|good|fair|for_parts`, default `good`), `quantity`, `auto_accept` (default true), `location`, `availability`
+→ `{ listing, deal | null, waiting_buyers, say }`. `deal` is opened when a buyer was already waiting; `waiting_buyers` counts the requests this item satisfies.
 
 ### `create_buy_intent`
-`need` and/or `raw_request`*, `max_price` (required if not in `raw_request`), `min_condition`, `quantity`, `needed_by` (ISO), `location`, `source` (`voice|bee_context`)
-→ `{ intent, say }`. Structured args win; `raw_request` is parsed to fill the gaps.
+`need` and/or `raw_request`*, `max_price` (required unless stated in `raw_request`), `min_condition`, `quantity`, `needed_by` (ISO 8601, must be in the future), `location`, `source` (`voice|bee_context`)
+→ `{ intent, deal | null, alternatives: [listing + within_budget_at_ask + score] (up to 4), say }`. Structured args win; `raw_request` is parsed to fill the gaps.
 
 ### `find_matches`
 `intent_id`*, `limit` (1–10, default 3)
-→ `{ intent_id, matches: [listing + within_budget_at_ask + score], say }`
+→ `{ intent_id, matches, say }`. The item currently offered to the request is not repeated.
 
 ### `negotiate`
 `intent_id`*, `listing_id`*
-→ `{ deal, saved_vs_ask, say }` or `{ deal: null, say }`. Creates a **proposed** deal. With `auto_accept`, the seller is already confirmed.
+→ `{ deal | null, say }`. Replaces the request's current offer. `deal: null` when no price fits both limits.
 
-### `confirm_deal` / `decline_deal`
-`deal_id`*. Call `confirm_deal` **only after the user explicitly says yes.**
-→ `{ deal, say }`. The deal is `confirmed` once both sides have confirmed; the listing is then marked `sold`.
+### `confirm_deal`
+`deal_id`*. Call **only after the user explicitly says yes.**
+→ `{ deal, say }`.
+
+### `decline_deal`
+`deal_id`*
+→ `{ deal_id, status: "declined", next_deal | null, say }`. `next_deal` is the user's next best offer.
 
 ### `get_deal_status`
-`deal_id` (optional) → `{ deals, say }`
+`deal_id` (optional)
+→ `{ deals, waiting_for_you, say }`. Deals waiting for the user's yes come first.
 
-## Conversation flow Alexa+ should follow
+### Deal object
+`deal_id`, `listing_id`, `title`, `condition`, `your_role` (`buyer|seller`), `counterpart`, `price`, `ask_price`, `saved_vs_ask`, `currency`, `status` (`proposed|confirmed|declined|replaced`), `buyer_confirmed`, `seller_confirmed`, `waiting_for` (`["buyer"|"seller"]`), `waiting_for_you`, `meetup: { place, availability }`, `created_at`, `updated_at`.
+
+## Conversation flow
 
 ```
-seller speaks → create_listing → Alexa: "Listed. Two people are already looking for this."
-buyer speaks  → create_buy_intent → find_matches → (offer best) → negotiate
-             → Alexa: "Got it for $17, confirm?" → user "yes" → confirm_deal
+seller: "Sell my TI-84 for $20, I'll take anything above $15."
+  → create_listing            Alexa: "Listed … I'll pair you with a buyer as soon as one asks."
+buyer:  "I need a graphing calculator today, max $18."
+  → create_buy_intent         Alexa: "Found it: TI-84 Plus graphing calculator for $17, $3 below asking.
+                                      Meet-up: HKUST campus. Should I confirm it?"
+buyer:  "Yes."  → confirm_deal   Alexa: "Done! … Meet-up: HKUST campus, weekdays after 5pm."
+seller: "Did anyone buy my calculator?" → get_deal_status
 ```
+
+When the buyer posts first, the order flips: the request waits, and the
+seller's `create_listing` opens the deal ("A buyer was already looking for one…").
+The buyer hears about it through `get_deal_status`.

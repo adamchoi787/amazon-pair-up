@@ -34,7 +34,7 @@ export const config = {
   embeddingModelId: env("BEDROCK_EMBEDDING_MODEL_ID", "amazon.titan-embed-text-v2:0"),
   intentModelId: env("BEDROCK_INTENT_MODEL_ID"),
   embeddingDim: Number(env("EMBEDDING_DIM", "1024")),
-  matchThreshold: Number(env("MATCH_THRESHOLD", "0.2")),
+  matchThreshold: Number(env("MATCH_THRESHOLD", "0.35")),
 };
 
 export type Config = typeof config;

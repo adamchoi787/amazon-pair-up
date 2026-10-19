@@ -19,7 +19,7 @@ Both sides post what they have or what they need, new or used:
 
 - **Seller:** "Alexa, sell my TI-84 for $20. I'll take anything above $15."
 - **Buyer:** "Alexa, I need a graphing calculator today, max $18."
-- **Alexa:** "I found a TI-84 on campus and got it down to $17. Confirm?" — "Yes." — Done.
+- **Alexa:** "Found it: TI-84 Plus graphing calculator for $17, $3 below asking. Meet-up: HKUST campus. Should I confirm it?" — "Yes." — Done.
 
 Neither side ever sees the other's limit. Our MCP server understands both
 requests, pairs the buyer with the best-fitting seller, negotiates and records
@@ -47,57 +47,61 @@ flowchart TB
   U[Buyer / Seller] -- voice --> A[Alexa+<br/>interface + agent]
   A -- "MCP tools (Streamable HTTP)" --> S
   subgraph S["VoiceMarket MCP server"]
-    I[Intent extraction<br/>Bedrock LLM] --> H[Hybrid search<br/>pgvector + full-text + constraints]
-    H --> N[Negotiation engine<br/>deterministic, private limits]
-    N --> D[Deal + confirmation]
+    I[Intent extraction<br/>Bedrock LLM] --> P[Pairing engine<br/>runs on every post, both sides]
+    P --> H[Hybrid search<br/>pgvector + full-text, relevance gate]
+    P --> N[Negotiation<br/>deterministic, private limits]
+    N --> D[Proposed deal<br/>both sides confirm]
   end
-  S --> DB[(Postgres + pgvector<br/>users · listings · intents · deals · events)]
+  S --> DB[(Postgres + pgvector<br/>users · listings · requests · deals · events)]
   B[Bee context] -. intent enrichment .-> I
 ```
 
 | Layer | Role |
 |---|---|
 | Alexa+ | Interface and agent: conversation, confirmation |
-| MCP server (this repo) | Pairing intelligence: listings, buy intents, matching, negotiation, deals |
-| Bee | Ambient context → proactive buy intents |
+| MCP server (this repo) | Pairing intelligence: posts, matching, negotiation, deals |
+| Bee | Ambient context → proactive buy requests |
 
 ## MCP tools
 
 | Tool | What it does |
 |---|---|
-| `create_listing` | Sell: item, public ask, **private minimum**, meet-up area |
-| `create_buy_intent` | Buy: need + **private budget**; free text is parsed for missing fields |
-| `find_matches` | Pairs a buy intent with sellers' listings: hybrid semantic + keyword search under hard constraints |
-| `negotiate` | Settles a price inside both limits, creates a proposed deal |
-| `confirm_deal` / `decline_deal` | Human-in-the-loop final decision |
-| `get_deal_status` | Deals and meet-up details |
+| `create_listing` | Sell: item, public ask, **private minimum**, meet-up area. Pairs with a waiting buyer in the same call |
+| `create_buy_intent` | Buy: need + **private budget**. Pairs with the best seller and negotiates in the same call; returns alternatives |
+| `find_matches` | More options for a request |
+| `negotiate` | Take a different option instead; replaces the current offer |
+| `confirm_deal` / `decline_deal` | Each side's yes or no; a no re-pairs both posts |
+| `get_deal_status` | Deals waiting for your yes first, with counterpart and meet-up details |
 
-Full schemas and privacy rules: [docs/TOOL_CONTRACT.md](docs/TOOL_CONTRACT.md).
+Every tool declares an output schema and annotations. Pairing rules, schemas
+and privacy rules: [docs/TOOL_CONTRACT.md](docs/TOOL_CONTRACT.md).
 
 ## Repo map
 
 ```
 src/
-  index.ts            entry point
-  app.ts              HTTP: /mcp (Streamable HTTP), /health, /api/dashboard     [A]
-  mcp/server.ts       MCP tool definitions                                       [A]
-  market/service.ts   business operations behind each tool                       [B]
-  market/matching.ts  hybrid pgvector + full-text search                         [B]
-  market/negotiation.ts  deterministic price settlement                          [B]
-  market/views.ts     the only place rows become output (privacy redaction)      [B]
-  ai/                 mock + Bedrock embeddings and intent extraction            [C]
-  db/                 PGlite / Postgres client and schema                        [B]
-public/index.html     judge dashboard                                            [C]
-data/seed-listings.json  seed marketplace                                        [C]
-scripts/seed.ts, scripts/smoke.ts
-docs/                 team handoff, contract, Alexa+ setup, deploy, demo script, submission, friction log
-src/auth/oauth.ts     OAuth 2.1 account linking for Alexa+                       [A]
-Dockerfile, deploy/   container image and Lightsail config                      [A]
+  index.ts               entry point
+  app.ts                 HTTP: /mcp (Streamable HTTP), /health, /api/dashboard, OAuth routes
+  auth/oauth.ts          OAuth 2.1 account linking (PKCE, protected-resource metadata)
+  mcp/server.ts          MCP tool definitions
+  mcp/schemas.ts         output schemas for every tool
+  market/pairing.ts      pairing engine: pair on every post, atomic holds, release and re-pair
+  market/matching.ts     hybrid pgvector + full-text search in both directions
+  market/negotiation.ts  deterministic price settlement
+  market/service.ts      business operations behind each tool
+  market/views.ts        the only place rows become output (privacy redaction)
+  ai/                    mock + Bedrock embeddings and intent extraction
+  db/                    PGlite / Postgres client, schema, seeding
+public/index.html        live dashboard
+data/seed-listings.json  seed marketplace
+scripts/                 seed, smoke test, add-on assets
+docs/                    contract, award plan, Alexa+ setup, deploy, demo script, submission, friction log
+Dockerfile, deploy/      container image and Lightsail config
 ```
 
-## Team
+## Plan
 
-See [docs/HANDOFF.md](docs/HANDOFF.md) for owners, tasks and the day-by-day plan.
+See [docs/AWARD_GAPS.md](docs/AWARD_GAPS.md) for the award analysis and the day-by-day plan.
 
 ## License
 

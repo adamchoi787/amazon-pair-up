@@ -1,4 +1,4 @@
-// Schema is applied idempotently on startup. Owner: B (marketplace engine).
+// Schema is applied idempotently on startup.
 // Private limits (min_price / max_price) live here and must never be returned
 // to the counterparty — see src/market/views.ts.
 
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS deals (
   buy_intent_id   TEXT NOT NULL REFERENCES buy_intents(id),
   price           NUMERIC(10,2) NOT NULL,
   currency        TEXT NOT NULL,
-  status          TEXT NOT NULL DEFAULT 'proposed', -- proposed | confirmed | declined
+  status          TEXT NOT NULL DEFAULT 'proposed', -- proposed | confirmed | declined | replaced
   buyer_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
   seller_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
   meetup          TEXT,

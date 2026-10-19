@@ -1,8 +1,8 @@
 import { num, type BuyIntentRow, type DealRow, type ListingRow } from "./types.js";
 
 // The ONLY place rows become tool output. Private limits are included solely
-// for their owner. Every tool response must go through these functions —
-// test/privacy.test.ts fails if a counterparty limit ever leaks.
+// for their owner. Every tool response goes through these functions, and
+// test/e2e.test.ts fails if a counterparty limit ever leaks.
 
 export function listingView(l: ListingRow, viewerId: string) {
   const isOwner = l.seller_id === viewerId;
@@ -39,18 +39,49 @@ export function intentView(i: BuyIntentRow, viewerId: string) {
   };
 }
 
-export function dealView(d: DealRow & { title?: string; seller_id?: string; buyer_id?: string }, viewerId: string) {
-  const role = viewerId === d.buyer_id ? "buyer" : viewerId === d.seller_id ? "seller" : "observer";
+/** A deal joined with the public facts of both posts (see DEAL_WITH_PARTIES). */
+export interface DealWithParties extends DealRow {
+  title: string;
+  condition: string;
+  ask_price: string | number;
+  availability: string | null;
+  seller_id: string;
+  buyer_id: string;
+  seller_name: string;
+  buyer_name: string;
+}
+
+export type Role = "buyer" | "seller" | "observer";
+
+export function dealView(d: DealWithParties, viewerId: string) {
+  const role: Role = viewerId === d.buyer_id ? "buyer" : viewerId === d.seller_id ? "seller" : "observer";
+  const price = num(d.price)!;
+  const ask = num(d.ask_price)!;
+  const waitingFor =
+    d.status !== "proposed" ? [] : [
+      ...(d.buyer_confirmed ? [] : ["buyer" as const]),
+      ...(d.seller_confirmed ? [] : ["seller" as const]),
+    ];
   return {
     deal_id: d.id,
     listing_id: d.listing_id,
     title: d.title,
+    condition: d.condition,
     your_role: role,
-    price: num(d.price),
+    counterpart: role === "buyer" ? d.seller_name : role === "seller" ? d.buyer_name : null,
+    price,
+    ask_price: ask,
+    saved_vs_ask: +(ask - price).toFixed(2),
     currency: d.currency,
     status: d.status,
     buyer_confirmed: d.buyer_confirmed,
     seller_confirmed: d.seller_confirmed,
-    meetup: d.meetup,
+    waiting_for: waitingFor,
+    waiting_for_you: role !== "observer" && waitingFor.includes(role),
+    meetup: { place: d.meetup, availability: d.availability },
+    created_at: new Date(d.created_at).toISOString(),
+    updated_at: new Date(d.updated_at).toISOString(),
   };
 }
+
+export type DealView = ReturnType<typeof dealView>;

@@ -3,7 +3,7 @@ import { createBedrockAi } from "./bedrock.js";
 import { createMockAi } from "./mock.js";
 import type { Ai } from "./types.js";
 
-// Owner: C (intent + data). Two implementations behind one interface:
+// Two implementations behind one interface:
 // - mock:    offline, deterministic, no AWS account needed (dev + tests)
 // - bedrock: Amazon Bedrock embeddings + LLM (demo + AWS Builder mini challenge)
 

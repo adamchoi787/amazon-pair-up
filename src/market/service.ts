@@ -1,14 +1,15 @@
-import { randomUUID } from "node:crypto";
 import type { Ai, Condition } from "../ai/index.js";
 import type { Config } from "../config.js";
 import { toVector, type Db } from "../db/client.js";
+import { logEvent, shortId } from "./events.js";
 import { findIntentsForListing, findMatchesForIntent } from "./matching.js";
 import { negotiate } from "./negotiation.js";
+import { isExpired, pairIntent, pairListing, propose, release } from "./pairing.js";
 import { num, type BuyIntentRow, type DealRow, type ListingRow } from "./types.js";
-import { dealView, intentView, listingView } from "./views.js";
+import { dealView, intentView, listingView, type DealView, type DealWithParties } from "./views.js";
 
-// Business operations. MCP tools (src/mcp/tools.ts) are thin wrappers around these,
-// so a web simulator or tests can call the same functions directly.
+// Business operations. MCP tools (src/mcp/server.ts) are thin wrappers around
+// these, so the web demo and the tests call the same functions.
 
 export interface Deps {
   db: Db;
@@ -18,13 +19,7 @@ export interface Deps {
 
 export class MarketError extends Error {}
 
-const shortId = (prefix: string) => `${prefix}_${randomUUID().slice(0, 8)}`;
-
-async function logEvent(db: Db, kind: string, actorId: string | null, refId: string | null, detail: object = {}) {
-  await db.query(`INSERT INTO events (kind, actor_id, ref_id, detail) VALUES ($1,$2,$3,$4)`, [
-    kind, actorId, refId, JSON.stringify(detail),
-  ]);
-}
+const ALTERNATIVES = 4;
 
 export async function ensureUser(db: Db, userId: string, displayName?: string) {
   await db.query(
@@ -50,8 +45,9 @@ export interface CreateListingInput {
   availability?: string;
 }
 
+/** Post an item. If a buyer is already waiting for it, pair them and open a deal. */
 export async function createListing(deps: Deps, input: CreateListingInput) {
-  const { db, ai } = deps;
+  const { db, ai, cfg } = deps;
   const minPrice = input.min_price ?? input.ask_price;
   if (minPrice > input.ask_price) throw new MarketError("Minimum price can't be above the asking price.");
   await ensureUser(db, input.user_id);
@@ -71,29 +67,28 @@ export async function createListing(deps: Deps, input: CreateListingInput) {
       input.availability ?? null, toVector(embedding),
     ],
   );
-  // Pair from the seller's side too: buyers who posted first are waiting for this.
-  const waiting = await findIntentsForListing(db, id, { limit: 5, threshold: deps.cfg.matchThreshold });
-  await logEvent(db, "listing_created", input.user_id, id, {
-    title: input.title, ask: input.ask_price, waiting_buyers: waiting.length,
-  });
-  const listing = listingView(rows[0], input.user_id);
-  return {
-    listing,
-    waiting_buyers: waiting.length,
-    buyer_intents: waiting.map((i) => ({ ...intentView(i, input.user_id), score: +i.score.toFixed(3) })),
-    say: `Listed ${input.title} for ${fmt(input.ask_price, listing.currency)}. ` +
-      (input.min_price != null
-        ? `I'll accept offers down to ${fmt(minPrice, listing.currency)} without asking you, and buyers will never see that number.`
-        : `I'll only accept the asking price.`) +
-      (waiting.length ? ` ${waitingLine(waiting.length)}` : ""),
-  };
-}
+  const waiting = (await findIntentsForListing(db, id, { limit: 5, threshold: cfg.matchThreshold })).length;
+  await logEvent(db, "listing_created", input.user_id, id, { title: input.title, ask: input.ask_price, waiting_buyers: waiting });
 
-const COUNT_WORDS = ["Zero", "One", "Two", "Three", "Four", "Five"];
+  const pairing = await pairListing(db, rows[0], cfg.matchThreshold, "seller");
+  const listing = listingView(await getListing(db, id), input.user_id);
+  const deal = pairing ? dealView(await getDealWithParties(db, pairing.deal.id), input.user_id) : null;
+  const ask = fmt(input.ask_price, listing.currency);
 
-function waitingLine(count: number) {
-  const n = COUNT_WORDS[count] ?? String(count);
-  return count === 1 ? `${n} person is already looking for this.` : `${n} people are already looking for this.`;
+  let say: string;
+  if (deal) {
+    const others = waiting - 1;
+    say = `Listed ${input.title} for ${ask}. A buyer was already looking for one: I agreed ${fmt(deal.price, deal.currency)}, inside your limit, ` +
+      (deal.seller_confirmed ? `and asked them to confirm.` : `so it's your call. Should I accept?`) +
+      (others > 0 ? ` ${countWord(others)} more ${others === 1 ? "person is" : "people are"} looking too.` : "");
+  } else {
+    say = `Listed ${input.title} for ${ask}. ` +
+      (input.min_price != null && minPrice < input.ask_price
+        ? `I'll accept offers down to ${fmt(minPrice, listing.currency)} without asking you, and buyers will never see that number. `
+        : `I'll hold out for the asking price. `) +
+      `I'll pair you with a buyer as soon as one asks.`;
+  }
+  return { listing, deal, waiting_buyers: waiting, say };
 }
 
 // ---------- Buy side ----------
@@ -111,8 +106,9 @@ export interface CreateBuyIntentInput {
   source?: "voice" | "bee_context";
 }
 
+/** Post a buy request. Pair it with the best seller right away, or keep it waiting for one. */
 export async function createBuyIntent(deps: Deps, input: CreateBuyIntentInput) {
-  const { db, ai } = deps;
+  const { db, ai, cfg } = deps;
   if (!input.need && !input.raw_request) throw new MarketError("Tell me what you need.");
 
   // Structured fields from the voice agent win; extraction fills the gaps.
@@ -120,6 +116,7 @@ export async function createBuyIntent(deps: Deps, input: CreateBuyIntentInput) {
   const need = input.need ?? extracted?.need ?? input.raw_request!;
   const maxPrice = input.max_price ?? extracted?.max_price;
   if (maxPrice == null) throw new MarketError("What's the most you'd pay? I keep that private from sellers.");
+  const neededBy = parseDeadline(input.needed_by ?? extracted?.needed_by);
 
   await ensureUser(db, input.user_id);
   const id = shortId("int");
@@ -133,132 +130,160 @@ export async function createBuyIntent(deps: Deps, input: CreateBuyIntentInput) {
       id, input.user_id, need, input.raw_request ?? null, input.source ?? "voice", category,
       input.min_condition ?? extracted?.min_condition ?? "for_parts",
       input.quantity ?? extracted?.quantity ?? 1, input.currency ?? "USD", maxPrice,
-      input.needed_by ?? extracted?.needed_by ?? null, input.location ?? extracted?.location ?? null,
-      toVector(embedding),
+      neededBy, input.location ?? extracted?.location ?? null, toVector(embedding),
     ],
   );
   await logEvent(db, "intent_created", input.user_id, id, { need, source: input.source ?? "voice" });
+
+  const pairing = await pairIntent(db, rows[0], cfg.matchThreshold, "buyer");
+  const intentRow = await getIntent(db, id);
+  const alternatives = await findMatchesForIntent(db, intentRow, { limit: ALTERNATIVES, threshold: cfg.matchThreshold });
+  const deal = pairing ? dealView(await getDealWithParties(db, pairing.deal.id), input.user_id) : null;
+
   return {
-    intent: intentView(rows[0], input.user_id),
-    say: `Got it — looking for ${need}, up to ${fmt(maxPrice, rows[0].currency)}. Sellers won't see your budget.`,
+    intent: intentView(intentRow, input.user_id),
+    deal,
+    alternatives: alternatives.map((m) => matchView(m, intentRow, input.user_id)),
+    say: deal
+      ? buyerOfferLine(deal, "found")
+      : `Got it: ${need}, up to ${fmt(maxPrice, intentRow.currency)}. Nothing fits yet, so I'll keep looking and pair you as soon as a seller lists one. Sellers won't see your budget.`,
   };
 }
 
+/** Browse other listings for a request (the paired one is held, so it isn't repeated). */
 export async function findMatches(deps: Deps, userId: string, intentId: string, limit = 3) {
-  const { db, ai, cfg } = deps;
-  const intent = await getIntent(db, intentId);
-  if (intent.buyer_id !== userId) throw new MarketError("That request belongs to someone else.");
-
-  const embedding = await ai.embed([intent.need, intent.category].filter(Boolean).join(". "));
-  const matches = await findMatchesForIntent(db, intent, embedding, { limit, threshold: cfg.matchThreshold });
+  const { db, cfg } = deps;
+  const intent = await getOwnIntent(db, userId, intentId);
+  const matches = await findMatchesForIntent(db, intent, { limit, threshold: cfg.matchThreshold });
   await logEvent(db, "matches_found", userId, intentId, { count: matches.length, top: matches[0]?.id });
-
+  const best = matches[0];
   return {
     intent_id: intentId,
-    matches: matches.map((m) => ({
-      ...listingView(m, userId),
-      within_budget_at_ask: num(m.ask_price)! <= num(intent.max_price)!,
-      score: +m.score.toFixed(3),
-    })),
-    say: matches.length
-      ? `I found ${matches.length} option${matches.length > 1 ? "s" : ""}. The best is ${matches[0].title}, asking ${fmt(num(matches[0].ask_price)!, matches[0].currency)}. Want me to negotiate?`
-      : `Nothing matches yet. I'll keep your request open.`,
+    matches: matches.map((m) => matchView(m, intent, userId)),
+    say: best
+      ? `I found ${matches.length} option${matches.length > 1 ? "s" : ""}. The best is ${best.title}, asking ${fmt(num(best.ask_price)!, best.currency)}. Want me to negotiate it?`
+      : `No other options right now. I'll keep your request open.`,
   };
 }
 
 // ---------- Deal-making ----------
 
+/** The buyer picks a specific listing: negotiate it, replacing any deal the request already holds. */
 export async function negotiateDeal(deps: Deps, userId: string, intentId: string, listingId: string) {
-  const { db } = deps;
-  const intent = await getIntent(db, intentId);
-  if (intent.buyer_id !== userId) throw new MarketError("That request belongs to someone else.");
+  const { db, cfg } = deps;
+  const intent = await getOwnIntent(db, userId, intentId);
+  if (intent.status === "fulfilled" || intent.status === "cancelled") throw new MarketError("That request is already closed.");
+  if (isExpired(intent)) throw new MarketError("That request's deadline has passed. Want to post a new one?");
   const listing = await getListing(db, listingId);
-  if (listing.status !== "active") throw new MarketError("That item is no longer available.");
 
-  const result = negotiate({
-    askPrice: num(listing.ask_price)!,
-    sellerMin: num(listing.min_price)!,
-    buyerMax: num(intent.max_price)!,
-  });
+  const held = await proposedDealFor(db, intentId);
+  if (held?.listing_id === listingId) {
+    const deal = dealView(await getDealWithParties(db, held.id), userId);
+    return { deal, say: buyerOfferLine(deal, "already") };
+  }
+  if (listing.status !== "active") {
+    throw new MarketError(listing.status === "pending" ? "That one is on hold for another buyer right now." : "That item is no longer available.");
+  }
 
-  if (!result.ok) {
+  const preview = negotiate({ askPrice: num(listing.ask_price)!, sellerMin: num(listing.min_price)!, buyerMax: num(intent.max_price)! });
+  if (!preview.ok) {
     await logEvent(db, "negotiation_failed", userId, listingId, { intent_id: intentId });
     // Deliberately vague: never reveal how far apart the limits are.
     return { deal: null, say: `The seller can't meet your budget on this one. Want to try another option or raise your limit?` };
   }
 
-  const id = shortId("deal");
-  const { rows } = await db.query<DealRow>(
-    `INSERT INTO deals (id, listing_id, buy_intent_id, price, currency, seller_confirmed, meetup)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-    [id, listingId, intentId, result.price, listing.currency, listing.auto_accept, listing.location],
-  );
-  await logEvent(db, "deal_proposed", userId, id, {
-    listing_id: listingId, price: result.price, rule: result.rule, saved_vs_ask: result.savedVsAsk,
-  });
-  return {
-    deal: dealView({ ...rows[0], title: listing.title, seller_id: listing.seller_id, buyer_id: intent.buyer_id }, userId),
-    saved_vs_ask: result.savedVsAsk,
-    say: `I negotiated ${listing.title} down to ${fmt(result.price, listing.currency)}` +
-      (result.savedVsAsk > 0 ? ` — ${fmt(result.savedVsAsk, listing.currency)} below asking` : "") +
-      `. Should I confirm it?`,
-  };
+  // Open the new deal before offering the released item to anyone else, so it
+  // can't be handed straight back to this same request.
+  if (held) {
+    await release(db, held, "replaced");
+    await logEvent(db, "deal_switched", userId, held.id, { to_listing: listingId });
+  }
+  const created = await propose(db, listing, await getIntent(db, intentId), "browse");
+  if (held) await pairListing(db, await getListing(db, held.listing_id), cfg.matchThreshold, "repair");
+  if (!created) {
+    await pairIntent(db, await getIntent(db, intentId), cfg.matchThreshold, "repair");
+    throw new MarketError("Someone just took that one. Ask me for your deals to see what I found instead.");
+  }
+  const deal = dealView(await getDealWithParties(db, created.id), userId);
+  return { deal, say: buyerOfferLine(deal, "negotiated") };
 }
 
 export async function confirmDeal(deps: Deps, userId: string, dealId: string) {
   const { db } = deps;
   const d = await getDealWithParties(db, dealId);
-  if (d.status !== "proposed") throw new MarketError(`This deal is already ${d.status}.`);
   const isBuyer = userId === d.buyer_id;
   const isSeller = userId === d.seller_id;
   if (!isBuyer && !isSeller) throw new MarketError("You're not part of this deal.");
-  if ((await getListing(db, d.listing_id)).status !== "active") {
-    throw new MarketError("Sorry, that item was just sold to someone else.");
-  }
+  if (d.status !== "proposed") throw new MarketError(`This deal is already ${d.status}.`);
 
   const buyer = d.buyer_confirmed || isBuyer;
   const seller = d.seller_confirmed || isSeller;
   const done = buyer && seller;
-  await db.query(
-    `UPDATE deals SET buyer_confirmed=$2, seller_confirmed=$3, status=$4, updated_at=now() WHERE id=$1`,
+  const { rows } = await db.query(
+    `UPDATE deals SET buyer_confirmed=$2, seller_confirmed=$3, status=$4, updated_at=now()
+     WHERE id=$1 AND status='proposed' RETURNING id`,
     [dealId, buyer, seller, done ? "confirmed" : "proposed"],
   );
+  if (!rows[0]) throw new MarketError("That deal just changed. Ask me for your deal status.");
   if (done) {
     await db.query(`UPDATE listings SET status='sold' WHERE id=$1`, [d.listing_id]);
     await db.query(`UPDATE buy_intents SET status='fulfilled' WHERE id=$1`, [d.buy_intent_id]);
   }
   await logEvent(db, done ? "deal_confirmed" : "deal_half_confirmed", userId, dealId, { by: isBuyer ? "buyer" : "seller" });
-  const fresh = await getDealWithParties(db, dealId);
+  const deal = dealView(await getDealWithParties(db, dealId), userId);
   return {
-    deal: dealView(fresh, userId),
+    deal,
     say: done
-      ? `Done! ${fresh.title} for ${fmt(num(fresh.price)!, fresh.currency)}.` + (fresh.meetup ? ` Meet-up: ${fresh.meetup}.` : "")
-      : `Confirmed on your side. Waiting for the ${isBuyer ? "seller" : "buyer"}.`,
+      ? `Done! ${deal.title} for ${fmt(deal.price, deal.currency)} with ${deal.counterpart}.` +
+        (deal.meetup.place ? ` Meet-up: ${deal.meetup.place}${deal.meetup.availability ? `, ${deal.meetup.availability}` : ""}.` : "")
+      : `Confirmed on your side. I'll let you know when the ${isBuyer ? "seller" : "buyer"} says yes.`,
   };
 }
 
+/** Say no to a deal. Both posts go back on the market and get re-paired with their next-best match. */
 export async function declineDeal(deps: Deps, userId: string, dealId: string) {
-  const { db } = deps;
+  const { db, cfg } = deps;
   const d = await getDealWithParties(db, dealId);
-  if (userId !== d.buyer_id && userId !== d.seller_id) throw new MarketError("You're not part of this deal.");
-  if (d.status !== "proposed") throw new MarketError(`This deal is already ${d.status}.`);
-  await db.query(`UPDATE deals SET status='declined', updated_at=now() WHERE id=$1`, [dealId]);
-  await logEvent(db, "deal_declined", userId, dealId);
-  return { deal_id: dealId, status: "declined", say: "No problem, I've cancelled that deal." };
+  const isBuyer = userId === d.buyer_id;
+  if (!isBuyer && userId !== d.seller_id) throw new MarketError("You're not part of this deal.");
+  if (d.status !== "proposed" || !(await release(db, d, "declined"))) throw new MarketError(`This deal is already ${d.status}.`);
+  await logEvent(db, "deal_declined", userId, dealId, { by: isBuyer ? "buyer" : "seller" });
+
+  // The decliner's own post is re-paired first, so their next offer is the best one left.
+  const intentNext = await pairIntent(db, await getIntent(db, d.buy_intent_id), cfg.matchThreshold, "repair");
+  const listingNext = await pairListing(db, await getListing(db, d.listing_id), cfg.matchThreshold, "repair");
+  const own = isBuyer ? intentNext : listingNext;
+  const next = own ? dealView(await getDealWithParties(db, own.deal.id), userId) : null;
+
+  let say: string;
+  if (isBuyer) {
+    say = next ? `No problem, I've cancelled that. ${buyerOfferLine(next, "next")}` : `No problem, I've cancelled that. I'll keep looking for you.`;
+  } else {
+    say = next
+      ? `Cancelled. Another buyer was waiting: I agreed ${fmt(next.price, next.currency)}, inside your limit` +
+        (next.seller_confirmed ? `, and asked them to confirm.` : `. Should I accept this one?`)
+      : `Cancelled. Your listing is back up, and I'll pair it with the next buyer who asks.`;
+  }
+  return { deal_id: dealId, status: "declined" as const, next_deal: next, say };
 }
 
+/** The user's deals, the ones waiting for their yes first. */
 export async function getDealStatus(deps: Deps, userId: string, dealId?: string) {
   const { db } = deps;
-  const { rows } = await db.query<DealRow & { title: string; seller_id: string; buyer_id: string }>(
+  const { rows } = await db.query<DealWithParties>(
     `${DEAL_WITH_PARTIES} WHERE (l.seller_id = $1 OR i.buyer_id = $1) AND ($2::text IS NULL OR d.id = $2)
      ORDER BY d.created_at DESC LIMIT 10`,
     [userId, dealId ?? null],
   );
-  const deals = rows.map((r) => dealView(r, userId));
+  if (dealId && !rows[0]) throw new MarketError("I can't find that deal.");
+  const deals = rows.map((r) => dealView(r, userId)).sort((a, b) => Number(b.waiting_for_you) - Number(a.waiting_for_you));
+  const waiting = deals.filter((d) => d.waiting_for_you).length;
   return {
     deals,
+    waiting_for_you: waiting,
     say: deals.length
-      ? deals.map((d) => `${d.title}: ${d.status} at ${fmt(d.price!, d.currency)}`).join(". ")
+      ? (waiting ? `${countWord(waiting)} deal${waiting > 1 ? "s are" : " is"} waiting for your yes. ` : "") +
+        deals.slice(0, 3).map(statusLine).join(" ")
       : "You don't have any deals yet.",
   };
 }
@@ -279,26 +304,80 @@ export async function dashboard(db: Db) {
 // ---------- helpers ----------
 
 const DEAL_WITH_PARTIES = `
-  SELECT d.*, l.title, l.seller_id, i.buyer_id
-  FROM deals d JOIN listings l ON l.id = d.listing_id JOIN buy_intents i ON i.id = d.buy_intent_id`;
+  SELECT d.*, l.title, l.condition, l.ask_price, l.availability, l.seller_id, i.buyer_id,
+         su.display_name AS seller_name, bu.display_name AS buyer_name
+  FROM deals d
+  JOIN listings l    ON l.id = d.listing_id
+  JOIN buy_intents i ON i.id = d.buy_intent_id
+  JOIN users su      ON su.id = l.seller_id
+  JOIN users bu      ON bu.id = i.buyer_id`;
+
+function matchView(m: ListingRow & { score: number }, intent: BuyIntentRow, viewerId: string) {
+  return {
+    ...listingView(m, viewerId),
+    within_budget_at_ask: num(m.ask_price)! <= num(intent.max_price)!,
+    score: +m.score.toFixed(3),
+  };
+}
+
+function buyerOfferLine(deal: DealView, mode: "found" | "negotiated" | "next" | "already") {
+  const price = fmt(deal.price, deal.currency);
+  const lead = {
+    found: `Found it: ${deal.title} for ${price}`,
+    negotiated: `Got it: ${deal.title} for ${price}`,
+    next: `Next best: ${deal.title} for ${price}`,
+    already: `That one's already on hold for you: ${deal.title} for ${price}`,
+  }[mode];
+  const saved = deal.saved_vs_ask > 0 ? `, ${fmt(deal.saved_vs_ask, deal.currency)} below asking` : "";
+  const place = deal.meetup.place ? ` Meet-up: ${deal.meetup.place}.` : "";
+  const ask = deal.seller_confirmed ? " Should I confirm it?" : " Should I confirm? The seller gives the final yes.";
+  return `${lead}${saved}.${place}${ask}`;
+}
+
+function statusLine(d: DealView) {
+  const what = `${d.title}, ${fmt(d.price, d.currency)}`;
+  if (d.status === "confirmed") return `${what}: confirmed with ${d.counterpart}${d.meetup.place ? `, meet-up at ${d.meetup.place}` : ""}.`;
+  if (d.status === "declined") return `${what}: cancelled.`;
+  return d.waiting_for_you ? `${what}: waiting for your yes.` : `${what}: waiting for the ${d.waiting_for.join(" and ")}.`;
+}
+
+const COUNT_WORDS = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
+const countWord = (n: number) => COUNT_WORDS[n] ?? String(n);
+
+function parseDeadline(value: string | undefined) {
+  if (!value) return null;
+  const t = new Date(value);
+  if (Number.isNaN(t.getTime())) throw new MarketError("I couldn't understand that deadline.");
+  if (t <= new Date()) throw new MarketError("That deadline has already passed.");
+  return t.toISOString();
+}
+
+async function proposedDealFor(db: Db, intentId: string) {
+  const { rows } = await db.query<DealRow>(`SELECT * FROM deals WHERE buy_intent_id = $1 AND status = 'proposed'`, [intentId]);
+  return rows[0] ?? null;
+}
 
 async function getDealWithParties(db: Db, id: string) {
-  const { rows } = await db.query<DealRow & { title: string; seller_id: string; buyer_id: string }>(
-    `${DEAL_WITH_PARTIES} WHERE d.id = $1`, [id],
-  );
-  if (!rows[0]) throw new MarketError(`No deal ${id}.`);
+  const { rows } = await db.query<DealWithParties>(`${DEAL_WITH_PARTIES} WHERE d.id = $1`, [id]);
+  if (!rows[0]) throw new MarketError("I can't find that deal.");
   return rows[0];
 }
 
 async function getIntent(db: Db, id: string) {
   const { rows } = await db.query<BuyIntentRow>(`SELECT * FROM buy_intents WHERE id = $1`, [id]);
-  if (!rows[0]) throw new MarketError(`No request ${id}.`);
+  if (!rows[0]) throw new MarketError("I can't find that request.");
   return rows[0];
+}
+
+async function getOwnIntent(db: Db, userId: string, id: string) {
+  const intent = await getIntent(db, id);
+  if (intent.buyer_id !== userId) throw new MarketError("That request belongs to someone else.");
+  return intent;
 }
 
 async function getListing(db: Db, id: string) {
   const { rows } = await db.query<ListingRow>(`SELECT * FROM listings WHERE id = $1`, [id]);
-  if (!rows[0]) throw new MarketError(`No listing ${id}.`);
+  if (!rows[0]) throw new MarketError("I can't find that listing.");
   return rows[0];
 }
 

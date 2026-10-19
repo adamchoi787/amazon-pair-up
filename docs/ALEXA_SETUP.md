@@ -13,6 +13,11 @@ with the Alexa AI CLI. The steps below follow the official docs:
 If a step here disagrees with those pages, the official docs win. Write down every
 surprise in [FRICTION_LOG.md](FRICTION_LOG.md).
 
+**Status:** the MCP Toolkit, CLI and web simulator are in preview with select
+partners, so hackathon entrants demo through their own MCP client (Devpost FAQ).
+Our demo runs on the VoiceMarket web client; this guide is ready for when add-on
+access opens.
+
 ## What the server already provides
 
 | Alexa+ requirement | Where it lives |
@@ -30,8 +35,7 @@ The CLI is installed from Amazon's private package registry. Your AWS account ne
 permission to assume `arn:aws:iam::372468808636:role/AddOn3PDeveloperToolsRead`,
 and the docs say to use "the AWS account you provided to the Alexa Solutions
 Architect". For the hackathon, ask in the hackathon office hours or the Devpost
-discussion how participants get that access. **If you can't get access by Tue 20 Oct
-evening, switch to the simulated Alexa+ fallback** (see [HANDOFF.md](HANDOFF.md)).
+discussion how participants get that access.
 
 You also need:
 - A free Alexa developer account. Complete your Alexa app profile and set the marketplace and language to ones Alexa+ supports (en-US).
@@ -146,20 +150,20 @@ development stage is enough for the demo.
 **Name** (30 max): `VoiceMarket`
 
 **Short description** (123 max):
-> Buy and sell second-hand items by voice. Alexa finds matches and negotiates within your private price limits.
+> Buy and sell with people nearby, by voice. Alexa pairs buyers with sellers and negotiates inside your private limits.
 
 **Full description** (4000 max):
-> VoiceMarket is a second-hand marketplace you use just by talking.
+> VoiceMarket pairs people who want to buy something with people who want to sell it, and you use it just by talking.
 >
 > Selling: tell Alexa what you have, your asking price and, if you like, the lowest price you'd accept. Your minimum is never shown to buyers.
 >
-> Buying: tell Alexa what you need and the most you'd pay. VoiceMarket searches listings by meaning, not just keywords, checks condition, quantity and price, and finds the best options.
+> Buying: tell Alexa what you need and the most you'd pay. VoiceMarket finds the best seller by meaning and keywords, checks condition, quantity and price, and negotiates a fair price inside both people's limits in the same moment. If nobody has it yet, your request waits and Alexa pairs you as soon as someone lists one.
 >
-> Alexa then negotiates a fair price inside both people's limits, tells you the result, and only completes the deal when you say yes. You get the meet-up details right away.
+> Each side says yes before a deal closes, and both get the meet-up details right away.
 >
 > Because it takes a single sentence, even small everyday items, like a $2 pack of tissues, are worth trading.
 >
-> VoiceMarket is a prototype built for the Amazon Developer Hackathon 2026. It doesn't process payments.
+> VoiceMarket is a prototype built for the Amazon Developer Hackathon 2026. Payment happens in person at the meet-up.
 
 **Example phrases** (3–4, 200 max each):
 1. `Alexa, sell my TI-84 calculator for 20 dollars, I'll take anything above 15`

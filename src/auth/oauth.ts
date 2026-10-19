@@ -4,7 +4,7 @@ import type { Config } from "../config.js";
 import type { Db } from "../db/client.js";
 import { ensureUser } from "../market/service.js";
 
-// Owner: A (integration). Minimal OAuth 2.1 authorization server + protected
+// Minimal OAuth 2.1 authorization server + protected
 // resource metadata for Alexa+ account linking, following the Alexa+ MCP
 // add-on checklist:
 //   - RFC 9728 metadata at /.well-known/oauth-protected-resource
