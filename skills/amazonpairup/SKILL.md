@@ -20,6 +20,10 @@ into one tool call, read back the result, and ask for a yes.
 
 - MCP endpoint: `https://d3cxpkmhl89rw9.cloudfront.net/mcp`, Streamable HTTP, protocol `2025-11-25`, stateless.
 - Sign-in: OAuth 2.1 with PKCE. Discovery at `/.well-known/oauth-protected-resource`.
+  No pre-registration: use a Client ID Metadata Document (your `client_id` is the
+  https URL of your client metadata JSON) or register at `/oauth/register`
+  (RFC 7591, public client). The user approves your client by name and signs in
+  with Login with Amazon. Revoke tokens at `/oauth/revoke` when the user signs out.
   The user comes from the token; leave `user_id` out.
 - Locally (`npm start`): `http://127.0.0.1:3000/mcp` with an `X-User-Id` header.
 
