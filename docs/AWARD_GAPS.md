@@ -61,12 +61,12 @@ text, images and video alone, so the video and description carry most of the wei
 |---|---|---|
 | MCP server, spec 2025-11-25, Streamable HTTP, SDK called in code | ✅ on `main` | — |
 | Surface judges can see | ✅ web app at `/app/`: MCP host, MCP Apps cards, voice, Bedrock/offline agent | Deploy it |
-| Hosted endpoint live to Nov 20 | ⚠️ Lightsail guide on `a/alexa-addon`, nothing deployed | Deploy (Lambda or AgentCore Runtime) |
+| Hosted endpoint live to Nov 20 | ✅ live since Oct 20: https://d3cxpkmhl89rw9.cloudfront.net/app/ (CloudFront + EC2, us-east-1) | Run the TI-84 demo there daily |
 | Pairing engine, one-turn deals, output schemas | ✅ on `main` | — |
 | OAuth, Origin check, container, add-on assets | ✅ on `main` | — |
-| AWS Builder "documented integrations" | ⚠️ Bedrock code exists, never run live | Run Bedrock; add AgentCore/Strands; write the AWS section |
+| AWS Builder "documented integrations" | ⚠️ Bedrock live in production (Titan Text Embeddings V2; Nova Lite for intent and agent) | Add AgentCore/Strands; write the AWS section |
 | Open Source entry | ⚠️ `pairing-core` built and used by the server (separate local repo, next to this one) | Create the public GitHub repo and push before submitting |
-| Friction log | ❌ empty | Record real entries as they happen |
+| Friction log | ⚠️ 2 entries (AWS CLI under Git Bash, DLM validation) | Keep recording as they happen |
 | Product feedback per tool | ❌ | Draft from real experience |
 | Video under 3 min | ❌ | Record Thu |
 | Bee | ❌ no device known | Roadmap line unless you have a device |

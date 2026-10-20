@@ -7,6 +7,7 @@
 **Track:** Alexa+ (self-hosted MCP server, spec 2025-11-25, Streamable HTTP)
 **Mini challenge:** AWS Builder (Amazon Bedrock embeddings + intent extraction, AWS hosting)
 **Bee:** "Proactive Context Mode" turns real-world context into requests
+**Try it:** https://d3cxpkmhl89rw9.cloudfront.net/app/ · MCP endpoint `https://d3cxpkmhl89rw9.cloudfront.net/mcp` (OAuth 2.1)
 
 ## The idea in one minute
 
