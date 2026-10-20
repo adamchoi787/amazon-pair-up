@@ -3,7 +3,7 @@
 Deadline **Oct 23, 12:00pm PDT (Oct 24, 3:00am HKT)**. Submit by Fri 21:00 HKT.
 
 ## Required
-- [ ] **Track:** Alexa+ · **Mini challenge:** AWS Builder
+- [ ] **Track:** Alexa+ · **Mini challenges:** AWS Builder, Open Source ([pairing-core](https://github.com/rairurairu/pairing-core))
 - [ ] **Text description:** what it does and how it works (draft below)
 - [ ] **Repo:** public with the MIT `LICENSE` (already included). This avoids collaborator invitations expiring.
       If we go private instead, add only the reviewers named in the official list on the Devpost page, and check any extra name with the hackathon manager first.

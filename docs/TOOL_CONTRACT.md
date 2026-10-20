@@ -52,7 +52,7 @@ call. A post with no counterpart waits and is paired when one arrives.
   relevant offer), that buyer gets the listing only at the asking price, so
   rising budgets can't climb to the seller's minimum. Settlement runs in
   pairing-core, a Rust library compiled to WebAssembly
-  ([negotiation.ts](../src/market/negotiation.ts), `vendor/pairing-core`), in
+  ([negotiation.ts](../src/market/negotiation.ts), [pairing-core](https://github.com/rairurairu/pairing-core)), in
   integer cents. For hourly work the rule applies to the rate and `total` is the
   rate times `hours`.
 - **Ranking:** the hand-tuned score above, or a model learned from which deals

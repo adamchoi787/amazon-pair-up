@@ -68,7 +68,7 @@ text, images and video alone, so the video and description carry most of the wei
 | Agent Skill (SKILL.md) | ✅ `skills/amazonpairup/SKILL.md`, served at `/skills/amazonpairup/SKILL.md` (Oct 20) | — |
 | Agent friendliness | ✅ server card, llms.txt, MCP prompts, `idempotency_key` on writes, request ids (Oct 20) | — |
 | Seed market 150+ | ✅ 162 posts from 22 people, 30 services (Oct 20) | — |
-| Open Source entry | ⚠️ `pairing-core` built and used by the server (separate local repo, next to this one) | Create the public GitHub repo and push before submitting |
+| Open Source entry | ✅ [pairing-core](https://github.com/rairurairu/pairing-core) public (Oct 20): MIT, CI on Rust 1.82 and stable, WebAssembly + JS vectors, MCP server example | Name it in the submission form |
 | Friction log | ⚠️ 4 entries (AWS CLI under Git Bash, DLM validation, two AgentCore SDK entries) | Keep recording as they happen |
 | Product feedback per tool | ⚠️ Drafts for MCP SDK, Bedrock, Strands, AgentCore, AWS hosting in SUBMISSION.md | Check them against your own experience and edit |
 | Video under 3 min | ❌ | Record Thu |

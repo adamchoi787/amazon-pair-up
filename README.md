@@ -36,7 +36,7 @@ person just says yes or no.
 Agents don't bargain with each other here. Turn-by-turn haggling costs model
 calls and seconds on every deal, and a model can be talked into revealing a
 limit. One deterministic rule settles every deal instead, in
-[pairing-core](vendor/pairing-core) (Rust compiled to WebAssembly):
+[pairing-core](https://github.com/rairurairu/pairing-core) (Rust compiled to WebAssembly):
 
 - **The asking price is public.** A budget at or above it pays the ask.
 - **A budget below it is the buyer's offer**, and the seller's private minimum
@@ -230,7 +230,7 @@ skills/amazonpairup/     the Agent Skill (SKILL.md)
 agents/agentcore/        Strands Agents voice agent for Amazon Bedrock AgentCore Runtime
 scripts/                 seed, smoke test, add-on assets
 docs/                    contract, award plan, Alexa+ setup, deploy, demo script, submission, friction log
-vendor/pairing-core/     prebuilt pairing-core module (refresh: node scripts/sync-pairing-core.mjs)
+vendor/pairing-core/     prebuilt module from https://github.com/rairurairu/pairing-core (refresh: node scripts/sync-pairing-core.mjs)
 Dockerfile, deploy/      container image, AWS CloudFormation + deploy scripts, Lightsail config
 ```
 
