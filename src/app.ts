@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import compression from "compression";
 import express from "express";
 import { hostHeaderValidation, localhostHostValidation } from "@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js";
+import { SUPPORTED_PROTOCOL_VERSIONS } from "@modelcontextprotocol/sdk/types.js";
 import { agentMode, handleAgentTurn } from "./agent/index.js";
 import { oauthRouter, sendUnauthorized, userForAccessToken, WEB_CLIENT_ID, webRedirectUri } from "./auth/oauth.js";
 import type { Config } from "./config.js";
@@ -154,7 +155,14 @@ export function createApp(deps: Deps, cfg: Config) {
     next();
   };
 
-  app.use("/mcp", accessLog("mcp"), checkOrigin, rateLimit(cfg.mcpCallsPerMinute));
+  app.use("/mcp", accessLog("mcp"), checkOrigin, (req, res, next) => {
+    const protocol = req.header("mcp-protocol-version");
+    if (protocol !== undefined && !SUPPORTED_PROTOCOL_VERSIONS.includes(protocol)) {
+      res.status(400).json({ jsonrpc: "2.0", error: { code: -32000, message: "Unsupported MCP protocol version" }, id: null });
+      return;
+    }
+    next();
+  }, rateLimit(cfg.mcpCallsPerMinute));
   app.use("/api/agent", accessLog("agent"), checkOrigin, rateLimit(cfg.mcpCallsPerMinute));
   // Apple Watch, Bee and phone: words and context in, suggestions out (src/http/devices.ts).
   app.use(["/api/voice", "/api/context", "/api/devices"], accessLog("devices"), checkOrigin);
@@ -163,6 +171,12 @@ export function createApp(deps: Deps, cfg: Config) {
   app.post("/mcp", async (req, res) => {
     const who = await caller(req);
     if (!who.ok) return unauthorized(res);
+    // MCP 2025-11-25 requires one message per POST. The 1.x SDK also
+    // accepts legacy JSON-RPC batches, so enforce the current contract here.
+    if (Array.isArray(req.body)) {
+      res.status(400).json({ jsonrpc: "2.0", error: { code: -32600, message: "Send a single JSON-RPC message per POST" }, id: null });
+      return;
+    }
     // In local development a call without X-User-Id is allowed; tools then ask for user_id.
     try {
       await sessions.post(req, res, who.userId);
