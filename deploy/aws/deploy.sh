@@ -118,7 +118,8 @@ for _ in $(seq 1 30); do
   curl -fsS "$BASE/health" && echo && break
   sleep 10
 done
-curl -fsS -o /dev/null -w "web app: HTTP %{http_code}\n" "$BASE/app/"
+# No "-o /dev/null": with MSYS_NO_PATHCONV the Windows curl gets that path literally
+curl -fsS -w "web app: HTTP %{http_code}\n" "$BASE/app/" | tail -n 1
 echo
 echo "AmazonPairUp is live: $BASE/app/"
 echo "Dashboard: $BASE/dashboard/#token=<value of /amazonpairup/dashboard-token>"
