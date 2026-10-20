@@ -57,6 +57,7 @@ export function lastUserText(messages: AgentMessage[]): string {
 
 const YES = /^\s*(yes|yeah|yep|yup|sure|ok(ay)?|confirm|confirmed|do it|go ahead|deal|sounds good|accept|buy it|that one|please do)\b/i;
 const NOT = /\b(no|not|don'?t|cancel|decline|wait|stop)\b/i;
+const QUALIFIED = /\b(if|unless|provided|assuming|but|only|after|before|except|instead|first|what|why|how|can you|could you)\b|\?/i;
 
 /** An explicit yes: affirmative words up front and no negation anywhere. */
-export const isExplicitYes = (text: string) => YES.test(text) && !NOT.test(text);
+export const isExplicitYes = (text: string) => YES.test(text) && !NOT.test(text) && !QUALIFIED.test(text);

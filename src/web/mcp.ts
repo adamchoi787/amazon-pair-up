@@ -25,7 +25,9 @@ export class Mcp {
   }
 
   async call(name: string, args: Record<string, unknown>): Promise<CallToolResult> {
-    return (await this.client.callTool({ name, arguments: args })) as CallToolResult;
+    const writes = new Set(["post_offer", "post_request", "negotiate", "confirm_deal", "decline_deal", "withdraw_post", "accept_suggestion", "dismiss_suggestion", "report_user", "rate_deal", "add_context", "delete_my_data"]);
+    const input = writes.has(name) ? { idempotency_key: crypto.randomUUID(), ...args } : args;
+    return (await this.client.callTool({ name, arguments: input })) as CallToolResult;
   }
 
   /** A view's HTML (resources/read), fetched once per page load. */

@@ -29,7 +29,7 @@ Return ONLY a JSON object. Include a key only when the request states it; every 
 Examples:
 "I need a graphing calculator today, maximum $18" → {"need":"graphing calculator","category":"calculator","max_price":18,"needed_by":"<today 23:59>"}
 "looking for 3 packs of tissues on campus, under 5 dollars" → {"need":"tissues","category":"tissue","max_price":5,"quantity":3,"location":"campus"}
-"find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5" → {"need":"pick up my lunch","kind":"service","category":"delivery","max_price":5,"price_unit":"job","pickup":"LG7 canteen","location":"Hall 5","schedule":"today by 12:30","needed_by":"<today 12:30>"}
+"find someone to pick up my lunch from the HUB to McCarty Hall by 12:30, $5" → {"need":"pick up my lunch","kind":"service","category":"delivery","max_price":5,"price_unit":"job","pickup":"the HUB","location":"McCarty Hall","schedule":"today by 12:30","needed_by":"<today 12:30>"}
 "get me a guy to help with the event on Saturday 2-6pm, budget $10/hr" → {"need":"help with the event","kind":"service","category":"event","max_price":10,"price_unit":"hour","hours":4,"schedule":"Saturday 2-6pm","needed_by":"<Saturday 14:00>"}`;
 
 // Model output is untrusted: keep each field only if it is valid on its own.

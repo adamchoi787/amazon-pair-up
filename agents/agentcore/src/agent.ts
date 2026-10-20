@@ -21,10 +21,11 @@ export interface PairUpAgentOptions {
   model?: Model;
 }
 
-const WRITES = new Set(["post_offer", "post_request", "negotiate", "confirm_deal", "decline_deal", "withdraw_post", "report_user", "rate_deal", "accept_suggestion", "dismiss_suggestion", "add_context"]);
+const WRITES = new Set(["post_offer", "post_request", "negotiate", "confirm_deal", "decline_deal", "withdraw_post", "report_user", "rate_deal", "accept_suggestion", "dismiss_suggestion", "add_context", "delete_my_data"]);
 const YES = /^\s*(yes|yeah|yep|yup|sure|ok(ay)?|confirm|confirmed|do it|go ahead|deal|sounds good|accept|buy it|that one|please do)\b/i;
 const NOT = /\b(no|not|don'?t|cancel|decline|wait|stop)\b/i;
-export const isExplicitYes = (text: string) => YES.test(text) && !NOT.test(text);
+const QUALIFIED = /\b(if|unless|provided|assuming|but|only|after|before|except|instead|first|what|why|how|can you|could you)\b|\?/i;
+export const isExplicitYes = (text: string) => YES.test(text) && !NOT.test(text) && !QUALIFIED.test(text);
 
 export const systemPrompt = (now = new Date()) => `You are PairUp, a voice assistant that pairs people directly: people who need something with people nearby who have it or can do it, for things to buy and sell and for services such as lunch runs, errands and event help.
 Current time: ${now.toISOString()}.
@@ -32,6 +33,7 @@ Current time: ${now.toISOString()}.
 - Offering something: post_offer. Needing something: post_request with the user's own words as raw_request.
 - Reply in one or two short spoken sentences, usually the result's "say" field. No markdown, lists or emoji.
 - Call confirm_deal only when the user's latest words are an explicit yes to the deal you just read; otherwise ask.
+- Preserve service availability and requested schedule, using America/Los_Angeles unless the user specifies another IANA time_zone. Use starts_at and ends_at with UTC offsets for exact appointments. A tentative time still needs the helper's yes. Conditional approval ("yes if...", "sure but...") is a constraint to clarify, not consent.
 - When asked what the user needs or for news, call get_suggestions. Read a suggestion and wait for yes before accept_suggestion; ask for a budget if missing. On not now use dismiss_suggestion; on forget pass forget true. Explain routines with get_my_routines. Use add_context for a need clause from the user’s Bee data.
 - Call delete_my_data with confirm true only after an explicit yes to erasing data.
 - On a no call decline_deal; for more options find_matches; for news or meet-ups get_deal_status.
@@ -46,7 +48,7 @@ export function createPairUpAgent(o: PairUpAgentOptions) {
   if (o.token) headers.Authorization = `Bearer ${o.token}`;
   else if (o.userId) headers["X-User-Id"] = o.userId;
 
-  const mcp = new McpClient({ url: o.mcpUrl, headers, applicationName: "pairup-agentcore", applicationVersion: "0.6.0" });
+  const mcp = new McpClient({ url: o.mcpUrl, headers, applicationName: "pairup-agentcore", applicationVersion: "0.7.0" });
   const agent = new Agent({
     model: o.model ?? new BedrockModel({ region: o.region, modelId: o.modelId, temperature: 0.2, maxTokens: 600 }),
     tools: [mcp],

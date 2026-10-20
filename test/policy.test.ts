@@ -85,10 +85,10 @@ test("posting limits stop floods", async () => {
 test("model output is validated field by field", () => {
   const out = sanitizeIntent(
     { need: "  graphing calculator ", category: "Calculator", max_price: "18", min_condition: "pristine",
-      quantity: -2, needed_by: "not a date", location: "HKUST campus", extra: "ignored" },
+      quantity: -2, needed_by: "not a date", location: "UW campus", extra: "ignored" },
     "fallback text",
   );
-  assert.deepEqual(out, { need: "graphing calculator", category: "calculator", max_price: 18, location: "HKUST campus" });
+  assert.deepEqual(out, { need: "graphing calculator", category: "calculator", max_price: 18, location: "UW campus" });
   assert.deepEqual(sanitizeIntent("garbage", "I need a lamp"), { need: "I need a lamp" });
 });
 

@@ -13,6 +13,7 @@ import {
 } from "./trust.js";
 import { num, type BuyIntentRow, type DealRow, type Kind, type ListingRow, type PriceUnit, type RequestSource, type ServiceUnit } from "./types.js";
 import { tradeInCategory } from "./amazon.js";
+import { checkSchedule, DEFAULT_TIME_ZONE, hasBookingConflict, itemDeadline, providerBookings, resolveServiceTime, validTimeZone } from "./scheduling.js";
 import { dealView, fallbackView, offerView, ratingView, reportView, requestView, tradeInView, type DealView, type DealWithParties } from "./views.js";
 
 // Business operations. MCP tools (src/mcp/server.ts) are thin wrappers around
@@ -153,6 +154,7 @@ export interface PostOfferInput {
   auto_accept?: boolean;
   location?: string;
   availability?: string;
+  time_zone?: string;
   /** The user confirmed a price the price check questioned. */
   confirm_price?: boolean;
 }
@@ -166,6 +168,8 @@ export async function postOffer(deps: Deps, input: PostOfferInput) {
   const { db, ai, cfg } = deps;
   const kind = input.kind ?? "item";
   const unit = unitFor(kind, input.price_unit);
+  const timeZone = input.time_zone ?? DEFAULT_TIME_ZONE;
+  if (!validTimeZone(timeZone)) throw new MarketError("Use a valid IANA time zone, such as America/Los_Angeles.", "invalid_schedule");
   const minPrice = input.min_price ?? input.ask_price;
   if (minPrice > input.ask_price) throw new MarketError("Your minimum can't be above the asking price.");
   await sweep(deps);
@@ -187,13 +191,13 @@ export async function postOffer(deps: Deps, input: PostOfferInput) {
   const { rows } = await db.query<ListingRow>(
     `INSERT INTO listings (id, seller_id, kind, price_unit, title, description, category, condition, quantity, currency,
                            ask_price, min_price, auto_accept, location, availability, embedding,
-                           ref_low, ref_high, ref_source, price_flag)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::vector,$17,$18,$19,$20) RETURNING *`,
+                           ref_low, ref_high, ref_source, price_flag, time_zone)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::vector,$17,$18,$19,$20,$21) RETURNING *`,
     [
       id, input.user_id, kind, unit, input.title, input.description ?? "", input.category ?? null,
       input.condition ?? "good", kind === "item" ? input.quantity ?? 1 : 1, currency,
       input.ask_price, minPrice, input.auto_accept ?? kind === "item", input.location ?? null,
-      input.availability ?? null, toVector(embedding), band?.low ?? null, band?.high ?? null, band?.source ?? null, flag ?? null,
+      input.availability ?? null, toVector(embedding), band?.low ?? null, band?.high ?? null, band?.source ?? null, flag ?? null, timeZone,
     ],
   );
   const waiting = (await findIntentsForListing(db, id, { limit: 5, threshold: cfg.matchThreshold })).length;
@@ -244,6 +248,9 @@ export interface PostRequestInput {
   hours?: number;
   pickup?: string;
   schedule?: string;
+  starts_at?: string;
+  ends_at?: string;
+  time_zone?: string;
   currency?: string;
   needed_by?: string;
   location?: string;
@@ -277,8 +284,20 @@ export async function postRequest(deps: Deps, input: PostRequestInput) {
       `What's the most you'd pay${unit === "hour" ? " per hour" : ""}? I keep that private from ${kind === "item" ? "sellers" : "helpers"}.`,
     );
   }
-  const neededBy = parseDeadline(input.needed_by ?? extracted?.needed_by);
   const service = kind === "service";
+  const timeZone = input.time_zone ?? DEFAULT_TIME_ZONE;
+  if (!validTimeZone(timeZone)) throw new MarketError("Use a valid IANA time zone, such as America/Los_Angeles.", "invalid_schedule");
+  const schedule = service ? input.schedule ?? extracted?.schedule ?? null : null;
+  let work;
+  let itemDue: string | null = null;
+  try {
+    work = service ? resolveServiceTime({
+      schedule, needed_by: input.needed_by ?? (schedule ? undefined : extracted?.needed_by),
+      starts_at: input.starts_at, ends_at: input.ends_at, hours: input.hours ?? extracted?.hours, time_zone: timeZone,
+    }) : null;
+  } catch (error) { throw new MarketError((error as Error).message, "invalid_schedule"); }
+  if (!service && input.raw_request && !input.needed_by) itemDue = itemDeadline(input.raw_request, timeZone);
+  const neededBy = parseDeadline(work?.deadline ?? input.needed_by ?? itemDue ?? extracted?.needed_by);
 
   await checkPostingLimits(deps, input.user_id, "request");
   const id = shortId("req");
@@ -290,16 +309,18 @@ export async function postRequest(deps: Deps, input: PostRequestInput) {
   const flag = band && checkPrices(band, policy, kind, unit, currency, input.confirm_price, [["max_price", maxPrice]]);
   const { rows } = await db.query<BuyIntentRow>(
     `INSERT INTO buy_intents (id, buyer_id, kind, price_unit, need, raw_request, source, category, min_condition, quantity,
-                              hours, pickup, schedule, currency, max_price, needed_by, location, embedding, price_flag)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::vector,$19) RETURNING *`,
+                              hours, pickup, schedule, currency, max_price, needed_by, location, embedding, price_flag,
+                              time_zone, service_start, service_end)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::vector,$19,$20,$21,$22) RETURNING *`,
     [
       id, input.user_id, kind, unit, need, input.raw_request ?? null, input.source ?? "voice", category,
       service ? "for_parts" : input.min_condition ?? extracted?.min_condition ?? "for_parts",
       service ? 1 : input.quantity ?? extracted?.quantity ?? 1,
-      unit === "hour" ? input.hours ?? extracted?.hours ?? null : null,
+      unit === "hour" ? work?.hours ?? input.hours ?? extracted?.hours ?? null : null,
       service ? input.pickup ?? extracted?.pickup ?? null : null,
-      service ? input.schedule ?? extracted?.schedule ?? null : null,
+      schedule,
       currency, maxPrice, neededBy, input.location ?? extracted?.location ?? null, toVector(embedding), flag ?? null,
+      timeZone, work?.start ?? null, work?.end ?? null,
     ],
   );
   await logEvent(db, "intent_created", input.user_id, id, { need, kind, unit, source: input.source ?? "voice" });
@@ -385,6 +406,12 @@ export async function negotiateDeal(deps: Deps, userId: string, requestId: strin
   if (listing.status !== "active") {
     throw new MarketError(listing.status === "pending" ? "That one is on hold for someone else right now." : "That offer is no longer available.");
   }
+  if (checkSchedule(listing, intent).status === "conflict") {
+    throw new MarketError("That helper isn't available for your requested time. Ask for other options.", "schedule_conflict");
+  }
+  // A direct tool call must pass the same non-price constraints as discovery.
+  const eligible = await findMatchesForIntent(db, intent, { limit: 1, threshold: cfg.matchThreshold, offerId, ignorePrice: true });
+  if (!eligible.length) throw new MarketError("That offer doesn't fit this request or is no longer available. Ask for other options.", "offer_unavailable");
   if (maxPrice != null && maxPrice !== num(intent.max_price)) {
     if (maxPrice < num(intent.max_price)!) throw new MarketError("A request's budget can only go up. For a lower one, post a new request.");
     await db.query(`UPDATE buy_intents SET max_price = $2 WHERE id = $1`, [requestId, maxPrice]);
@@ -425,36 +452,51 @@ export async function negotiateDeal(deps: Deps, userId: string, requestId: strin
 export async function confirmDeal(deps: Deps, userId: string, dealId: string) {
   const { db, cfg } = deps;
   await sweep(deps);
-  const d = await getDealWithParties(db, dealId);
-  const isBuyer = userId === d.buyer_id;
-  const isSeller = userId === d.seller_id;
-  if (!isBuyer && !isSeller) throw new MarketError("You're not part of this deal.");
-  if (d.status !== "proposed") throw new MarketError(closedDealLine(d.status));
+  const initial = await getDealWithParties(db, dealId);
+  if (![initial.buyer_id, initial.seller_id].includes(userId)) throw new MarketError("You're not part of this deal.");
+  const result = await db.transaction(async tx => {
+    await tx.query(`SELECT id FROM users WHERE id = $1 FOR UPDATE`, [initial.seller_id]);
+    await tx.query(`SELECT id FROM deals WHERE id = $1 FOR UPDATE`, [dealId]);
+    const d = await getDealWithParties(tx, dealId);
+    const isBuyer = userId === d.buyer_id;
+    const isSeller = userId === d.seller_id;
+    if (d.status !== "proposed") throw new MarketError(closedDealLine(d.status));
+    if (d.expires_at && new Date(d.expires_at) <= new Date()) throw new MarketError("That offer has expired. Ask for your deals to see the latest options.");
+    await assertActive(tx, userId);
+    if (d.kind === "service") {
+      const listing = await getListing(tx, d.listing_id);
+      const intent = await getIntent(tx, d.buy_intent_id);
+      if (checkSchedule(listing, intent).status === "conflict" || hasBookingConflict(intent, await providerBookings(tx, [d.seller_id]))) {
+        throw new MarketError("That helper isn't available for this time. Decline this offer and ask for other options.", "schedule_conflict");
+      }
+    }
 
-  const buyer = d.buyer_confirmed || isBuyer;
-  const seller = d.seller_confirmed || isSeller;
-  const done = buyer && seller;
-  const { rows } = await db.query(
-    `UPDATE deals SET buyer_confirmed=$2, seller_confirmed=$3, status=$4, updated_at=now()
-     WHERE id=$1 AND status='proposed' RETURNING id`,
-    [dealId, buyer, seller, done ? "confirmed" : "proposed"],
-  );
-  if (!rows[0]) throw new MarketError("That deal just changed. Ask me for your deal status.");
-  if (done) {
-    // An item is sold once; a service offer stands and takes the next job.
-    await db.query(`UPDATE listings SET status=$2 WHERE id=$1`, [d.listing_id, d.kind === "item" ? "sold" : "active"]);
-    await db.query(`UPDATE buy_intents SET status='fulfilled' WHERE id=$1`, [d.buy_intent_id]);
-  }
-  await logEvent(db, done ? "deal_confirmed" : "deal_half_confirmed", userId, dealId, { by: isBuyer ? "buyer" : "seller" });
-  if (done && d.kind === "service") await pairListing(db, await getListing(db, d.listing_id), pairing(cfg), "repair");
-  const deal = dealView(await getDealWithParties(db, dealId), userId);
-  const other = isBuyer ? (d.kind === "item" ? "seller" : deal.counterpart ?? "they") : (d.kind === "item" ? "buyer" : deal.counterpart ?? "they");
-  return {
-    deal,
-    say: done
-      ? doneLine(deal)
-      : `Confirmed on your side. I'll let you know when ${d.kind === "item" ? `the ${other}` : other} says yes.`,
-  };
+    const buyer = d.buyer_confirmed || isBuyer;
+    const seller = dealView(d, userId).seller_confirmed || isSeller;
+    const done = buyer && seller;
+    const { rows } = await tx.query(
+      `UPDATE deals SET buyer_confirmed=$2, seller_confirmed=$3, status=$4, updated_at=now()
+       WHERE id=$1 AND status='proposed' RETURNING id`,
+      [dealId, buyer, seller, done ? "confirmed" : "proposed"],
+    );
+    if (!rows[0]) throw new MarketError("That deal just changed. Ask me for your deal status.");
+    if (done) {
+      // An item is sold once; a service offer stands and takes the next job.
+      await tx.query(`UPDATE listings SET status=$2 WHERE id=$1`, [d.listing_id, d.kind === "item" ? "sold" : "active"]);
+      await tx.query(`UPDATE buy_intents SET status='fulfilled' WHERE id=$1`, [d.buy_intent_id]);
+    }
+    await logEvent(tx, done ? "deal_confirmed" : "deal_half_confirmed", userId, dealId, { by: isBuyer ? "buyer" : "seller" });
+    const deal = dealView(await getDealWithParties(tx, dealId), userId);
+    const other = isBuyer ? (d.kind === "item" ? "seller" : deal.counterpart ?? "they") : (d.kind === "item" ? "buyer" : deal.counterpart ?? "they");
+    return {
+      deal,
+      say: done
+        ? doneLine(deal)
+        : `Confirmed on your side. I'll let you know when ${d.kind === "item" ? `the ${other}` : other} says yes.`,
+    };
+  });
+  if (result.deal.status === "confirmed" && result.deal.kind === "service") await pairListing(db, await getListing(db, initial.listing_id), pairing(cfg), "repair");
+  return result;
 }
 
 /**
@@ -727,7 +769,11 @@ export async function reviewUser(deps: Deps, userId: string, decision: ReviewDec
 // the job happens where and when the requester needs it.
 const DEAL_WITH_PARTIES = `
   SELECT d.*, l.kind, l.price_unit, l.title, l.condition, l.ask_price, l.ref_low, l.ref_high, l.ref_source,
-         CASE WHEN l.kind = 'service' THEN COALESCE(i.schedule, l.availability) ELSE l.availability END AS availability,
+         CASE WHEN l.kind = 'service' THEN i.schedule ELSE l.availability END AS availability,
+         l.availability AS offer_availability, l.time_zone AS offer_time_zone, i.time_zone AS request_time_zone,
+         i.schedule AS request_schedule, i.created_at AS request_created_at, i.service_start, i.service_end,
+         EXISTS (SELECT 1 FROM events e WHERE e.ref_id = d.id AND e.actor_id = l.seller_id
+                 AND e.kind IN ('deal_half_confirmed', 'deal_confirmed')) AS provider_explicit_yes,
          i.hours, i.pickup, i.needed_by, i.need AS task, l.seller_id, i.buyer_id,
          su.display_name AS seller_name, bu.display_name AS buyer_name,
          l.location AS offer_location, i.location AS request_location, su.home_area AS seller_home, bu.home_area AS buyer_home
@@ -764,13 +810,15 @@ function placeLine(deal: DealView) {
   const { place, availability } = deal.meetup;
   if (deal.kind === "item") return place ? ` Meet-up: ${place}.` : "";
   const route = deal.pickup && place ? `From ${deal.pickup} to ${place}` : deal.pickup ? `Pickup at ${deal.pickup}` : place ? `At ${place}` : "";
-  const time = availability ?? (deal.needed_by ? `by ${clock(deal.needed_by)}` : "");
+  const work = deal.scheduling;
+  const time = availability ?? (work?.starts_at
+    ? `${new Date(work.starts_at).toLocaleString("en-US", { timeZone: work.time_zone, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}${work.ends_at ? ` to ${new Date(work.ends_at).toLocaleTimeString("en-US", { timeZone: work.time_zone, hour: "numeric", minute: "2-digit" })}` : ""} (${work.time_zone})`
+    : (deal.needed_by ? `by ${clock(deal.needed_by, work?.time_zone)}` : ""));
   const line = [route, time].filter(Boolean).join(", ");
   return line ? ` ${line}.` : "";
 }
 
-/** Server-local time, the same clock deadlines are read in (set TZ for the market's city). */
-const clock = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+const clock = (iso: string, timeZone = DEFAULT_TIME_ZONE) => new Date(iso).toLocaleTimeString("en-US", { timeZone, hour: "numeric", minute: "2-digit" });
 
 function buyerOfferLine(deal: DealView, mode: "found" | "negotiated" | "next" | "already") {
   const price = dealPrice(deal);
@@ -787,7 +835,9 @@ function buyerOfferLine(deal: DealView, mode: "found" | "negotiated" | "next" | 
   const ask = deal.seller_confirmed
     ? " Should I confirm it?"
     : ` Should I confirm? ${deal.kind === "item" ? "The seller" : deal.counterpart} gives the final yes.`;
-  return `${lead}${saved}.${placeLine(deal)}${priceWarning(deal)}${ask}`;
+  const scheduling = deal.scheduling?.status === "needs_confirmation" && !deal.seller_confirmed
+    ? " The helper still needs to check the time." : "";
+  return `${lead}${saved}.${placeLine(deal)}${priceWarning(deal)}${scheduling}${ask}`;
 }
 
 /** Said to the buyer when the price is far from what similar things go for. */

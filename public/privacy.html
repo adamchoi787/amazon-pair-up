@@ -17,25 +17,25 @@
 <h1>PairUp privacy policy</h1>
 <p class="muted">Last updated October 20, 2026</p>
 
-<p>PairUp pairs people who need something with people nearby who have it or can do it, for things and for small jobs such as errands or event help, by voice, through its web app and as an Alexa+ add-on. It is an independent project built for the Amazon Developer Hackathon 2026.</p>
+<p>PairUp pairs people who need something with people nearby who have it or can do it, for things and small jobs, through a voice-enabled web app and MCP tools. The web app simulates an Alexa+ experience. It is an independent project built for the Amazon Developer Hackathon 2026.</p>
 
 <h2>What we store</h2>
 <ul>
   <li><strong>Account:</strong> your Login with Amazon user id and first name, or your demo display name, internal user id and hashed demo passcode.</li>
   <li><strong>Listings:</strong> items you sell, including the asking price and the private minimum price you set.</li>
   <li><strong>Buy requests:</strong> what you're looking for, including the private maximum price you set, and the words of your request.</li>
-  <li><strong>Deals:</strong> agreed prices, confirmation status and meet-up area.</li>
+  <li><strong>Scheduling and deals:</strong> stated availability, requested work times, time zones, agreed prices, confirmation status and meet-up area.</li>
   <li><strong>Activity log:</strong> a record of marketplace actions, used to run and debug the service.</li>
 </ul>
 
 <h2>Private price limits</h2>
-<p>Your minimum selling price and maximum buying price are used only on our server to decide whether a deal is possible and at what price. They are never shown to other users.</p>
+<p>The server uses your limits to decide whether a deal is possible. Your minimum selling price does not set the agreed price and is not shown to the buyer. A buying budget at or above the asking price stays private from the seller. A lower budget becomes your offer, so the seller sees that amount as the proposed price. Your own agent and signed-in client can see the limits you give them.</p>
 
 <h2>Sign-in tokens</h2>
 <p>When you sign in, the web app (or Alexa, when you link your account) receives tokens that let it act on the marketplace for you. We store only one-way hashes of these tokens. The web app keeps its tokens in your browser's storage until you sign out.</p>
 
 <h2>Processing</h2>
-<p>Text of listings, requests and assistant conversations is processed by Amazon Web Services (Amazon Bedrock) to understand requests and find matches. Voice is turned into text by your browser's speech service before it reaches us. We don't sell your data or use it for advertising.</p>
+<p>When Bedrock mode is enabled, text of listings, requests and assistant conversations is processed by Amazon Web Services (Amazon Bedrock) to understand requests and find matches. Offline demo mode uses local parsing and embeddings. Voice is turned into text by your browser's speech service before it reaches us. We don't sell your data or use it for advertising.</p>
 
 <h2>Retention and deletion</h2>
 <p>Listings, requests and deals are kept while the service runs, and backups for seven days. Take down your own posts any time in the app ("My posts"). Ask your agent to delete your data and explicitly confirm. The delete_my_data tool takes down live posts, releases holds, erases your account, tokens, history and learning data, and keeps past deals for the other person under Former member. Backups expire after seven days.</p>

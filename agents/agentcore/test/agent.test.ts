@@ -10,7 +10,7 @@ import { config } from "../../../src/config.js";
 import { openDb, type Db } from "../../../src/db/client.js";
 import { postOffer, ensureUser } from "../../../src/market/service.js";
 import { addContext } from "../../../src/market/context.js";
-import { createPairUpAgent } from "../src/agent.js";
+import { createPairUpAgent, isExplicitYes } from "../src/agent.js";
 
 // The Strands agent against a real PairUp server (in-memory Postgres,
 // Streamable HTTP on a local port). A scripted model stands in for Bedrock, so
@@ -18,6 +18,11 @@ import { createPairUpAgent } from "../src/agent.js";
 // an idempotency_key, and confirm_deal is blocked until the user says yes.
 
 type Step = { tool: string; input: Record<string, unknown> } | { text: string };
+
+test("conditional or questioning approval cannot authorize an agent action", () => {
+  for (const text of ["Yes if it's under $10", "Sure but only after 6pm", "Yes, can you check first?", "yes?"]) assert.equal(isExplicitYes(text), false, text);
+  assert.equal(isExplicitYes("Yes, confirm it please"), true);
+});
 
 /** Plays one scripted step per user turn, then speaks the last tool result's 'say'. */
 class ScriptedModel extends Model {
@@ -67,7 +72,7 @@ before(async () => {
   db = await openDb({ databaseUrl: "", pgliteDir: "", embeddingDim: DIM }, { inMemory: true });
   const deps = { db, ai: createMockAi(DIM), cfg: { matchThreshold: 0.35 } };
   await postOffer(deps, {
-    user_id: "u_mei", title: "TI-84 Plus graphing calculator", category: "calculator", ask_price: 20, min_price: 15, location: "HKUST campus",
+    user_id: "u_mei", title: "TI-84 Plus graphing calculator", category: "calculator", ask_price: 20, min_price: 15, location: "UW campus",
   });
   const app = createApp(deps, { ...config, host: "127.0.0.1", mcpApiKey: "", authMode: "none" });
   await new Promise<void>((resolve) => {

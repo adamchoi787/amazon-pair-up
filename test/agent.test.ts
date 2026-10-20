@@ -23,10 +23,10 @@ const toolUse = (step: ReturnType<typeof planOffline>) => {
 };
 
 test("understands selling, with a private minimum, place and condition", () => {
-  const use = toolUse(planOffline([user("Sell my TI-84 graphing calculator for $20 on HKUST campus, like new. I'll take anything above $15.")]));
+  const use = toolUse(planOffline([user("Sell my TI-84 graphing calculator for $20 on UW campus, like new. I'll take anything above $15.")]));
   assert.deepEqual(use && { name: use.name, input: use.input }, {
     name: "post_offer",
-    input: { title: "TI-84 graphing calculator", ask_price: 20, min_price: 15, location: "HKUST campus", condition: "like_new" },
+    input: { title: "TI-84 graphing calculator", ask_price: 20, min_price: 15, location: "UW campus", condition: "like_new" },
   });
 });
 
@@ -52,13 +52,23 @@ test("understands offering a service, per job or per hour", () => {
     input: { kind: "service", title: "Lunch runs around campus", price_unit: "job", ask_price: 4, min_price: 3, location: "campus" },
   });
   const help = toolUse(planOffline([user("I'm free on Saturday to help at events, $11 an hour, at least $9")]));
-  assert.deepEqual(help?.input, { kind: "service", title: "Help at events", price_unit: "hour", ask_price: 11, min_price: 9 });
-  const ask = planOffline([user("I can walk dogs in Sai Kung")]);
-  assert.equal((ask.content[0] as { text: string }).text, 'How much do you charge for "walk dogs in Sai Kung"?');
+  assert.deepEqual(help?.input, { kind: "service", title: "Help at events", price_unit: "hour", ask_price: 11, min_price: 9, availability: "Saturday" });
+  const ask = planOffline([user("I can walk dogs in Ballard")]);
+  assert.equal((ask.content[0] as { text: string }).text, 'How much do you charge for "walk dogs in Ballard"?');
+});
+
+test("spoken availability is preserved and conditional approval never confirms an action", () => {
+  const use = toolUse(planOffline([user("I can tutor weekdays 9am-5pm for $20 an hour")]));
+  assert.equal(use?.input.ask_price, 20, "a clock time is not the fee");
+  assert.equal(use?.input.availability, "weekdays 9am-5pm");
+  for (const text of ["yes if it is under $10", "sure but only after 6pm", "yes, can you check the price first?", "yes?"]) {
+    const content: Block[] = [{ toolUse: { toolUseId: "t", name: "confirm_deal", input: { deal_id: "d" } } }];
+    assert.ok(!requireExplicitYes(content, text).some(b => "toolUse" in b), text);
+  }
 });
 
 test("passes requests for help through in the user's own words", () => {
-  for (const said of ["Find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5", "Get me a guy to help with the upcoming events, budget $10/hr"]) {
+  for (const said of ["Find someone to pick up my lunch from the HUB to McCarty Hall by 12:30, $5", "Get me a guy to help with the upcoming events, budget $10/hr"]) {
     const use = toolUse(planOffline([user(said)]));
     assert.deepEqual(use && { name: use.name, input: use.input }, { name: "post_request", input: { raw_request: said } });
   }
@@ -172,18 +182,18 @@ test("a spoken sale and purchase, end to end through the web app's loop", async 
   const seller = await session("u_mei");
   const buyer = await session("u_ken");
 
-  const listed = await seller.say("Sell my TI-84 graphing calculator for $20 on HKUST campus. I'll take anything above $15.");
+  const listed = await seller.say("Sell my TI-84 graphing calculator for $20 on UW campus. I'll take anything above $15.");
   assert.match(listed, /Listed TI-84 graphing calculator for \$20/);
 
   const offer = await buyer.say("I need a graphing calculator today, maximum $18");
-  assert.equal(offer, "Found it: TI-84 graphing calculator for $18, $2 below asking. Meet-up: HKUST campus. Should I confirm it?");
+  assert.equal(offer, "Found it: TI-84 graphing calculator for $18, $2 below asking. Meet-up: UW campus. Should I confirm it?");
   const card = buyer.cards.at(-1)!;
   assert.equal(card.view, "ui://pairup/market.html", "the result names its MCP Apps view");
   assert.equal((card.data.deal as { price: number }).price, 18);
 
   assert.match(await buyer.say("what does it cost?"), /^You can say things like: sell my TI-84 for 20 dollars/);
   const done = await buyer.say("Yes, confirm it");
-  assert.match(done, /^Done! TI-84 graphing calculator for \$18 with u_mei\. Meet-up: HKUST campus\.$/);
+  assert.match(done, /^Done! TI-84 graphing calculator for \$18 with u_mei\. Meet-up: UW campus\.$/);
   assert.match(await seller.say("Any news on my deals?"), /confirmed with u_ken/);
 
   for (const s of [seller, buyer]) await s.close();
@@ -194,13 +204,13 @@ test("a spoken lunch run, end to end: the requester and the runner each say yes"
   const hungry = await session("u_hungry");
 
   assert.match(await runner.say("I can do lunch runs around campus for $4 a run, at least $3"), /^You're on the market: Lunch runs around campus, \$4 a job\./);
-  const offer = await hungry.say("Find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5");
-  assert.equal(offer, "Found someone: u_runner can do it for $4. From LG7 canteen to Hall 5, by 12:30. Should I confirm? u_runner gives the final yes.");
+  const offer = await hungry.say("Find someone to pick up my lunch from the HUB to McCarty Hall by 12:30, $5");
+  assert.equal(offer, "Found someone: u_runner can do it for $4. From the HUB to McCarty Hall, by 12:30. The helper still needs to check the time. Should I confirm? u_runner gives the final yes.");
   assert.equal((hungry.cards.at(-1)!.data.deal as { kind: string }).kind, "service");
   assert.equal(await hungry.say("Yes"), "Confirmed on your side. I'll let you know when u_runner says yes.");
 
   assert.match(await runner.say("Any jobs for me?"), /^One deal is waiting for your yes\. Pick up my lunch for u_hungry, \$4:/);
-  assert.equal(await runner.say("Yes, I'll take it"), "Booked! Lunch runs around campus with u_hungry, $4. From LG7 canteen to Hall 5, by 12:30.");
+  assert.equal(await runner.say("Yes, I'll take it"), "Booked! Lunch runs around campus with u_hungry, $4. From the HUB to McCarty Hall, by 12:30.");
   for (const s of [runner, hungry]) await s.close();
 });
 

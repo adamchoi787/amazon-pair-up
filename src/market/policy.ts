@@ -21,7 +21,7 @@ interface Category {
   id: string;
   label: string;
   severity: Severity;
-  /** Restricted only: why, as spoken ("selling it needs an age check and a licence"). */
+  /** Restricted only: why, as spoken ("selling it needs an age check and a license"). */
   why?: string;
   keywords: string[];
   allow: string[];

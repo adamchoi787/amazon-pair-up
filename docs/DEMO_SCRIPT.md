@@ -1,22 +1,31 @@
-# Demo video script (under 3:00, English, no third-party brands or music)
+# PairUp demo: 2 minutes 55 seconds
 
-Judges may stop at 3:00, so put the best material first.
+The video follows one day on the University of Washington campus. Record with two browser profiles (seller and buyer, plus a helper for the service beat) so each screen shows only its owner's private limits. Caption the web app **Alexa+ experience** and the seed market **demo data**.
 
-| Time | Shot | Words |
+## Before recording
+
+1. Use a scratch local or staging market for rehearsals (`PGLITE_DIR`, `npm run reset`). Keep the shared production database for the final take.
+2. Run the release you will submit. For a hosted URL, run `npm run check:release` first and make one real Bedrock request.
+3. Sign in as three people: a seller, a buyer and a helper. Rehearse the judge sign-in in a fresh browser.
+4. Pick a future weekday for the service beat and say the date out loud. For the lunch suggestion, record on a weekday between 10:45 and 12:45 Pacific after `npm run seed -- --lifestyle`.
+5. Post the waiting event-help request before recording the helper's arrival.
+
+## Recording beats
+
+| Time | Show | Say |
 |---|---|---|
-| 0:00–0:15 | Title + one line | "PairUp: a voice-first marketplace on Alexa+ that pairs buyers and sellers directly, for things and for help. Say what you have, what you can do or what you need, and Alexa pairs you up, settles a fair price and closes the deal." |
-| 0:15–0:30 | Problem | "Trading with another person means photos, forms and haggling, and getting a small job done means paying a platform on top. So small things rarely happen: the calculator next door, the lunch run two buildings over." |
-| 0:30–1:15 | **Things** (split screen: two devices + live dashboard) | Seller: "Alexa, sell my TI-84 for $20. I'll accept anything above $15." · Buyer: "Alexa, I need a graphing calculator today, maximum $18." · Alexa: "Found it: TI-84 Plus graphing calculator for $18, $2 below asking. Meet-up: HKUST campus. Should I confirm it?" · "Yes." · Dashboard: deal confirmed, 🔒 limits never shown. |
-| 1:15–1:55 | **Errands** (same two devices) | Runner: "Alexa, I can do lunch runs around campus for $4 a run, at least $3." · Hungry student: "Alexa, find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5." · Alexa: "Found someone: Ken can do it for $4 … From LG7 canteen to Hall 5, by 12:30. Should I confirm?" · "Yes." · Runner's device: "New job … Want it?" · "Yes." · Card: pickup → drop-off, time, Booked. "The fee goes to the person who walks." |
-| 1:55–2:10 | **One-time jobs** | "Alexa, get me a helper for the event on Saturday 2-6pm, budget $10 an hour." · Card: "$10 an hour, $40 for 4 hours." "Same engine, same private limits." |
-| 2:10–2:40 | How it works | Architecture diagram: Alexa+ → MCP server (Streamable HTTP, spec 2025-11-25) → Bedrock intent extraction (item or task, fee or hourly rate, pickup, time) → pgvector hybrid search → pairing-core settlement (Rust → WebAssembly) → deal. Say it plainly: no agent haggling; one fixed rule settles every deal, and the seller's minimum never shows through the price. Flash the "$1 iPhone? Is $1 right?" check and the dashboard's learning panel (completion rate by day, learned vs control). |
-| 2:40–2:55 | Bee and watch | Show the labelled demo replay, a calculator suggestion in For you, and /watch/ with Yes/No. Say “anything I need?” then “what do you know about me?” Show a learned lunch routine and Forget. Describe the replay as demo data. |
-| 2:55–3:00 | Close | Impact line + team names. |
+| 0:00–0:12 | A UW student with an exam tomorrow; two signed-in screens | “Someone on campus has the calculator you need. PairUp finds them in one sentence.” |
+| 0:12–0:30 | Seller: “Sell my TI-84 for $20. I'll take anything above $15.” | “The seller sets a private minimum once. Only their own screen shows it.” |
+| 0:30–0:48 | Buyer: “I need a graphing calculator today, max $18.” The card shows $18 and the Hub Counter | “The buyer's budget is their offer. A fixed rule in our open-source pairing-core settles it inside the seller's limit.” |
+| 0:48–1:05 | Buyer says yes; seller sees the agreed deal; buyer asks “where do we meet?” | “Both said yes. They pay at the hand-off.” |
+| 1:05–1:30 | A Saturday 2-6pm event request waiting since yesterday; a Sunday-only helper stays unmatched; a weekend helper posts and is paired at once | “The whole work window has to fit the helper's hours, and one helper's bookings never overlap.” |
+| 1:30–1:45 | The card: $10/hr × 4 hours = $40, Saturday in Pacific time, waiting for the helper; the helper confirms | “Rate, total, time and whose yes is missing, at a glance.” |
+| 1:45–2:10 | Late morning: the For you strip offers the usual lunch run (the HUB → McCarty Hall, about $4). Then the Bee replay suggests a graphing calculator, and the `/watch/` view shows the same suggestion with Yes / No | “PairUp learns your routines and hears what you need. Every suggestion waits for your yes.” Caption: **demo replay**, **watch preview** |
+| 2:10–2:35 | Architecture slide plus a real MCP request and result | “Alexa+ or any agent → MCP tools → hybrid search → pairing-core in WebAssembly → a transaction → a card. Amazon Bedrock embeds and understands each request.” |
+| 2:35–2:55 | The pairing-core repo and the scheduling and privacy tests running; end on the app | “The price rule is open source for any agent to reuse. Next stop: a pilot with UW students. PairUp: say it, and it's paired.” |
 
-## Recording checklist
-- [ ] Run `npm run reset` before each take (the TI-84 and the campus lunch runs are created live, so they stay out of the seed)
-- [ ] Dashboard open, zoomed to 125%
-- [ ] Deployed URL, not localhost, if possible
-- [ ] Captions on the spoken lines
+## Notes
 
-For the lifestyle beat, use a scratch database and `npm run seed -- --lifestyle`. Sign in as Tony locally. Lunch is due from 10:45 to 12:45 HKT on weekdays; record in that window or use the deterministic test fixture for a clearly labelled demonstration. See BEE.md for replay. Test the watch preview in the same browser after sign-in; Siri hardware validation is a separate step.
+- Show the Bee replay and watch preview as captioned demo beats. Entering the Bee track needs real Bee-recorded data; the Alexa+ track needs no hardware.
+- The dashboard's learning chart runs on the simulated market; caption it **simulation** if shown.
+- Keep private limits, tokens and deployment secrets off screen.

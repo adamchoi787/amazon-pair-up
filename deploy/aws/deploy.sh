@@ -114,6 +114,8 @@ echo "uploaded $KEY"
 
 ENV_FILE=$(cat <<EOF
 NODE_ENV=production
+TZ=America/Los_Angeles
+RELEASE_REVISION=$(git rev-parse HEAD)
 HOST=0.0.0.0
 PORT=$PORT
 PGLITE_DIR=/var/lib/amazonpairup/pglite
@@ -165,6 +167,7 @@ for _ in $(seq 1 30); do
 done
 # No "-o /dev/null": with MSYS_NO_PATHCONV the Windows curl gets that path literally
 curl -fsS -w "web app: HTTP %{http_code}\n" "$BASE/app/" | tail -n 1
+node --import tsx scripts/check-release.ts --url "$BASE" --revision "$(git rev-parse HEAD)" --expect-ai bedrock --expect-auth oauth
 echo
 echo "PairUp is live: $BASE/app/"
 echo "Sign-in: $LOGIN"

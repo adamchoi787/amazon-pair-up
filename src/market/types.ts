@@ -27,6 +27,7 @@ export interface ListingRow {
   auto_accept: boolean;
   location: string | null;
   availability: string | null;
+  time_zone: string;
   status: string;
   /** The typical range the price was checked against (src/market/pricing.ts). */
   ref_low: string | number | null;
@@ -51,6 +52,9 @@ export interface BuyIntentRow {
   hours: string | number | null;
   pickup: string | null;
   schedule: string | null;
+  time_zone: string;
+  service_start: string | Date | null;
+  service_end: string | Date | null;
   currency: string;
   max_price: string | number; // PRIVATE
   needed_by: string | Date | null;

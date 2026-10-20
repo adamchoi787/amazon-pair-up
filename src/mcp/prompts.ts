@@ -33,7 +33,7 @@ export function registerPrompts(server: McpServer) {
       title: "Find an item or get help",
       description: "Ask for an item or for someone to do a task, with a private budget; returns a proposed deal when one fits.",
       argsSchema: {
-        need: z.string().describe("What you need, e.g. 'a graphing calculator today' or 'someone to pick up my lunch from LG7 by 12:30'"),
+        need: z.string().describe("What you need, e.g. 'a graphing calculator today' or 'someone to pick up my lunch from the HUB by 12:30'"),
         budget: z.string().describe("Your private maximum, e.g. '$18' or '$10 an hour'"),
       },
     },

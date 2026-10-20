@@ -69,6 +69,15 @@ test("/ready checks the database", async () => {
   assert.deepEqual(await res.json(), { ok: true });
 });
 
+test("health identifies the release and UI assets without cacheable responses", async () => {
+  const response = await fetch(`${base}/health`);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  const health = await response.json();
+  assert.equal(health.product, "PairUp");
+  assert.equal(health.revision, config.releaseRevision || null);
+  assert.match(health.ui_fingerprint, /^[a-f0-9]{64}$/);
+});
+
 test("the server card describes the live tool surface", async () => {
   const res = await fetch(`${base}/.well-known/mcp/server-card.json`);
   assert.equal(res.status, 200);

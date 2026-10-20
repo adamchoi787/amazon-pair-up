@@ -3,7 +3,7 @@ name: pairup
 description: Buy, sell or get small jobs done between people through the PairUp MCP server. Use when the user wants to sell an item, offer a service (errands, deliveries, event help, tutoring), find an item, get someone to do a task, or check on their deals and meet-ups, rate a deal or report someone. Covers posting, reading a proposed deal, confirming only on an explicit yes, private price limits, price checks, what can't be posted, ratings, reports and retries.
 license: MIT
 metadata:
-  version: "0.6.0"
+  version: "0.7.0"
   mcp-endpoint: https://d3cxpkmhl89rw9.cloudfront.net/mcp
   server-card: https://d3cxpkmhl89rw9.cloudfront.net/.well-known/mcp/server-card.json
 ---
@@ -31,9 +31,9 @@ into one tool call, read back the result, and ask for a yes.
 
 1. **Confirm only on an explicit yes.** Call `confirm_deal` only when the user's
    latest words are a yes to the deal you just read out. Anything else: ask.
-2. **Private limits stay private.** `min_price` (seller) and `max_price` (buyer)
-   are never shown to the other side. Never ask a user for someone else's
-   limit, never guess it, never mention it.
+2. **Respect private limits.** Never disclose or guess another person's limit.
+   A budget below the public ask becomes the buyer's visible offer; a budget
+   covering the ask stays private. The seller's minimum does not set the price.
 3. **No haggling.** The server sets every price. Never offer, counter or
    suggest a price on anyone's behalf.
 4. **Speak the `say` field.** Every result and every error has one sentence
@@ -48,13 +48,21 @@ into one tool call, read back the result, and ask for a yes.
 
 ## Which tool
 
+For services preserve the stated `availability` and `schedule`. The default
+time zone is `America/Los_Angeles`; use another IANA `time_zone` only when specified.
+Exact appointments may use `starts_at` / `ends_at` with UTC offsets. Read
+`deal.scheduling`: `verified` means the full work window fits stated availability;
+`needs_confirmation` means the provider must check it. Never call a tentative
+time verified. “Yes if…” and “sure but…” add constraints; they are not approval.
+Confirmation records agreement, not payment, handover or completed work.
+
 | The user says | Call |
 |---|---|
 | "Sell my TI-84 for $20, I'll take $15" | `post_offer` with `title`, `ask_price: 20`, `min_price: 15` |
 | "I can do lunch runs on campus for $5" | `post_offer` with `kind: "service"`, `ask_price: 5`, `location` |
 | "Event help, $12 an hour" | `post_offer` with `kind: "service"`, `price_unit: "hour"`, `ask_price: 12` |
 | "I need a graphing calculator today, max $18" | `post_request` with `raw_request` = their words (add fields you clearly heard) |
-| "Pick up my lunch from LG7 to Hall 5 by 12:30, $5" | `post_request` with `raw_request`; the server reads kind, pickup and time |
+| "Pick up my lunch from the HUB to McCarty Hall by 12:30, $5" | `post_request` with `raw_request`; the server reads kind, pickup and time |
 | "Yes" / "Confirm it" (right after you read a deal) | `confirm_deal` with that `deal_id` |
 | "No" / "Not that one" | `decline_deal`; the result includes the next best offer when there is one |
 | "Show me other options" | `find_matches` with the `request_id` |
@@ -96,7 +104,7 @@ is true when it is the user). Hourly work also has `hours` and `total`.
 `price_check` compares the price with the usual range. A deal is closed when
 its `status` is `confirmed`.
 
-Good: "Found it: TI-84 Plus for $18, $2 below asking, meet-up at HKUST campus. Should I confirm it?"
+Good: "Found it: TI-84 Plus for $18, $2 below asking, meet-up at UW campus. Should I confirm it?"
 
 ## Errors you can act on
 
@@ -133,12 +141,12 @@ to emergency services: always read it in full.
 ```
 User: I need a graphing calculator for my exam tomorrow, max 18 dollars.
 Agent → post_request { raw_request: "I need a graphing calculator for my exam tomorrow, max 18 dollars", idempotency_key: "7f9c…" }
-Server ← { say: "Found it: TI-84 Plus graphing calculator for $18, $2 below asking. Meet-up: HKUST campus. Should I confirm it?", deal: { deal_id: "d_1a2b", … } }
-Agent: Found it: TI-84 Plus graphing calculator for $18, $2 below asking. Meet-up: HKUST campus. Should I confirm it?
+Server ← { say: "Found it: TI-84 Plus graphing calculator for $18, $2 below asking. Meet-up: UW campus. Should I confirm it?", deal: { deal_id: "d_1a2b", … } }
+Agent: Found it: TI-84 Plus graphing calculator for $18, $2 below asking. Meet-up: UW campus. Should I confirm it?
 User: Yes.
 Agent → confirm_deal { deal_id: "d_1a2b", idempotency_key: "c41e…" }
-Server ← { say: "Done! TI-84 Plus graphing calculator for $18 with Mei. Meet-up: HKUST campus, weekdays after 5pm.", … }
-Agent: Done! TI-84 Plus graphing calculator for $18 with Mei. Meet-up: HKUST campus, weekdays after 5pm.
+Server ← { say: "Done! TI-84 Plus graphing calculator for $18 with Mei. Meet-up: UW campus, weekdays after 5pm.", … }
+Agent: Done! TI-84 Plus graphing calculator for $18 with Mei. Meet-up: UW campus, weekdays after 5pm.
 ```
 
 Full contract, schemas and privacy rules: [TOOL_CONTRACT.md](https://github.com/adamchoi787/voice-market-mcp/blob/main/docs/TOOL_CONTRACT.md).

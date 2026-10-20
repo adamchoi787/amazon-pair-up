@@ -6,6 +6,10 @@ import { schemaSql } from "./schema.js";
 // whether it runs on embedded PGlite (local dev, tests) or real Postgres (deploy).
 export interface Db {
   query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
+  /** A pinned connection, so row locks and all following reads share a transaction. */
+  transaction<T>(fn: (tx: Db) => Promise<T>): Promise<T>;
+  root?: Db;
+  afterCommit?(fn: () => void): void;
   close(): Promise<void>;
 }
 
@@ -19,6 +23,26 @@ export async function openDb(
     const pool = new pg.default.Pool({ connectionString: cfg.databaseUrl });
     db = {
       query: async (sql, params) => pool.query(sql, params as unknown[]) as never,
+      transaction: async (fn) => {
+        const connection = await pool.connect();
+        const committed: (() => void)[] = [];
+        const tx: Db = {
+          root: db, afterCommit: fn => committed.push(fn),
+          query: async (sql, params) => connection.query(sql, params as unknown[]) as never,
+          transaction: async (nested) => nested(tx),
+          close: async () => { throw new Error("Cannot close a transaction connection"); },
+        };
+        try {
+          await connection.query("BEGIN");
+          const result = await fn(tx);
+          await connection.query("COMMIT");
+          for (const notify of committed) notify();
+          return result;
+        } catch (error) {
+          await connection.query("ROLLBACK");
+          throw error;
+        } finally { connection.release(); }
+      },
       close: () => pool.end(),
     };
   } else {
@@ -30,6 +54,20 @@ export async function openDb(
     });
     db = {
       query: async (sql, params) => lite.query(sql, params) as never,
+      transaction: async (fn) => {
+        const committed: (() => void)[] = [];
+        const result = await lite.transaction(async (connection) => {
+          const tx: Db = {
+            root: db, afterCommit: fn => committed.push(fn),
+            query: async (sql, params) => connection.query(sql, params) as never,
+            transaction: async (nested) => nested(tx),
+            close: async () => { throw new Error("Cannot close a transaction connection"); },
+          };
+          return fn(tx);
+        });
+        for (const notify of committed) notify();
+        return result;
+      },
       close: () => lite.close(),
     };
   }

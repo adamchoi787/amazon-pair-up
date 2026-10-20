@@ -1,6 +1,7 @@
 import { AMAZON_TRADE_IN_URL, amazonSearchUrl, hubPointFor, type HubPoint } from "./amazon.js";
 import { verdict, type BandSource } from "./pricing.js";
 import { num, type BuyIntentRow, type DealRow, type Kind, type ListingRow, type PriceUnit } from "./types.js";
+import { checkSchedule } from "./scheduling.js";
 
 // The ONLY place rows become tool output. Private limits are included solely
 // for their owner. Every tool response goes through these functions, and
@@ -23,6 +24,7 @@ export function offerView(l: ListingRow, viewerId: string) {
     price_unit: l.price_unit,
     location: l.location,
     availability: l.availability,
+    time_zone: l.time_zone,
     status: l.status,
     typical_price: typicalPrice(l),
     ...(isOwner ? { your_min_price: num(l.min_price), auto_accept: l.auto_accept } : {}),
@@ -49,6 +51,9 @@ export function requestView(i: BuyIntentRow, viewerId: string) {
     hours: num(i.hours),
     pickup: i.pickup,
     schedule: i.schedule,
+    time_zone: i.time_zone,
+    starts_at: iso(i.service_start),
+    ends_at: iso(i.service_end),
     currency: i.currency,
     needed_by: iso(i.needed_by),
     location: i.location,
@@ -65,6 +70,14 @@ export interface DealWithParties extends DealRow {
   condition: string;
   ask_price: string | number;
   availability: string | null;
+  offer_availability: string | null;
+  offer_time_zone: string;
+  request_time_zone: string;
+  request_schedule: string | null;
+  request_created_at: string | Date;
+  service_start: string | Date | null;
+  service_end: string | Date | null;
+  provider_explicit_yes: boolean;
   hours: string | number | null;
   pickup: string | null;
   needed_by: string | Date | null;
@@ -96,6 +109,14 @@ export function dealView(d: DealWithParties, viewerId: string) {
   const price = num(d.price)!;
   const ask = num(d.ask_price)!;
   const hours = num(d.hours);
+  const scheduling = d.kind === "service" ? checkSchedule(
+    { kind: d.kind, availability: d.offer_availability, time_zone: d.offer_time_zone },
+    { kind: d.kind, schedule: d.request_schedule, needed_by: d.needed_by, hours: d.hours, time_zone: d.request_time_zone,
+      service_start: d.service_start, service_end: d.service_end, created_at: d.request_created_at },
+  ) : null;
+  // Older releases auto-approved service prices without checking the time.
+  // A tentative legacy proposal still needs an actual provider yes.
+  const sellerConfirmed = d.seller_confirmed && (d.status !== "proposed" || d.kind === "item" || scheduling?.status === "verified" || d.provider_explicit_yes);
   // Items change hands; two people in the same area meet at its Amazon Hub point.
   const hub = d.kind === "item"
     ? hubPointFor(d.offer_location ?? d.seller_home, d.request_location ?? d.buyer_home)
@@ -103,7 +124,7 @@ export function dealView(d: DealWithParties, viewerId: string) {
   const waitingFor =
     d.status !== "proposed" ? [] : [
       ...(d.buyer_confirmed ? [] : ["buyer" as const]),
-      ...(d.seller_confirmed ? [] : ["seller" as const]),
+      ...(sellerConfirmed ? [] : ["seller" as const]),
     ];
   return {
     deal_id: d.id,
@@ -125,12 +146,13 @@ export function dealView(d: DealWithParties, viewerId: string) {
     currency: d.currency,
     status: d.status,
     buyer_confirmed: d.buyer_confirmed,
-    seller_confirmed: d.seller_confirmed,
+    seller_confirmed: sellerConfirmed,
     waiting_for: waitingFor,
     waiting_for_you: role !== "observer" && waitingFor.includes(role),
     meetup: { place: hub ? hubPlace(hub) : d.meetup, availability: d.availability, hub_point: hub && { ...hub, demo: true } },
     pickup: d.kind === "service" ? d.pickup : null,
     needed_by: d.kind === "service" ? iso(d.needed_by) : null,
+    scheduling,
     on_hold_until: d.status === "proposed" && d.expires_at ? iso(d.expires_at) : null,
     created_at: iso(d.created_at)!,
     updated_at: iso(d.updated_at)!,
@@ -166,7 +188,7 @@ export function ratingView(r: { deal_id: string; stars: number; ratee_role: stri
   return { deal_id: r.deal_id, stars: Number(r.stars), rated_role: r.ratee_role as "buyer" | "seller" };
 }
 
-/** "Amazon Hub Counter, LG7 convenience store, HKUST campus". */
+/** "Amazon Hub Counter, HUB ground floor, UW campus". */
 const hubPlace = (hub: HubPoint) => `${hub.name}, ${hub.area} (demo location)`;
 
 const usd = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;

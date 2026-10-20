@@ -12,7 +12,7 @@ import { rateLimit } from "./rateLimit.js";
 //   POST /api/voice     words in, a sentence out: the Apple Watch Shortcut
 //                       ("Hey Siri, PairUp") and phone automations
 //   POST /api/context   context in: Bee to-dos and summaries (scripts/bee-bridge.ts),
-//                       "arrived at Hall 5" from a Shortcut automation
+//                       "arrived at McCarty Hall" from a Shortcut automation
 //   /api/devices        create (shown once), list and revoke device tokens; web app only
 // /api/voice and /api/context take a device token or the web app's own sign-in.
 

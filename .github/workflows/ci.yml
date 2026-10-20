@@ -17,7 +17,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - name: Committed browser bundles match the sources
-        run: npm run build:web && git diff --exit-code -- public/app/app.js public/mcp-apps public/watch/watch.js
+        run: npm run build:web && git diff --exit-code -- public/app/app.js public/mcp-apps public/watch/watch.js public/build-info.json
 
   agentcore:
     runs-on: ubuntu-latest

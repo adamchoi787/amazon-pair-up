@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { readFileSync } from "node:fs";
 import compression from "compression";
 import express from "express";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
@@ -64,7 +65,10 @@ export function createApp(deps: Deps, cfg: Config) {
 
   const started = Date.now();
   app.get("/health", (_req, res) => {
-    res.json({
+    let assets: { fingerprint?: string } = {};
+    try { assets = JSON.parse(readFileSync("public/build-info.json", "utf8")); } catch { /* Older/local unbuilt checkout. */ }
+    res.set("Cache-Control", "no-store").json({
+      product: "PairUp", revision: cfg.releaseRevision || null, ui_fingerprint: assets.fingerprint ?? null,
       ok: true, version: SERVER_INFO.version, ai: deps.ai.mode, auth: cfg.authMode, agent: agentMode(cfg),
       uptime_s: Math.round((Date.now() - started) / 1000), mcp_sessions: sessions.size, subscriptions: subscriberCount(),
     });

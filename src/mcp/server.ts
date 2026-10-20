@@ -14,6 +14,7 @@ import * as market from "../market/service.js";
 import type { Deps } from "../market/service.js";
 import { REPORT_REASONS } from "../market/trust.js";
 import { KINDS, REQUEST_SOURCES, SERVICE_UNITS } from "../market/types.js";
+import { DEFAULT_TIME_ZONE, validTimeZone } from "../market/scheduling.js";
 import * as suggestions from "../market/context.js";
 import { registerViews, VIEWS, type ViewName } from "./apps.js";
 import { registerPrompts } from "./prompts.js";
@@ -71,7 +72,7 @@ const writes = { readOnlyHint: false, destructiveHint: false, idempotentHint: fa
 const reads = { readOnlyHint: true, idempotentHint: true, openWorldHint: false };
 
 /** Shown in initialize and in the server card (/.well-known/mcp/server-card.json). */
-export const SERVER_INFO = { name: "pairup", title: "PairUp", version: "0.6.0" };
+export const SERVER_INFO = { name: "pairup", title: "PairUp", version: "0.7.0" };
 
 export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
   const server = new McpServer(
@@ -204,8 +205,9 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
           .describe("Pre-approve any deal at or above min_price. Default true for items, false for services (the user says yes to each job)"),
         condition: condition.optional().describe("Items: defaults to 'good'"),
         quantity: z.number().int().positive().max(1000).optional().describe("Items: units for sale; buyers needing more are not paired"),
-        location: text(120).optional().describe("Items: meet-up area. Services: the area the user covers, e.g. 'HKUST campus'. Requests there rank higher"),
+        location: text(120).optional().describe("Items: meet-up area. Services: the area the user covers, e.g. 'UW campus'. Requests there rank higher"),
         availability: text(120).optional().describe("When the user can meet or work, e.g. 'weekdays 11am-2pm'. Shown on the deal"),
+        time_zone: text(80).refine(validTimeZone).optional().describe(`IANA time zone for availability, default ${DEFAULT_TIME_ZONE}`),
         confirm_price: confirmPrice,
         idempotency_key: idempotencyKey,
       },
@@ -238,9 +240,12 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
         max_price: price.optional().describe("PRIVATE budget, per hour for hourly work; required unless stated in raw_request"),
         price_unit: unit.optional().describe("Services: 'job' for a flat fee (default), 'hour' for an hourly rate"),
         hours: z.number().positive().max(336).optional().describe("Hourly work: how long it lasts, used for the total"),
-        pickup: text(120).optional().describe("Errands: where to collect from, e.g. 'LG7 canteen'"),
+        pickup: text(120).optional().describe("Errands: where to collect from, e.g. 'the HUB'"),
         location: text(120).optional().describe("Items: preferred meet-up area. Services: where the job is or where to deliver"),
         schedule: text(80).optional().describe("Services: when, as said, e.g. 'today by 12:30' or 'Saturday 2-6pm'"),
+        starts_at: z.string().max(40).optional().describe("Services: exact ISO start with UTC offset, e.g. 2026-10-24T14:00:00-07:00. Use with ends_at or hours for a checked work window"),
+        ends_at: z.string().max(40).optional().describe("Services: exact ISO end with UTC offset; must be after starts_at and agree with hours"),
+        time_zone: text(80).refine(validTimeZone).optional().describe(`IANA time zone for the request, default ${DEFAULT_TIME_ZONE}; never infer it from the server clock`),
         needed_by: z.string().max(40).optional()
           .describe("ISO 8601: an item's deadline or a job's start time; the request stops pairing after it and offers expire by then"),
         min_condition: condition.optional().describe("Items: worst acceptable condition"),
@@ -589,10 +594,10 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
         source: z.enum(suggestions.SIGNAL_SOURCES),
         kind: z.enum(suggestions.SIGNAL_KINDS),
         text: z.string().trim().max(500).optional().describe("The to-do, summary or note, as written"),
-        place: text(120).optional().describe("location: the place the user arrived at, e.g. 'Hall 5'"),
+        place: text(120).optional().describe("location: the place the user arrived at, e.g. 'McCarty Hall'"),
         observed_at: z.string().max(40).optional().describe("ISO 8601; defaults to now"),
         external_id: z.string().max(128).optional().describe("The device's id for this item, so a resend is ignored"),
-        time_zone: z.string().max(64).optional().describe("IANA zone, e.g. 'Asia/Hong_Kong'"),
+        time_zone: z.string().max(64).optional().describe("IANA zone, e.g. 'America/Los_Angeles'"),
       },
       outputSchema: outputs.add_context,
       annotations: { ...writes, idempotentHint: true },

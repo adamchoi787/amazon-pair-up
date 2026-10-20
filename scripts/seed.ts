@@ -1,9 +1,10 @@
-import { seedLifestyle } from "../src/db/demo-lifestyle.js";
-// Load data/seed-listings.json. `npm run reset` wipes all tables first.
+// Load data/seed-listings.json into an empty market. `npm run reset` wipes all tables first;
+// `--lifestyle` adds the labelled demo lunch-run history.
 import { createAi } from "../src/ai/index.js";
 import { config } from "../src/config.js";
 import { openDb } from "../src/db/client.js";
-import { seedMarketplace } from "../src/db/seed.js";
+import { seedLifestyle } from "../src/db/demo-lifestyle.js";
+import { isEmpty, seedMarketplace } from "../src/db/seed.js";
 
 let db = await openDb(config);
 if (process.argv.includes("--reset")) {
@@ -17,7 +18,8 @@ if (process.argv.includes("--reset")) {
 }
 const deps = { db, ai: createAi(config), cfg: config };
 
-const added = await seedMarketplace(deps);
+// Seeding is safe to repeat: the market is loaded only into an empty database.
+const added = (await isEmpty(deps)) ? await seedMarketplace(deps) : 0;
 const { rows } = await db.query<{ n: number }>(`SELECT count(*)::int AS n FROM listings`);
 if(process.argv.includes("--lifestyle"))console.log(`DEMO DATA: added ${await seedLifestyle(deps)} closed lunch-run requests for u_tony.`);
 console.log(`Seeded ${added} listings (${rows[0].n} total) with ${deps.ai.mode} embeddings.`);

@@ -1,52 +1,30 @@
-# PairUp 0.6.0 local validation
+# PairUp 0.7.0 validation
 
-October 20, 2026, Windows, Node.js 24.14.1. All six handoff branches are merged
-into `main`. Work stayed local; no push, deployment or AWS calls were performed.
+October 20, 2026. Windows, Node.js v24.14.1, local checkout (not yet committed or deployed).
+
+## Checks run
 
 | Check | Result |
 |---|---|
-| Root `npm ci` | Passed; audit reported zero vulnerabilities |
-| `npm run typecheck` | Passed for server and browser sources |
-| `npm test` | 130 passed, zero failures |
-| `npm run build:web` | Web, MCP Apps and watch bundles rebuilt; reproducibility checked after commit |
-| Local server plus smoke | TI-84 purchase, ratings, prohibited-post refusal, lunch-run booking passed |
-| AgentCore `npm ci`, typecheck, tests | Passed; three scripted Strands conversations over real MCP |
-| Shell syntax | `bash -n` passed for AWS deploy, install, teardown and AgentCore deploy scripts |
-| Bee replay | Calculator and printer-paper suggestions; email task and hiking chat produce none |
-| Lifestyle seed | Fifteen labelled, closed requests; idempotent; weekday lunch suggestion before noon |
-| Reset | Scratch database checked for removal of device, context, auth, report and rating data |
+| `npm run typecheck` | Passed: server and browser sources |
+| `npm test` | 146 passed, 0 failed |
+| AgentCore `npm test` | 4 passed, 0 failed (scripted models over real local MCP) |
+| `npm run build:web`, twice | Bundles and `build-info.json` byte-identical |
+| `npm run smoke` against a fresh Seattle market | Passed: TI-84 sale at the HUB Hub Counter, rating, prohibited-post refusal, lunch run from the HUB to McCarty Hall, two-party booking |
+| `npm run bee:bridge -- --replay` | Calculator summary → graphing calculator; to-do → printer paper; e-mail task and hiking chat → nothing |
+| `npm run seed -- --lifestyle` after `npm run reset` | 15 closed lunch runs added; market stays at 162 posts |
+| Browser walkthrough (desktop, 800 × 757) | For you strip with Bee suggestions; routine "weekdays around 12:15pm, about $4"; event booking card: $10/hr, $40 for 4 hours, Sat Oct 24 2:00–6:00 PM America/Los_Angeles, fits stated availability |
+| `bash -n deploy/aws/deploy.sh`, `git diff --check` | Passed |
+| Hosted `check:release` (earlier today) | Public endpoint reports 0.5.0; deploy pending |
 
-The test command runs one file at a time to bound PGlite memory use. Tests cover
-private-limit redaction, schemas, OAuth/client registration/revocation, policy and
-moderation, subscriptions in memory and over HTTP SSE, cross-user session rejection,
-elicitation acceptance/decline/host failure, data erasure across all merged tables,
-device tokens, routine feedback and the offline assistant's approval guards.
+## What the tests cover
 
-Browser walkthrough on a scratch market:
+Scheduling: a Sunday-only provider is never proposed for a Monday job, in either posting direction or through `negotiate`; filtering runs before result limits; full-duration coverage, split shifts, overnight windows, explicit time zones, DST ambiguity and transitions, invalid dates and inconsistent durations. Concurrent requests cannot reserve overlapping timed jobs across one provider's offers, back-to-back jobs are allowed, and concurrent buyer and seller confirmations keep both yeses. Tentative times need the provider's explicit yes, also for deals approved automatically by an earlier release.
 
-- Sign-in, For you strip and Devices panel render.
-- `/watch/` shares sign-in and fits a 410 × 502 desktop watch frame.
-- A printer-paper suggestion accepts a budget, pairs the A4 paper listing, and
-  records confirmation only after a second Yes.
-- “What do you know about me?” renders the weekday lunch routine, $4 budget,
-  LG7 canteen → Hall 5 route and Forget button in an MCP Apps card.
-- “Anything I need?” renders a Bee suggestion with budget and action controls.
-- A $1 iPhone offer asks for price confirmation before posting.
+Requests: item deadlines come only from a day, a date or "by" a clear time ("around 20 bucks" and "at 7-Eleven" leave the request open). Seller disclaimers such as "Not graphing" exclude an offer, and wear notes such as "not used much" keep it. A conditional yes counts as a new constraint. The first device's time zone is kept for the user's routines.
 
-Local benchmark on the merged server: mock AI, PGlite, real HTTP MCP,
-two workers × five rounds, fresh users, 40 tool calls, zero errors:
+Privacy: private limits never appear in the other side's output; the check matches prices rather than any digits in ids or timestamps.
 
-| Tool | p50 | p95 | p99 |
-|---|---:|---:|---:|
-| post_offer | 42 ms | 331 ms | 331 ms |
-| post_request | 84 ms | 126 ms | 126 ms |
-| find_matches | 20 ms | 68 ms | 68 ms |
-| confirm_deal | 27 ms | 36 ms | 36 ms |
+## Still to run on the deployed release
 
-Throughput was 25.7 calls/s. This small sample includes cold calls; deployed
-network and Bedrock performance require a separate measurement.
-
-Live Login with Amazon, Bedrock/AgentCore deployment, physical Bee and Apple Watch
-remain human validation steps. The Bee replay, seed people, Hub locations and
-retail price references are labelled demo data. Search and Trade-In use links;
-live retail-price and Hub-locator APIs are not connected. CI was not triggered.
+A live Bedrock request, Login with Amazon sign-in, an AgentCore invocation if shown, the Siri Shortcut on a paired Apple Watch, and live Bee data for the Bee track. The seed market, Bee replay, Hub locations and reference prices are demo data.

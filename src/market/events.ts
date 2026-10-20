@@ -23,7 +23,10 @@ export async function logEvent(db: Db, kind: string, actorId: string | null, ref
   await db.query(`INSERT INTO events (kind, actor_id, ref_id, detail) VALUES ($1,$2,$3,$4)`, [
     kind, actorId, refId, JSON.stringify(detail),
   ]);
-  if (marketEvents.listenerCount("event")) {
-    marketEvents.emit("event", { db, kind, actorId, refId, detail: detail as Record<string, unknown> } satisfies MarketEvent);
-  }
+  const notify = () => {
+    if (marketEvents.listenerCount("event")) marketEvents.emit("event", {
+      db: db.root ?? db, kind, actorId, refId, detail: detail as Record<string, unknown>,
+    } satisfies MarketEvent);
+  };
+  if (db.afterCommit) db.afterCommit(notify); else notify();
 }

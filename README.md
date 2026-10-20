@@ -10,20 +10,29 @@
 **Bee:** need snippets become suggestions; the included replay uses labelled demo data.
 **Try it:** https://d3cxpkmhl89rw9.cloudfront.net/app/ · MCP endpoint `https://d3cxpkmhl89rw9.cloudfront.net/mcp` (OAuth 2.1)
 
+**Launch market:** the University of Washington campus in Seattle (U District,
+Capitol Hill, Fremont, Ballard, Northgate), US dollars, Pacific time.
+
+**Release 0.7.0:** every helper is checked against the requested work window,
+bookings never overlap, and each post carries its own time zone. The web app
+plays the Alexa+ conversation in any browser. `npm run check:release` confirms
+that the hosted endpoint runs this exact commit. [Validation](docs/VALIDATION.md)
+lists every check; [the campus pilot plan](docs/USER_VALIDATION.md) is the next step.
+
 ## The idea in one minute
 
 Getting something from another person today means photos, forms, haggling in
 chat and arranging a meet-up. Getting a small job done means a platform that
 adds its own fees on top. That effort and cost decide what happens: a spare
-calculator rarely finds the neighbour who needs it, and nobody pays a delivery
+calculator rarely finds the neighbor who needs it, and nobody pays a delivery
 app to carry a $5 lunch two buildings over.
 
 PairUp pairs buyers and sellers directly and does the work in between,
 for things and for services. Both sides post what they have, what they can do,
 or what they need:
 
-- **Things:** "Alexa, sell my TI-84 for $20. I'll take anything above $15." · "Alexa, I need a graphing calculator today, max $18." → "Found it: TI-84 Plus graphing calculator for $18, $2 below asking. Meet-up: HKUST campus. Should I confirm it?"
-- **Errands and delivery:** "Alexa, find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5." → a student already doing lunch runs on campus takes it for $4, and the fee goes to the person who walks.
+- **Things:** "Alexa, sell my TI-84 for $20. I'll take anything above $15." · "Alexa, I need a graphing calculator today, max $18." → "Found it: TI-84 Plus graphing calculator for $18, $2 below asking. Meet-up: UW campus. Should I confirm it?"
+- **Errands and delivery:** "Alexa, find someone to pick up my lunch from the HUB to McCarty Hall by 12:30, $5." → a student already doing lunch runs on campus takes it for $4, and the fee goes to the person who walks.
 - **One-time jobs:** "Alexa, get me a helper for the event on Saturday 2-6pm, budget $10 an hour." → "Found someone: Priya can do it for $10 an hour, $40 for 4 hours."
 
 Neither side ever sees the other's limit. Our MCP server understands both
@@ -55,7 +64,7 @@ limit. One deterministic rule settles every deal instead, in
 **Price check.** A price far from what similar things go for gets a "did you
 mean…?" before it is posted: a $1 iPhone, a minimum misheard as $1, a budget
 heard as $180 for an $18 calculator. The typical range comes from reference
-prices (a product catalog in production), or from the market's own confirmed
+prices (curated demo estimates in this prototype), or from the market's own confirmed
 trades. Those trades are counted so that staged ones barely move the range: one
 vote per seller, at least three independent sellers and buyers, accounts older
 than a week, a median-based range. A buyer who is offered something far below
@@ -71,15 +80,39 @@ Each night ([learning.ts](src/market/learning.ts)) a small logistic model is
 trained on older outcomes and judged on the newest ones. It replaces the
 current ranking only if it ranks them better. 10% of requests always keep the
 hand-tuned ranking as a live control, and the model rolls back automatically
-if its completion rate falls behind. The model only reorders candidates that
+if its mutual-confirmation rate falls behind. The model only reorders candidates that
 already pass every hard constraint, and prices stay with the fixed rule. The
-dashboard shows the daily completion rate, both arms, and what drives
-completion in this market.
+dashboard shows daily mutual confirmation and both arms. The learning label
+is mutual confirmation: both people said yes.
 
 `npm run simulate` runs the real engine on simulated buyers who prefer nearby,
 delivered and pre-approved offers; the engine is never told. Over 12 simulated
 days the learned ranking closed 77% of its proposals against 59% for the
-control, and it named delivery and same area as the main drivers.
+control, and it named delivery and same area as the main drivers. The simulated
+buyers make this a test of the learning loop itself; the campus pilot measures real people.
+
+## A helper must fit the time
+
+Service requests accept natural schedules such as `Saturday 2-6pm`, or exact
+`starts_at` / `ends_at` timestamps with offsets. Each post has an IANA `time_zone`
+(default `America/Los_Angeles`), independent of the server's clock. The whole work
+window must fit the provider's stated availability; a Sunday-only helper is not
+proposed for a Monday job. Checks apply to both posting directions and direct
+alternative selection. Timed reservations cannot overlap across a provider's
+different offers, including when requests arrive concurrently.
+
+The deterministic parser supports weekday names/ranges, weekdays/weekends,
+explicit clock ranges, overnight windows and semicolon-separated shifts. Vague
+phrases such as `evenings`, missing duration or unsupported exceptions stay
+**tentative** and require the provider's explicit yes, even on an auto-accept
+offer. Deadline-only errands cannot prove how long the work takes. Ambiguous DST
+times require an explicit offset. See [the scheduling contract](docs/TOOL_CONTRACT.md#service-scheduling).
+
+## Knows what you need
+
+PairUp learns regular requests from your own history and offers them shortly before they are due. Bee to-dos, need snippets and phone arrival signals can suggest an errand or item. The For you strip lets you say Yes, Not now or Forget. The Devices panel connects a watch, Bee or phone; /watch/ provides a compact voice view. See [Apple Watch](docs/APPLE_WATCH.md) and [Bee](docs/BEE.md). `npm run seed -- --lifestyle` adds three weeks of labelled demo lunch runs (the HUB → McCarty Hall, about $4, around 12:15) for `u_tony`.
+
+Lifestyle code: src/market/lifestyle.ts and context.ts; device tokens: src/auth/devices.ts and src/http/devices.ts; voice loop: src/agent/runner.ts; browser: src/web/watch.ts and lifestyle-ui.ts; Bee bridge: scripts/bee-bridge.ts.
 
 ## Run it (2 minutes, no database or AWS needed)
 
@@ -88,6 +121,7 @@ npm install
 npm run reset        # create tables + load seed listings
 npm start            # web app on http://127.0.0.1:3000/, MCP server at /mcp, operations dashboard at /dashboard/
 npm run smoke        # (second terminal) plays the TI-84 demo over real MCP
+npm run check:release # read-only comparison of the running release and this checkout
 npm test             # unit + end-to-end tests (in-memory Postgres + pgvector)
 npm run simulate     # the learning loop on a simulated market, day by day
 cd agents/agentcore && npm install && npm test   # the Strands agent against a real server
@@ -192,7 +226,7 @@ without a human wiring it up:
 | **Speakable errors** | Every result and error has a `say` sentence; errors an agent can act on carry a `code` |
 | **Strands + AgentCore** | [agents/agentcore](agents/agentcore): a Strands Agents voice agent on Amazon Bedrock AgentCore Runtime whose only tools are this server's, with a code-level guard that blocks `confirm_deal` until the user says yes |
 
-## Production readiness
+## Deployment and operational support
 
 - **AWS:** CloudFront (HTTPS, HTTP/3, security headers) → EC2 Graviton with an IAM
   role (no access keys), encrypted EBS with daily snapshots, auto-recovery, deploys
@@ -202,7 +236,7 @@ without a human wiring it up:
   Embedded Metric Format for per-tool latency.
 - **Reliability:** `/ready` checks the database before traffic switches; graceful
   shutdown drains calls in flight; holds expire and re-pair on a timer; Bedrock
-  failures fall back to local parsing and the offline planner.
+  intent/agent failures fall back to local parsing and the offline planner.
 - **Safety:** OAuth 2.1 with PKCE, Login with Amazon as the identity provider,
   token revocation, SSRF-guarded client metadata fetches, Origin validation, CDN-only origin, per-caller rate
   limits, per-user posting limits, bounded inputs, private limits redacted in one
@@ -211,9 +245,10 @@ without a human wiring it up:
   checked before every post, reports with a review queue on the dashboard, and
   ratings that feed each person's track record.
 - **Speed:** `npm run bench` measures real MCP tool latency and throughput. See the measured local sample below.
-  Local benchmark (2026-10-20, Windows, Node v24.14.1, mock AI, PGlite, real HTTP MCP, 2 workers × 5 rounds, fresh users, 40 calls, zero errors): post_offer p50/p95/p99 42/331/331 ms; post_request 84/126/126 ms; find_matches 20/68/68 ms; confirm_deal 27/36/36 ms. Throughput 25.7 calls/s. This small local sample includes cold calls; measure Bedrock and the deployed network separately with `npm run bench`.
-- **Tests:** 130 server tests (unit, end-to-end over MCP, HTTP, OAuth, schemas, privacy,
-  idempotency) plus the Strands agent against a real server, on every push.
+  Historical 0.6.0 benchmark before the scheduling changes (2026-10-20, Windows, Node v24.14.1, mock AI, PGlite, real HTTP MCP, 2 workers × 5 rounds, fresh users, 40 calls, zero errors): post_offer p50/p95/p99 42/331/331 ms; post_request 84/126/126 ms; find_matches 20/68/68 ms; confirm_deal 27/36/36 ms. Throughput 25.7 calls/s. This small local sample includes cold calls; measure Bedrock and the deployed network separately with `npm run bench`.
+- **Tests:** unit and integration checks over MCP/HTTP, OAuth, schemas, privacy,
+  idempotency, schedule compatibility, overlapping bookings and concurrent approvals;
+  plus scripted Strands conversations against a real server. CI runs on every push.
 
 ## Repo map
 
@@ -229,6 +264,7 @@ src/
   mcp/apps.ts            the MCP Apps view (ui://pairup/market.html)
   agent/                 the web app's assistant step: Bedrock tool use, offline planner, confirm guard
   market/pairing.ts      pairing engine: pair on every post, atomic holds, release and re-pair
+  market/scheduling.ts   deterministic availability, time zones and overlapping work windows
   market/matching.ts     hybrid pgvector + full-text search in both directions
   market/negotiation.ts  price settlement via pairing-core (Rust → WebAssembly)
   market/pricing.ts      price check: reference prices, robust trade-history range
@@ -247,7 +283,6 @@ src/apps/                the MCP Apps view (deal card, options, deals, posts)
 public/app/              web app shell + built bundle (npm run build:web)
 public/mcp-apps/         built single-file MCP Apps view
 public/dashboard/        operations dashboard
-data/seed-listings.json  seed market: 162 posts from 22 people, items and services
 data/policy.json         prohibited and restricted items and services
 data/seed-listings.json  seed market: 162 posts from 22 people, items and services; demo Amazon Hub points per area
 data/trade-in-categories.json  categories Amazon Trade-In takes
@@ -266,11 +301,3 @@ See [docs/AWARD_GAPS.md](docs/AWARD_GAPS.md) for the award analysis and the day-
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
-
-
-## Knows what you need
-
-PairUp learns regular requests from your own history and offers them shortly before they are due. Bee to-dos, need snippets and phone arrival signals can suggest an errand or item. The For you strip lets you say Yes, Not now or Forget. The Devices panel connects a watch, Bee or phone; /watch/ provides a compact voice view. See [Apple Watch](docs/APPLE_WATCH.md) and [Bee](docs/BEE.md). Use npm run seed -- --lifestyle for labelled, closed demo lunch-run history for u_tony.
-
-Lifestyle code: src/market/lifestyle.ts and context.ts; device tokens: src/auth/devices.ts and src/http/devices.ts; voice loop: src/agent/runner.ts; browser: src/web/watch.ts and lifestyle-ui.ts; Bee bridge: scripts/bee-bridge.ts.

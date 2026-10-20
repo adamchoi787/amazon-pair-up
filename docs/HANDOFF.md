@@ -1,3 +1,32 @@
+# PairUp 0.7.0 — handoff (October 20, 2026)
+
+**US-first.** The demo market is the University of Washington in Seattle: UW
+campus, U District, Capitol Hill, Fremont, Ballard and Northgate, each with demo
+Amazon Hub points. The lunch run goes from the HUB to McCarty Hall. Posts default
+to `America/Los_Angeles`, and the Dockerfile and deploy set `TZ` to match.
+
+**Scheduling.** Helpers are checked against the whole work window in both
+pairing directions, one provider's timed bookings never overlap, and a tentative
+time needs the helper's own yes. Cards show total, date, time zone and the
+missing approval. A conditional yes counts as a new constraint.
+
+**Fixes after review.** Item requests take a deadline only from a day, a date or
+"by" a clear time, so "around 20 bucks" or "at 7-Eleven" leave the request open.
+The disclaimer guard reads "not used much" as wear. The privacy test matches
+prices instead of any digits.
+
+**Release identity.** `/health` and `/build-info.json` name the commit and
+browser build; `npm run check:release` compares them with this checkout.
+
+**To deploy:** commit everything with `git add -A` (the deploy ships git HEAD,
+and several files are new), take an EBS snapshot, then run the commands below.
+The public endpoint still runs 0.5.0. See [VALIDATION.md](VALIDATION.md) for
+the checks and [DEMO_SCRIPT.md](DEMO_SCRIPT.md) for the recording.
+
+---
+
+The following is the historical 0.6.0 handoff.
+
 # PairUp 0.6.0 — local release handoff (October 20, 2026 HKT)
 
 All six Claude workstreams are merged into main. Authentication and revocation,

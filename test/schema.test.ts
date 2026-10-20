@@ -61,7 +61,7 @@ test("all tool results conform to their declared schemas", async () => {
   await seller.call("post_offer", { title: "Scientific calculator", category: "calculator", ask_price: 12, min_price: 9 });
   const posted = await seller.call("post_offer", {
     title: "TI-84 Plus graphing calculator", category: "calculator", condition: "good",
-    ask_price: 20, min_price: 15, location: "HKUST campus", availability: "weekdays after 5pm",
+    ask_price: 20, min_price: 15, location: "UW campus", availability: "weekdays after 5pm",
   });
   const req = await buyer.call("post_request", { raw_request: "I need a graphing calculator tomorrow, maximum $18" });
   assert.ok(req.deal, "paired");
@@ -89,12 +89,12 @@ test("service results conform too: errands, hourly work, posts", async () => {
   const client = await clientAs("schema_client");
 
   await runner.call("post_offer", {
-    kind: "service", title: "Lunch runs around campus", category: "delivery", ask_price: 4, min_price: 3, location: "HKUST campus",
+    kind: "service", title: "Lunch runs around campus", category: "delivery", ask_price: 4, min_price: 3, location: "UW campus",
   });
   await helper.call("post_offer", {
     kind: "service", price_unit: "hour", title: "Event helper: setup and registration", category: "event", ask_price: 11, min_price: 9,
   });
-  const lunch = await client.call("post_request", { raw_request: "find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5" });
+  const lunch = await client.call("post_request", { raw_request: "find someone to pick up my lunch from the HUB to McCarty Hall by 12:30, $5" });
   assert.equal(lunch.deal?.kind, "service");
   const event = await client.call("post_request", { raw_request: "get me a guy to help with the event on Saturday 2-6pm, budget $10/hr" });
   assert.equal(event.deal?.price_unit, "hour");

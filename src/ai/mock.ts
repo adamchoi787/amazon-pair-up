@@ -129,7 +129,7 @@ function readWhen(t: string, now: Date): When {
   return out;
 }
 
-// Where an errand starts and ends: "from LG7 canteen to Hall 5 by 12:30".
+// Where an errand starts and ends: "from the HUB to McCarty Hall by 12:30".
 const STOP = String.raw`(?=\s+(?:by|before|at|around|for|on|today|tonight|tomorrow)\b|\s*[,.;!?]|$)`;
 const ROUTE_RE = new RegExp(String.raw`\bfrom\s+([^,;!?]+?)\s+to\s+([^,;!?]+?)${STOP}`, "i");
 const FROM_RE = new RegExp(String.raw`\bfrom\s+([^,;!?]+?)${STOP}`, "i");

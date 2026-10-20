@@ -67,8 +67,8 @@ async function worker(w: number) {
     const buyer = await connectAs(`bench-b-${tag}`);
     // A made-up item per round, so each buyer is paired with its own seller.
     const item = `Bench widget ${tag}`;
-    await call(seller, "post_offer", { title: item, category: "bench", ask_price: 20, min_price: 15, location: "HKUST campus", confirm_price: true });
-    const req = await call(buyer, "post_request", { need: item, max_price: 18, location: "HKUST campus", confirm_price: true });
+    await call(seller, "post_offer", { title: item, category: "bench", ask_price: 20, min_price: 15, location: "UW campus", confirm_price: true });
+    const req = await call(buyer, "post_request", { need: item, max_price: 18, location: "UW campus", confirm_price: true });
     if (req) await call(buyer, "find_matches", { request_id: req.request.request_id });
     if (req?.deal) await call(buyer, "confirm_deal", { deal_id: req.deal.deal_id });
     await Promise.all([seller.close(), buyer.close()]);

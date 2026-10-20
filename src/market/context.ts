@@ -9,7 +9,7 @@ import { type Kind, type PriceUnit, type RequestSource } from "./types.js";
 
 // Knowing what someone needs before they ask. Two sources:
 //   - context signals from devices: Bee (a to-do, a conversation summary, a
-//     voice note), an Apple Watch or phone Shortcut ("arrived at Hall 5",
+//     voice note), an Apple Watch or phone Shortcut ("arrived at McCarty Hall",
 //     "I need a charger"), or an agent that holds the user's Bee data;
 //   - routines learned from the user's own past requests (lifestyle.ts).
 // Either becomes a suggestion: a ready-made request the user accepts with one
@@ -53,7 +53,7 @@ export interface SignalInput {
   observed_at?: string;
   /** The device's own id for the event (a Bee to-do id), so a resend is ignored. */
   external_id?: string;
-  /** IANA zone of the device, e.g. "Asia/Hong_Kong"; remembered for the user's routines. */
+  /** IANA zone of the device, e.g. "America/Los_Angeles"; remembered for the user's routines. */
   time_zone?: string;
 }
 
@@ -103,10 +103,14 @@ const parseDate = (s?: string) => {
 
 // ---------- taking in context ----------
 
-/** A device's time zone places the user's routines in their own day. */
+/**
+ * The first device's time zone places the user's routines in their own day.
+ * Later devices keep it, so a phone abroad or a laptop set to another zone
+ * leaves the home market's clock in place.
+ */
 export async function rememberTimeZone(db: Db, userId: string, tz?: string) {
   const zone = validZone(tz);
-  if (zone) await db.query(`UPDATE users SET time_zone = $2 WHERE id = $1 AND time_zone IS DISTINCT FROM $2`, [userId, zone]);
+  if (zone) await db.query(`UPDATE users SET time_zone = $2 WHERE id = $1 AND time_zone IS NULL`, [userId, zone]);
 }
 
 /** Record one signal; when it names a need, return the suggestion it makes. */

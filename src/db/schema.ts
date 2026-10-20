@@ -89,6 +89,13 @@ ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS price_unit TEXT NOT NULL DEFAUL
 ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS hours      NUMERIC(5,2);
 ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS pickup     TEXT;
 ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS schedule   TEXT;
+-- Natural-language schedules are retained for speech; concrete work windows
+-- are stored separately for availability and overlap checks. Existing rows
+-- are interpreted conservatively from their original creation time.
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS time_zone TEXT NOT NULL DEFAULT 'America/Los_Angeles';
+ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS time_zone TEXT NOT NULL DEFAULT 'America/Los_Angeles';
+ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS service_start TIMESTAMPTZ;
+ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS service_end TIMESTAMPTZ;
 
 -- Price check (src/market/pricing.ts). Reference prices for typical second-hand
 -- ranges; each offer keeps the range it was checked against, and price_flag
@@ -206,6 +213,7 @@ CREATE TABLE IF NOT EXISTS events (
   detail      JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS events_ref_actor_idx ON events (ref_id, actor_id, kind);
 
 -- OAuth 2.1 account linking (src/auth/oauth.ts). Only SHA-256 hashes of codes
 -- and tokens are stored, never the raw values.
@@ -258,7 +266,7 @@ CREATE TABLE IF NOT EXISTS user_passcodes (
 -- Knowing what people need (src/market/lifestyle.ts, src/market/context.ts).
 -- Each user's time zone places their routines in their own day. Context
 -- signals are short snippets from Bee, a watch or a phone (a to-do, a
--- conversation summary, "arrived at Hall 5"); one that names a need becomes a
+-- conversation summary, "arrived at McCarty Hall"); one that names a need becomes a
 -- suggestion the user accepts with a yes. Snippets are deleted after 30 days.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS time_zone TEXT;
 CREATE TABLE IF NOT EXISTS context_signals (

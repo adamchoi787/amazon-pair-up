@@ -56,7 +56,7 @@ test("keyword rules catch each prohibited category and leave everyday posts alon
     ["disposable vapes, 10 pack", "tobacco"],
     ["recalled baby car seat", "recalled"],
     ["fake Rolex, looks real", "counterfeit"],
-    ["cracked Photoshop licence", "counterfeit"],
+    ["cracked Photoshop license", "counterfeit"],
     ["novelty ID card", "documents"],
     ["selling my Netflix account", "documents"],
     ["write my essay for me, 2000 words", "academic_dishonesty"],
@@ -104,7 +104,7 @@ test("a prohibited offer or request is refused before anything is stored, with a
   const vodka = await buyer("post_request", { raw_request: "can someone buy me a bottle of vodka from the store" });
   assert.equal(vodka.code, "restricted_item");
   assert.equal(vodka.category, "alcohol");
-  assert.match(vodka.say, /doesn't allow alcohol, since selling it needs an age check and a licence\.$/);
+  assert.match(vodka.say, /doesn't allow alcohol, since selling it needs an age check and a license\.$/);
   assert.equal(await count(m.db, `SELECT count(*)::int AS n FROM buy_intents`), 0, "nothing requested");
 
   // Wording the keywords miss is caught by meaning.
@@ -117,7 +117,7 @@ test("a prohibited offer or request is refused before anything is stored, with a
   const runner = await m.as("u_runner");
   const essay = await runner("post_offer", { kind: "service", title: "I'll write your essay for you", ask_price: 50 });
   assert.equal(essay.category, "academic_dishonesty");
-  const ok = await runner("post_offer", { kind: "service", title: "Grocery runs from Hang Hau", category: "delivery", ask_price: 5 });
+  const ok = await runner("post_offer", { kind: "service", title: "Grocery runs from U District", category: "delivery", ask_price: 5 });
   assert.equal(ok._isError, false);
 
   assert.equal(await count(m.db, `SELECT count(*)::int AS n FROM events WHERE kind = 'post_blocked'`), 4, "every refusal is on the audit trail");

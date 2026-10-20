@@ -2,6 +2,7 @@
 // Usage: npm start (in another terminal), then: npm run smoke [-- http://host/mcp]
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { resolveServiceTime } from "../src/market/scheduling.js";
 
 const url = new URL(process.argv[2] ?? "http://127.0.0.1:3000/mcp");
 const apiKey = process.env.MCP_API_KEY;
@@ -38,14 +39,14 @@ const { offer } = await call(seller, "Seller", "post_offer", {
   condition: "good",
   ask_price: 20,
   min_price: 15,
-  location: "HKUST campus",
+  location: "UW campus",
   availability: "weekdays after 5pm",
 });
 
 // "Alexa, I need a graphing calculator today, maximum $18." (The buyer is on campus too.)
 const { deal, alternatives } = await call(buyer, "Buyer", "post_request", {
   raw_request: "I need a graphing calculator today, maximum $18",
-  location: "HKUST campus",
+  location: "UW campus",
 }, ["min_price"]);
 if (!deal || deal.offer_id !== offer.offer_id) throw new Error("Expected the TI-84 to be paired in one turn");
 if (!deal.meetup.hub_point) throw new Error("Expected an Amazon Hub point as the campus meet-up");
@@ -70,17 +71,19 @@ const hungry = await connectAs("demo_hungry");
 const { offer: runs } = await call(runner, "Runner", "post_offer", {
   kind: "service",
   title: "Lunch runs around campus",
-  description: "I'll pick up food from any campus canteen and bring it to your hall.",
+  description: "I'll pick up food from any campus food court and bring it to your hall.",
   category: "delivery",
   price_unit: "job",
   ask_price: 4,
   min_price: 3,
-  location: "HKUST campus",
+  location: "UW campus",
   availability: "weekdays 11am-2pm",
 });
-// "Find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5."
+// "Find someone to pick up my lunch from the HUB to McCarty Hall by 12:30, $5."
 const lunch = await call(hungry, "Requester", "post_request", {
-  raw_request: "find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5",
+  raw_request: "find someone to pick up my lunch from the HUB to McCarty Hall by 12:30, $5",
+  // Always a future weekday, independent of the recording time/server's zone.
+  needed_by: resolveServiceTime({ schedule: "Monday by 12:30" }).deadline,
 }, ["min_price"]);
 if (!lunch.deal || lunch.deal.offer_id !== runs.offer_id) throw new Error("Expected the lunch run to be paired in one turn");
 await call(hungry, "Requester", "confirm_deal", { deal_id: lunch.deal.deal_id }, ["min_price"]);

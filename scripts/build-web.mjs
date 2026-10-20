@@ -5,6 +5,7 @@
 // and fails if the committed files are out of date.
 import { build } from "esbuild";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 
 const common = {
   bundle: true,
@@ -33,4 +34,9 @@ writeFileSync(
 );
 
 const size = (f) => `${(readFileSync(f).length / 1024).toFixed(0)} KB`;
+const fingerprint = createHash("sha256");
+for (const path of ["public/app/index.html", "public/app/app.js", "public/mcp-apps/market.html", "public/watch/index.html", "public/watch/watch.js"]) {
+  fingerprint.update(path).update("\0").update(readFileSync(path, "utf8").replace(/\r\n/g, "\n")).update("\0");
+}
+writeFileSync("public/build-info.json", JSON.stringify({ version: JSON.parse(readFileSync("package.json", "utf8")).version, fingerprint: fingerprint.digest("hex") }, null, 2) + "\n");
 console.log(`public/app/app.js ${size("public/app/app.js")} · public/mcp-apps/market.html ${size("public/mcp-apps/market.html")}`);

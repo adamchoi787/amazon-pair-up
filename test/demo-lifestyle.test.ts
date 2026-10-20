@@ -9,13 +9,13 @@ import { postOffer, postRequest } from '../src/market/service.js';
 test('labelled demo lunch history is idempotent, closed and suggested before noon',async()=>{
   const db=await openDb({databaseUrl:'',pgliteDir:'',embeddingDim:64},{inMemory:true});
   const deps={db,ai:createMockAi(64),cfg:{matchThreshold:0.35}};
-  const now=new Date('2026-10-20T11:45:00+08:00');
+  const now=new Date('2026-10-20T11:45:00-07:00');
   try{
     assert.equal(await seedLifestyle(deps,now),15);
     assert.equal(await seedLifestyle(deps,now),0);
     const s=await getSuggestions(deps,'u_tony',now);
     assert.equal(s.suggestions.length,1);
-    assert.deepEqual([s.suggestions[0].request.max_price,s.suggestions[0].request.pickup,s.suggestions[0].request.location],[4,'LG7 canteen','Hall 5']);
+    assert.deepEqual([s.suggestions[0].request.max_price,s.suggestions[0].request.pickup,s.suggestions[0].request.location],[4,'the HUB','McCarty Hall']);
     assert.equal((await db.query("SELECT id FROM buy_intents WHERE status != 'cancelled'")).rows.length,0);
     assert.equal((await db.query('SELECT id FROM deals')).rows.length,0);
   }finally{await db.close();}

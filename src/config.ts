@@ -11,6 +11,7 @@ if (existsSync(".env")) {
 const env = (k: string, d = "") => process.env[k] ?? d;
 
 export const config = {
+  releaseRevision: env("RELEASE_REVISION"),
   port: Number(env("PORT", "3000")),
   host: env("HOST", "127.0.0.1"),
   allowedHosts: env("ALLOWED_HOSTS").split(",").map((s) => s.trim()).filter(Boolean),

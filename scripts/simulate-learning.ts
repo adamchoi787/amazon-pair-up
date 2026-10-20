@@ -28,7 +28,7 @@ const random = () => {
 const pick = <T,>(xs: T[]) => xs[Math.floor(random() * xs.length)];
 
 /** The simulated buyers' preferences: hidden from the engine. */
-const HOME = "HKUST campus";
+const HOME = "UW campus";
 function buyerSaysYes(offer: { nearby: boolean; delivered: boolean; preApproved: boolean }) {
   const z = -1.6 + 1.8 * +offer.nearby + 1.5 * +offer.delivered + 0.6 * +offer.preApproved;
   return random() < 1 / (1 + Math.exp(-z));
@@ -49,7 +49,8 @@ const db = await openDb({ databaseUrl: "", pgliteDir: "", embeddingDim: DIM }, {
 const deps: Deps = { db, ai: createMockAi(DIM), cfg: { matchThreshold: 0.35, postsPerHour: 1e6, maxOpenRequests: 1e6 } };
 
 console.log(`Simulated market, ${days} days. Buyers prefer nearby, delivered and pre-approved offers; the engine isn't told.\n`);
-console.log("day  requests  closed on 1st offer  all proposals closed  ranking in use");
+console.log("Synthetic preferences and confirmations only. This is not a field experiment or evidence of completed jobs.\n");
+console.log("day  requests  yes on 1st offer    mutually confirmed    ranking in use");
 let uid = 0;
 for (let day = 1; day <= days; day++) {
   const traits = new Map<string, { nearby: boolean; delivered: boolean; preApproved: boolean }>();
@@ -61,7 +62,7 @@ for (let day = 1; day <= days; day++) {
         user_id: `seller_${++uid}`, title: pick(g.titles), category: g.need.split(" ").at(-1),
         description: t.delivered ? "I can deliver it to your hall." : "Pick it up from me.",
         ask_price: g.ask[0] + Math.floor(random() * (g.ask[1] - g.ask[0] + 1)),
-        location: t.nearby ? HOME : pick(["Sai Kung", "Mong Kok", "Tseung Kwan O"]),
+        location: t.nearby ? HOME : pick(["Ballard", "Wallingford", "Capitol Hill"]),
         auto_accept: t.preApproved,
       });
       traits.set(o.offer.offer_id, t);

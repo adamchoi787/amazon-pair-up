@@ -35,7 +35,7 @@
   <p>Everything Alexa+ does through the MCP server. <span class="lock">🔒 Private limits never leave the server.</span></p>
 </header>
 <main>
-  <section class="wide"><h2>Learning to pair better</h2><div id="learning" class="muted">No finished deals yet.</div></section>
+  <section class="wide"><h2>Learning to pair better</h2><p class="muted">Measures mutual confirmation, not payment, handover or completed work. Seed and simulated activity are not user adoption.</p><div id="learning" class="muted">No resolved proposals yet.</div></section>
   <section class="wide"><h2>Trust and safety</h2><ul id="review"><li class="muted">No reports or refused posts.</li></ul></section>
   <section><h2>Deals</h2><ul id="deals"></ul></section>
   <section><h2>Requests</h2><ul id="intents"></ul></section>
@@ -77,7 +77,7 @@ async function refresh() {
       const pct = (r) => Math.round(r * 100) + "%";
       const arm = (a, name) => a ? `<div><b>${pct(a.rate)}</b><span class="muted">${name}, ${a.n} deals</span></div>` : "";
       $("learning").innerHTML =
-        `<div class="stats"><div><b>${pct(L.daily.at(-1).completion_rate)}</b><span class="muted">closed, latest day</span></div>${arm(L.arms.model, "learned ranking")}${arm(L.arms.control, "control ranking")}
+        `<div class="stats"><div><b>${pct(L.daily.at(-1).completion_rate)}</b><span class="muted">mutually confirmed, latest day</span></div>${arm(L.arms.model, "learned ranking")}${arm(L.arms.control, "control ranking")}
           <div><b>${L.model ? "v" + L.model.version : "none"}</b><span class="muted">model in use</span></div></div>
          <div class="bars" title="Share of proposed deals that both sides confirmed, per day">${L.daily.map((x) => `<span style="height:${Math.max(4, x.completion_rate * 100)}%" title="${esc(x.day)}: ${pct(x.completion_rate)} of ${x.outcomes}"></span>`).join("")}</div>
          ${L.model ? `<div class="muted">What closes deals here: ${L.model.drivers.slice(0, 4).map((x) => `${esc(x.feature.replaceAll("_", " "))} (${x.weight > 0 ? "+" : ""}${x.weight.toFixed(2)})`).join(" · ")}</div>` : ""}`;

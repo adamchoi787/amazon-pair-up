@@ -57,7 +57,7 @@ test("a watch token talks to /api/voice: suggestion, budget, deal, yes", async (
   assert.match(ctxBody.say, /Your Bee picked up/);
 
   const say = async (text: string) => {
-    const res = await post("/api/voice", { text, time_zone: "Asia/Hong_Kong" }, auth);
+    const res = await post("/api/voice", { text, time_zone: "America/Los_Angeles" }, auth);
     assert.equal(res.status, 200);
     return (await res.json()) as { say: string; tool: string | null; result: Record<string, unknown> | null };
   };
@@ -71,7 +71,10 @@ test("a watch token talks to /api/voice: suggestion, budget, deal, yes", async (
   assert.match(yes.say, /confirm|seller|deal/i);
 
   const tz = await db.query<{ time_zone: string }>(`SELECT time_zone FROM users WHERE id = 'u_tony'`);
-  assert.equal(tz.rows[0].time_zone, "Asia/Hong_Kong", "the watch's zone places routines in the user's day");
+  assert.equal(tz.rows[0].time_zone, "America/Los_Angeles", "the watch's zone places routines in the user's day");
+  await post("/api/voice", { text: "any news?", time_zone: "Asia/Tokyo" }, auth);
+  const kept = await db.query<{ time_zone: string }>(`SELECT time_zone FROM users WHERE id = 'u_tony'`);
+  assert.equal(kept.rows[0].time_zone, "America/Los_Angeles", "a later device in another zone keeps the home market's clock");
 });
 
 test("device tokens reach only /api/voice and /api/context, and can be revoked", async () => {
@@ -92,9 +95,9 @@ test("context validates its input and ignores resends", async () => {
   const phone = await newDevice("phone", "u_mei");
   const auth = { Authorization: `Bearer ${phone.token}` };
   assert.equal((await post("/api/context", { kind: "weather" }, auth)).status, 400);
-  const batch = { signals: [{ kind: "location", place: "Hall 5" }, { kind: "note", text: "ran out of tissues", external_id: "n1" }] };
+  const batch = { signals: [{ kind: "location", place: "McCarty Hall" }, { kind: "note", text: "ran out of tissues", external_id: "n1" }] };
   const first = (await (await post("/api/context", batch, auth)).json()) as { suggestions: { request: { location: string } }[] };
-  assert.equal(first.suggestions[0].request.location, "Hall 5", "the place the phone reported");
+  assert.equal(first.suggestions[0].request.location, "McCarty Hall", "the place the phone reported");
   const again = (await (await post("/api/context", batch, auth)).json()) as { results: { duplicate: boolean }[] };
   assert.equal(again.results[1].duplicate, true);
 });

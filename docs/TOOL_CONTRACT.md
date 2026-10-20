@@ -35,13 +35,15 @@ call. A post with no counterpart waits and is paired when one arrives.
 - **Relevance gate:** two posts count as a match only when their relevance
   (semantic + keyword, 0..1) reaches `MATCH_THRESHOLD`. Price fit and area then
   rank the relevant ones. Ties go to the earlier post.
-- **Hard constraints:** same kind and price unit, enough quantity and the wanted
+- **Hard constraints:** same kind, currency and price unit, enough quantity and the wanted
   condition (items), a price both limits allow, the request's deadline still ahead,
   the pair not declined or left to expire before, both people in good standing,
-  and neither having reported the other.
+  and neither having reported the other. Service availability and known overlapping
+  timed bookings are checked as described in [Service scheduling](#service-scheduling).
 - **One hold at a time:** an offer (`pending`) and a request (`matched`) are each
-  held by at most one proposed deal. Both are claimed in one SQL statement, so
-  concurrent posts can never double-book an item or a runner.
+  held by at most one proposed deal. Transactions and row locks protect the
+  reservation, including overlapping timed jobs across one provider's offers.
+  Work without a known duration is scheduled by the provider when they approve it.
 - **Price:** one fixed rule, no haggling. The price is the asking price, or the
   buyer's budget when that is lower, and the deal exists when that price is at
   least the seller's minimum. So the seller's minimum never moves the price, and
@@ -186,7 +188,7 @@ a person-to-person market:
 | Live animals and wildlife products | restricted | `restricted_item` |
 | Illegal and harmful services | prohibited | `prohibited_item` |
 
-Restricted means selling it needs a licence, an age check, a prescription or a
+Restricted means selling it needs a license, an age check, a prescription or a
 breeder, which people trading directly can't provide, so it isn't allowed here
 either. The check is deterministic:
 
@@ -198,7 +200,7 @@ either. The check is deterministic:
 
 A refused post returns `isError: true` with `say` ("I can't post that.
 PairUp doesn't allow alcohol, since selling it needs an age check and a
-licence."), `code`, `category`, `label`, `severity` and `matched_by`
+license."), `code`, `category`, `label`, `severity` and `matched_by`
 (`keyword|meaning`). A request is checked before its budget is asked for. Speak
 `say`; never reword the post to get around the rule. Refused posts count toward
 `POSTS_PER_HOUR` and appear on the dashboard's review queue.
@@ -299,7 +301,7 @@ All output goes through [views.ts](../src/market/views.ts); the tests fail on an
 
 ### `post_request`
 `need` and/or `raw_request`*, `max_price` (required unless stated in `raw_request`; per hour for hourly work), `kind`, `price_unit`, `hours`, `pickup`, `location`, `schedule`, `needed_by` (ISO 8601, in the future: an item's deadline or a job's start), `min_condition` (items), `quantity` (items), `source` (`voice|bee_context|device_context|routine`), `confirm_price` (only after a `confirm_price` error)
-→ `{ request, deal | null, alternatives: [offer + within_budget_at_ask + score] (up to 4), fallback | null, say }`. With no deal, `alternatives` and `say` also name the closest offers the budget can't reach, at their asking price, and an item request gets a `fallback` (see [Hand-offs to Amazon](#hand-offs-to-amazon)). The marketplace policy is checked before posting. Structured args win; `raw_request` is parsed to fill the gaps, including kind, unit, hours, pickup, place and time ("find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5").
+→ `{ request, deal | null, alternatives: [offer + within_budget_at_ask + score] (up to 4), fallback | null, say }`. With no deal, `alternatives` and `say` also name the closest offers the budget can't reach, at their asking price, and an item request gets a `fallback` (see [Hand-offs to Amazon](#hand-offs-to-amazon)). The marketplace policy is checked before posting. Structured args win; `raw_request` is parsed to fill the gaps, including kind, unit, hours, pickup, place and time ("find someone to pick up my lunch from the HUB to McCarty Hall by 12:30, $5").
 
 ### `find_matches`
 `request_id`*, `limit` (1–10, default 3)
@@ -381,20 +383,20 @@ seller: "Sell my TI-84 for $20, I'll take anything above $15."
   → post_offer              Alexa: "Listed … I'll pair you with a buyer as soon as one asks."
 buyer:  "I need a graphing calculator today, max $18."
   → post_request            Alexa: "Found it: TI-84 Plus graphing calculator for $18, $2 below asking.
-                                    Meet-up: HKUST campus. Should I confirm it?"
-buyer:  "Yes."  → confirm_deal   Alexa: "Done! … Meet-up: HKUST campus, weekdays after 5pm."
+                                    Meet-up: UW campus. Should I confirm it?"
+buyer:  "Yes."  → confirm_deal   Alexa: "Done! … Meet-up: UW campus, weekdays after 5pm."
 seller: "Did anyone buy my calculator?" → get_deal_status
 ```
 
 ```
 runner: "I can do lunch runs around campus for $4 a run, at least $3."
   → post_offer (service)    Alexa: "You're on the market: Lunch runs around campus, $4 a job. …"
-hungry: "Find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5."
+hungry: "Find someone to pick up my lunch from the HUB to McCarty Hall by 12:30, $5."
   → post_request            Alexa: "Found someone: Ken can do it for $4.
-                                    From LG7 canteen to Hall 5, by 12:30. Should I confirm? Ken gives the final yes."
+                                    From the HUB to McCarty Hall, by 12:30. Should I confirm? Ken gives the final yes."
 hungry: "Yes."  → confirm_deal   Alexa: "Confirmed on your side. I'll let you know when Ken says yes."
 runner: "Any jobs for me?" → get_deal_status   "One deal is waiting for your yes. Pick up my lunch for Mei, $4 …"
-runner: "Yes."  → confirm_deal   Alexa: "Booked! Lunch runs around campus with Mei, $4. From LG7 canteen to Hall 5, by 12:30."
+runner: "Yes."  → confirm_deal   Alexa: "Booked! Lunch runs around campus with Mei, $4. From the HUB to McCarty Hall, by 12:30."
 ```
 
 Hourly work reads the same way: "Get me a helper for the event on Saturday
@@ -452,3 +454,48 @@ get_suggestions. Ask for a budget if needed and wait for yes before accepting.
 See [BEE.md](BEE.md) and [APPLE_WATCH.md](APPLE_WATCH.md).
 
 Retail reference amounts are hand-set demo estimates and are labelled in spoken results and cards. Amazon search links let the user check current prices. Trade-In links ask the user to check eligibility for their model and country.
+
+## Service scheduling
+
+Version 0.7.0 adds `time_zone` to offers and requests (IANA name, default
+`America/Los_Angeles`) and optional `starts_at` / `ends_at` to `post_request`.
+Exact timestamps require a UTC offset. An end requires a start, must follow it,
+and must agree with `hours` when supplied. Request output includes the new fields.
+Availability is decided by code from the stated hours.
+
+The supported availability grammar is weekday names and ranges (`Mon-Fri`),
+`weekdays`, `weekends`, `daily` / `any day`, clock ranges (`9am-5pm`, `09:00-17:00`),
+overnight ranges and semicolon-separated shifts. A full job interval must be
+covered without a gap. Requests can use an explicit date, today/tomorrow or a
+weekday and a clock range. Bare clocks without am/pm, unsupported qualifiers and
+missing duration give a tentative match. Ambiguous or nonexistent DST local
+times require an explicit ISO offset.
+
+A service deal adds `scheduling` with `status`, resolved `starts_at` / `ends_at`,
+the provider's `time_zone` and original `provider_availability`. `verified`
+means the full interval fits the stated availability. `needs_confirmation`
+means the provider must explicitly approve it, even on an auto-accept offer.
+A `by` deadline alone cannot prove the errand's duration. `conflict` prevents a
+new proposal; a direct alternative selection returns `schedule_conflict`.
+
+Availability filters run before candidate limits in both directions. Explicit
+alternative selection must pass the same non-price eligibility constraints.
+Existing proposed/confirmed timed jobs exclude overlapping work across all
+of the provider's service offers. A transaction locks the provider before
+checking reservations, so concurrent requests cannot reserve overlapping timed
+jobs. Back-to-back intervals are allowed. Work without a known duration is
+scheduled by the provider when they approve it.
+
+Both sides' confirmations and the related post-state updates commit together.
+Resource notifications are emitted after commit. A conditional yes ("yes if…")
+is treated as a new constraint. `confirmed` and the request state `fulfilled`
+mean **both people agreed**; payment and hand-off happen between them. The
+dashboard's `completion_rate` measures mutual confirmation among resolved
+proposals, and `learning.outcome` names that label.
+
+`/health` now includes `product`, `revision` (from `RELEASE_REVISION`, null locally)
+and `ui_fingerprint`. The committed `/build-info.json` contains a deterministic
+fingerprint of the browser surfaces. `npm run check:release` reads these plus
+readiness and the app shell, and returns a failing exit code for stale assets,
+version or an explicitly expected revision. It is read-only: no sign-in and no
+market writes.

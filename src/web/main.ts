@@ -102,14 +102,15 @@ function greet() {
   addBubble("assistant", `Hi${first ? ` ${first}` : ""}! Tell me what you need, what you're selling or what you can do for people, and I'll pair you with someone nearby.`);
   const chips = $("suggestions");
   chips.replaceChildren();
-  for (const s of [
-    "Sell my TI-84 for $20, I'll take anything above $15",
-    "I need a graphing calculator today, max $18",
-    "Find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5",
-    "Get me a helper for the event on Saturday 2-6pm, budget $10/hr",
-    "Any news on my deals?",
+  for (const [label, s] of [
+    ["Sell a calculator", "Sell my TI-84 for $20, I'll take anything above $15"],
+    ["Find a calculator", "I need a graphing calculator today, max $18"],
+    ["Lunch pickup", "Find someone to pick up my lunch from the HUB to McCarty Hall tomorrow by 12:30, $5"],
+    ["Book event help", "Get me a helper for the event on Saturday 2-6pm, budget $10/hr"],
+    ["Check my deals", "Any news on my deals?"],
   ]) {
-    const b = el("button", "chip", s);
+    const b = el("button", "chip", label);
+    b.title = s;
     b.type = "button";
     b.onclick = () => void ask(s);
     chips.append(b);
@@ -123,9 +124,12 @@ function addBubble(role: "user" | "assistant" | "note", text: string, parent: HT
   return b;
 }
 
-function scrollDown() {
+function scrollDown(anchor?: HTMLElement) {
   const log = $("log");
-  requestAnimationFrame(() => log.scrollTo({ top: log.scrollHeight, behavior: "smooth" }));
+  requestAnimationFrame(() => log.scrollTo({
+    top: anchor ? anchor.getBoundingClientRect().top - log.getBoundingClientRect().top + log.scrollTop - 8 : log.scrollHeight,
+    behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+  }));
 }
 
 async function ask(text: string) {
@@ -188,7 +192,7 @@ async function ask(text: string) {
   reply.classList.remove("pending");
   turnEl.prepend(reply);
   if (voiceOn) speak(finalText);
-  scrollDown();
+  scrollDown(turnEl);
 }
 
 /** The last stretch of conversation, starting at something the user said. */
@@ -207,12 +211,13 @@ async function addView(parent: HTMLElement, uri: string, input: Record<string, u
   const box = el("div", "card-slot");
   parent.append(box);
   try {
-    return await renderView(mcp, box, uri, input, result, onCardAction, scrollDown);
+    return await renderView(mcp, box, uri, input, result, onCardAction, () => scrollDown(parent));
   } catch {
     box.remove();
+    addBubble("note", "The offer card couldn't load. Open Deals, or ask me for your deal status, to review it.", parent);
     return undefined;
   } finally {
-    scrollDown();
+    scrollDown(parent);
   }
 }
 
@@ -277,13 +282,29 @@ function asDealResult(r: CallToolResult): CallToolResult {
 // ---------- tabs: assistant, deals, posts ----------
 
 function bindTabs() {
-  for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-tab]")) {
+  const tabs = [...document.querySelectorAll<HTMLButtonElement>("[data-tab]")];
+  for (const [index, tab] of tabs.entries()) {
+    tab.id = `tab-${tab.dataset.tab}`;
+    tab.setAttribute("aria-controls", `panel-${tab.dataset.tab}`);
+    $(`panel-${tab.dataset.tab}`).setAttribute("aria-labelledby", tab.id);
+    tab.tabIndex = index === 0 ? 0 : -1;
     tab.onclick = () => void openTab(tab.dataset.tab as "assistant" | "deals" | "posts" | "devices");
+    tab.onkeydown = event => {
+      const next = event.key === "ArrowRight" ? (index + 1) % tabs.length : event.key === "ArrowLeft" ? (index - 1 + tabs.length) % tabs.length
+        : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : null;
+      if (next == null) return;
+      event.preventDefault();
+      tabs[next].focus();
+      tabs[next].click();
+    };
   }
 }
 
 async function openTab(name: "assistant" | "deals" | "posts" | "devices") {
-  for (const t of document.querySelectorAll<HTMLButtonElement>("[data-tab]")) t.setAttribute("aria-selected", String(t.dataset.tab === name));
+  for (const t of document.querySelectorAll<HTMLButtonElement>("[data-tab]")) {
+    t.setAttribute("aria-selected", String(t.dataset.tab === name));
+    t.tabIndex = t.dataset.tab === name ? 0 : -1;
+  }
   for (const p of ["assistant", "deals", "posts", "devices"]) $(`panel-${p}`).hidden = p !== name;
   if (name === "assistant") return;
   if (name === "devices") return showDevices(auth);

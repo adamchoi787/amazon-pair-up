@@ -31,11 +31,11 @@ test("Trade-In categories match by category or title words", () => {
 });
 
 test("a Hub point is suggested only when both sides are in the same area", () => {
-  const hub = hubPointFor("HKUST campus", " hkust  Campus ");
-  assert.deepEqual(hub, { name: "Amazon Hub Counter, LG7 convenience store", type: "counter", area: "HKUST campus" });
-  assert.equal(hubPointFor("HKUST campus", "Sai Kung"), null);
-  assert.equal(hubPointFor("HKUST campus", null), null);
-  assert.equal(hubPointFor("Mong Kok", "Mong Kok"), null, "an area without Hub points");
+  const hub = hubPointFor("UW campus", " uw  Campus ");
+  assert.deepEqual(hub, { name: "Amazon Hub Counter, HUB ground floor", type: "counter", area: "UW campus" });
+  assert.equal(hubPointFor("UW campus", "Ballard"), null);
+  assert.equal(hubPointFor("UW campus", null), null);
+  assert.equal(hubPointFor("Wallingford", "Wallingford"), null, "an area without Hub points");
 });
 
 // ---------- through the MCP tools ----------
@@ -138,31 +138,31 @@ test("no Trade-In hint when a buyer is already waiting", async () => {
 test("both sides on campus: the deal suggests the campus Amazon Hub point", async () => {
   const seller = await clientAs("amz_hub_seller");
   const buyer = await clientAs("amz_hub_buyer");
-  await seller.call("post_offer", { title: "Rice cooker, 1L", category: "kitchen", ask_price: 15, location: "HKUST campus", availability: "evenings" });
-  const req = await buyer.call("post_request", { need: "rice cooker", max_price: 15, location: "HKUST campus" });
+  await seller.call("post_offer", { title: "Rice cooker, 1L", category: "kitchen", ask_price: 15, location: "UW campus", availability: "evenings" });
+  const req = await buyer.call("post_request", { need: "rice cooker", max_price: 15, location: "UW campus" });
   assert.deepEqual(req.deal.meetup, {
-    place: "Amazon Hub Counter, LG7 convenience store, HKUST campus (demo location)",
+    place: "Amazon Hub Counter, HUB ground floor, UW campus (demo location)",
     availability: "evenings",
-    hub_point: { name: "Amazon Hub Counter, LG7 convenience store", type: "counter", area: "HKUST campus", demo: true },
+    hub_point: { name: "Amazon Hub Counter, HUB ground floor", type: "counter", area: "UW campus", demo: true },
   });
-  assert.match(req.say, /Meet-up: Amazon Hub Counter, LG7 convenience store, HKUST campus \(demo location\)\./);
+  assert.match(req.say, /Meet-up: Amazon Hub Counter, HUB ground floor, UW campus \(demo location\)\./);
   const done = await buyer.call("confirm_deal", { deal_id: req.deal.deal_id });
-  assert.match(done.say, /Meet-up: Amazon Hub Counter, LG7 convenience store, HKUST campus \(demo location\), evenings\./);
+  assert.match(done.say, /Meet-up: Amazon Hub Counter, HUB ground floor, UW campus \(demo location\), evenings\./);
   for (const c of [seller, buyer]) await c.close();
 });
 
 test("a buyer's home area counts when the request names none; different areas keep the seller's area", async () => {
   await ensureUser(db, "amz_home_buyer", "Hana");
-  await db.query(`UPDATE users SET home_area = 'Sai Kung' WHERE id = 'amz_home_buyer'`);
+  await db.query(`UPDATE users SET home_area = 'Ballard' WHERE id = 'amz_home_buyer'`);
   const seller = await clientAs("amz_home_seller");
   const buyer = await clientAs("amz_home_buyer");
-  await seller.call("post_offer", { title: "Yoga mat, purple", category: "sports", ask_price: 8, location: "Sai Kung" });
+  await seller.call("post_offer", { title: "Yoga mat, purple", category: "sports", ask_price: 8, location: "Ballard" });
   const near = await buyer.call("post_request", { need: "yoga mat", max_price: 8 });
-  assert.equal(near.deal.meetup.hub_point.area, "Sai Kung");
+  assert.equal(near.deal.meetup.hub_point.area, "Ballard");
 
   const far = await clientAs("amz_far_seller");
-  await far.call("post_offer", { title: "Basketball, size 7", category: "sports", ask_price: 10, location: "Diamond Hill" });
+  await far.call("post_offer", { title: "Basketball, size 7", category: "sports", ask_price: 10, location: "Northgate" });
   const away = await buyer.call("post_request", { need: "basketball", max_price: 10 });
-  assert.deepEqual(away.deal.meetup, { place: "Diamond Hill", availability: null, hub_point: null });
+  assert.deepEqual(away.deal.meetup, { place: "Northgate", availability: null, hub_point: null });
   for (const c of [seller, buyer, far]) await c.close();
 });

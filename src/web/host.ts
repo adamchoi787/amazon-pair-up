@@ -57,15 +57,23 @@ export async function renderView(
     }
     onResize?.();
   };
-  const ready = new Promise<void>((resolve) => {
+  let readyTimer: ReturnType<typeof setTimeout>;
+  const ready = new Promise<void>((resolve, reject) => {
     bridge.oninitialized = () => resolve();
+    readyTimer = setTimeout(() => reject(new Error("The offer card did not load")), 8_000);
   });
 
+  try {
   await bridge.connect(new PostMessageTransport(frame.contentWindow!, frame.contentWindow!));
   frame.srcdoc = html;
   await ready;
   await bridge.sendToolInput({ arguments: input });
   await bridge.sendToolResult(result);
+  } catch (error) {
+    void bridge.close().catch(() => undefined);
+    frame.remove();
+    throw error;
+  } finally { clearTimeout(readyTimer!); }
 
   const themeQuery = matchMedia("(prefers-color-scheme: dark)");
   const onTheme = () => bridge.setHostContext({ ...context, theme: themeNow() });

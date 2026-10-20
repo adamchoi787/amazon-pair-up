@@ -10,12 +10,12 @@ import { postOffer, postRequest, type Deps } from "../src/market/service.js";
 // Bee or a watch, become suggestions that wait for a yes.
 
 const DIM = 256;
-const TZ = "Asia/Hong_Kong";
+const TZ = "America/Los_Angeles";
 let db: Db;
 let deps: Deps;
 
-/** A local Hong Kong time, as an instant. */
-const hk = (date: string, time: string) => new Date(`${date}T${time}:00+08:00`);
+/** A local Seattle time (Pacific Daylight Time in these weeks), as an instant. */
+const local = (date: string, time: string) => new Date(`${date}T${time}:00-07:00`);
 
 /** Post a request as if it were made at `at`, then close it so it doesn't hold the market. */
 async function pastRequest(user: string, at: Date, input: Partial<Parameters<typeof postRequest>[1]>) {
@@ -30,48 +30,48 @@ before(async () => {
   // Three weeks of lunch runs, Tuesdays and Thursdays around 12:10, and one stray request.
   const days = ["2026-09-29", "2026-10-01", "2026-10-06", "2026-10-08", "2026-10-13", "2026-10-15"];
   for (const [i, d] of days.entries()) {
-    await pastRequest("tony", hk(d, ["12:05", "12:15", "12:10", "12:20", "12:10", "12:00"][i]), {
-      need: "pick up my lunch", kind: "service", price_unit: "job", max_price: [4, 4, 5, 4, 4, 4][i], pickup: "LG7 canteen", location: "Hall 5",
+    await pastRequest("tony", local(d, ["12:05", "12:15", "12:10", "12:20", "12:10", "12:00"][i]), {
+      need: "pick up my lunch", kind: "service", price_unit: "job", max_price: [4, 4, 5, 4, 4, 4][i], pickup: "the HUB", location: "McCarty Hall",
     });
   }
-  await pastRequest("tony", hk("2026-10-02", "20:00"), { need: "yoga mat", max_price: 8 });
-  await pastRequest("mei", hk("2026-10-01", "10:00"), { need: "graphing calculator", max_price: 18 });
+  await pastRequest("tony", local("2026-10-02", "20:00"), { need: "yoga mat", max_price: 8 });
+  await pastRequest("mei", local("2026-10-01", "10:00"), { need: "graphing calculator", max_price: 18 });
   // Offers come after the history, so past requests hold none of them.
-  await postOffer(deps, { user_id: "runner", kind: "service", title: "Lunch runs around campus", category: "delivery", ask_price: 4, min_price: 3, location: "HKUST campus" });
+  await postOffer(deps, { user_id: "runner", kind: "service", title: "Lunch runs around campus", category: "delivery", ask_price: 4, min_price: 3, location: "UW campus" });
   await postOffer(deps, { user_id: "seller", title: "TI-84 Plus graphing calculator", category: "calculator", ask_price: 20, min_price: 15 });
 });
 after(async () => db.close());
 
 test("a routine is learned from the user's own requests: days, time, usual budget and place", async () => {
-  const mine = await getMyRoutines(deps, "tony", hk("2026-10-19", "09:00"));
+  const mine = await getMyRoutines(deps, "tony", local("2026-10-19", "09:00"));
   assert.equal(mine.routines.length, 1, "the stray yoga mat is not a routine");
   const r = mine.routines[0];
   assert.equal(r.need, "pick up my lunch");
   assert.equal(r.when, "on Tuesdays and Thursdays around 12:10pm");
   assert.equal(r.usual_budget, 4);
-  assert.equal(r.pickup, "LG7 canteen");
-  assert.equal(r.location, "Hall 5");
+  assert.equal(r.pickup, "the HUB");
+  assert.equal(r.location, "McCarty Hall");
   assert.equal(r.times, 6);
   assert.equal(localTime(new Date(r.next_at), TZ).date, "2026-10-20", "next due on Tuesday");
   assert.match(mine.say, /one routine: pick up my lunch/);
 });
 
 test("a routine is suggested shortly before it is due, and not at other times", async () => {
-  const early = await getSuggestions(deps, "tony", hk("2026-10-20", "09:00"));
+  const early = await getSuggestions(deps, "tony", local("2026-10-20", "09:00"));
   assert.equal(early.suggestions.length, 0, "too early on Tuesday");
-  const wednesday = await getSuggestions(deps, "tony", hk("2026-10-21", "11:50"));
+  const wednesday = await getSuggestions(deps, "tony", local("2026-10-21", "11:50"));
   assert.equal(wednesday.suggestions.length, 0, "not a lunch-run day");
 
-  const due = await getSuggestions(deps, "tony", hk("2026-10-20", "11:45"));
+  const due = await getSuggestions(deps, "tony", local("2026-10-20", "11:45"));
   assert.equal(due.suggestions.length, 1);
   const s = due.suggestions[0];
   assert.equal(s.from, "routine");
-  assert.deepEqual([s.request.max_price, s.request.pickup, s.request.location], [4, "LG7 canteen", "Hall 5"]);
-  assert.match(s.say, /your usual: pick up my lunch from LG7 canteen to Hall 5, about \$4 a job/);
+  assert.deepEqual([s.request.max_price, s.request.pickup, s.request.location], [4, "the HUB", "McCarty Hall"]);
+  assert.match(s.say, /your usual: pick up my lunch from the HUB to McCarty Hall, about \$4 a job/);
 });
 
 test("accepting a routine suggestion posts and pairs the request; it isn't suggested again that day", async () => {
-  const now = hk("2026-10-20", "11:45");
+  const now = local("2026-10-20", "11:45");
   const s = (await getSuggestions(deps, "tony", now)).suggestions[0];
   const r = await acceptSuggestion(deps, "tony", s.suggestion_id, undefined, now);
   assert.equal(r.request.source, "routine");
@@ -81,7 +81,7 @@ test("accepting a routine suggestion posts and pairs the request; it isn't sugge
 });
 
 test("forget stops a routine from being suggested", async () => {
-  const thursday = hk("2026-10-22", "11:50");
+  const thursday = local("2026-10-22", "11:50");
   const s = (await getSuggestions(deps, "tony", thursday)).suggestions[0];
   assert.ok(s, "due again on Thursday");
   const d = await dismissSuggestion(deps, "tony", s.suggestion_id, true, thursday);
@@ -113,10 +113,10 @@ test("a Bee to-do that names a need becomes a suggestion with the usual budget; 
 });
 
 test("a watch location sets where a need is; a need without a usual budget asks for one", async () => {
-  await addContext(deps, "ken", { source: "watch", kind: "location", place: "Hall 5" });
+  await addContext(deps, "ken", { source: "watch", kind: "location", place: "McCarty Hall" });
   const s = await addContext(deps, "ken", { source: "watch", kind: "note", text: "I need someone to pick up my parcel from the mail room" });
   assert.ok(s.suggestion);
-  assert.equal(s.suggestion.request.location, "Hall 5");
+  assert.equal(s.suggestion.request.location, "McCarty Hall");
   assert.equal(s.suggestion.request.max_price, null);
   assert.match(s.suggestion.say, /Tell me the most you'd pay/);
   await assert.rejects(acceptSuggestion(deps, "ken", s.suggestion.suggestion_id), /most you'd pay/);
@@ -132,6 +132,6 @@ test("need cues", () => {
 });
 
 test("next occurrence uses the user's own time zone", () => {
-  const at = nextOccurrence([2, 4], 12 * 60 + 10, TZ, hk("2026-10-20", "13:00"));
-  assert.equal(at.toISOString(), hk("2026-10-22", "12:10").toISOString());
+  const at = nextOccurrence([2, 4], 12 * 60 + 10, TZ, local("2026-10-20", "13:00"));
+  assert.equal(at.toISOString(), local("2026-10-22", "12:10").toISOString());
 });

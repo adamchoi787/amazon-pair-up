@@ -32,6 +32,7 @@ export const offerOut = z.object({
   price_unit: priceUnit,
   location: z.string().nullable().describe("Items: meet-up area. Services: area covered"),
   availability: z.string().nullable().describe("When the person can meet or work"),
+  time_zone: z.string().describe("IANA time zone for the provider's availability"),
   status: z.enum(["active", "pending", "sold", "withdrawn"])
     .describe("pending = held by a proposed deal; sold = item sold (a service offer stays active after each job)"),
   typical_price: typical.nullable().describe("null when nothing reliable describes this offer"),
@@ -57,6 +58,9 @@ export const requestOut = z.object({
   hours: z.number().nullable().describe("Hourly work: expected length"),
   pickup: z.string().nullable().describe("Errands: where to collect from"),
   schedule: z.string().nullable().describe("Services: when, as said"),
+  time_zone: z.string(),
+  starts_at: z.string().nullable().describe("Resolved service start, with UTC offset; null for deadline-only or vague requests"),
+  ends_at: z.string().nullable().describe("Resolved service end; null if the duration is unknown"),
   currency: z.string(),
   needed_by: z.string().nullable().describe("ISO 8601: an item's deadline or a job's start; the request stops pairing after it"),
   location: z.string().nullable(),
@@ -125,6 +129,14 @@ export const dealOut = z.object({
   }).describe("Where and when: the meet-up for an item; for a service, where the job is (drop-off for errands) and when"),
   pickup: z.string().nullable().describe("Errands: where to collect from"),
   needed_by: z.string().nullable().describe("Services: when the job is due or starts"),
+  scheduling: z.object({
+    status: z.enum(["verified", "needs_confirmation", "conflict", "not_applicable"])
+      .describe("verified = full work window fits the provider's stated availability; needs_confirmation = a person must check the time"),
+    starts_at: z.string().nullable(),
+    ends_at: z.string().nullable(),
+    time_zone: z.string(),
+    provider_availability: z.string().nullable(),
+  }).nullable().describe("Services: availability check, never a claim that a job was completed"),
   on_hold_until: z.string().nullable().describe("While proposed: when the offer expires if nobody answers"),
   created_at: z.string(),
   updated_at: z.string(),

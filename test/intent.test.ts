@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { contradictsNeed } from "../src/market/matching.js";
 import { test } from "node:test";
 import { mockEmbed, mockExtractIntent } from "../src/ai/mock.js";
 
@@ -22,14 +23,14 @@ test("mock embeddings: related items closer than unrelated", () => {
 
 test("reads a request for help: errand route, fee, deadline", () => {
   const now = new Date(2026, 9, 20, 10, 0); // Tue 20 Oct, 10:00 local
-  const i = mockExtractIntent("find some one to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5", now);
+  const i = mockExtractIntent("find some one to pick up my lunch from the HUB to McCarty Hall by 12:30, $5", now);
   assert.equal(i.kind, "service");
   assert.equal(i.price_unit, "job");
   assert.equal(i.need, "pick up my lunch");
   assert.equal(i.category, "delivery");
   assert.equal(i.max_price, 5);
-  assert.equal(i.pickup, "LG7 canteen");
-  assert.equal(i.location, "Hall 5");
+  assert.equal(i.pickup, "the HUB");
+  assert.equal(i.location, "McCarty Hall");
   assert.equal(i.schedule, "by 12:30");
   assert.equal(new Date(i.needed_by!).getTime(), new Date(2026, 9, 20, 12, 30).getTime());
 });
@@ -45,6 +46,15 @@ test("reads hourly work: rate, day, time window and hours", () => {
   assert.equal(i.schedule, "Saturday 2-6pm");
   assert.equal(new Date(i.needed_by!).getTime(), new Date(2026, 9, 24, 14, 0).getTime());
   assert.equal(mockExtractIntent("tutor me in calculus tomorrow, $15 an hour for 2 hours", now).hours, 2);
+});
+
+test("explicit feature disclaimers are excluded even when embeddings share the same words", () => {
+  assert.equal(contradictsNeed("graphing calculator", "Scientific calculator. Not graphing."), true);
+  assert.equal(contradictsNeed("graphing calculator", "Non-graphing calculator"), true);
+  assert.equal(contradictsNeed("non-graphing calculator", "Scientific calculator. Not graphing."), false);
+  assert.equal(contradictsNeed("graphing calculator", "TI-84 graphing calculator, no box"), false);
+  assert.equal(contradictsNeed("used calculator", "TI-84, not used much"), false);
+  assert.equal(contradictsNeed("calculator with case", "Works great, no case scratches"), false);
 });
 
 test("items stay items", () => {

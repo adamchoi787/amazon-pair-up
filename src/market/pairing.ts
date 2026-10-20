@@ -4,6 +4,7 @@ import { armFor, champion, featuresOf, loadTracks, predict, recordPairing, type 
 import { findIntentsForListing, findMatchesForIntent } from "./matching.js";
 import { negotiate, type NegotiationResult } from "./negotiation.js";
 import { num, type BuyIntentRow, type DealRow, type ListingRow } from "./types.js";
+import { checkSchedule, hasBookingConflict, providerBookings } from "./scheduling.js";
 
 // The pairing engine. Offers (listings) and requests (buy intents) are both
 // standing posts, for an item or a service: when
@@ -163,37 +164,50 @@ export async function propose(
   score: number | null = null,
   learn?: Learn,
 ): Promise<DealRow | null> {
-  const result = await settlePair(db, listing, intent);
-  if (!result.ok) return null;
+  return db.transaction(async tx => {
+    // Serialise bookings across every offer belonging to this provider. The
+    // following reads get a fresh READ COMMITTED snapshot after the row lock.
+    await tx.query(`SELECT id FROM users WHERE id = $1 FOR UPDATE`, [listing.seller_id]);
+    const freshListing = (await tx.query<ListingRow>(`SELECT * FROM listings WHERE id = $1 FOR UPDATE`, [listing.id])).rows[0];
+    const freshIntent = (await tx.query<BuyIntentRow>(`SELECT * FROM buy_intents WHERE id = $1 FOR UPDATE`, [intent.id])).rows[0];
+    if (!freshListing || !freshIntent || freshListing.status !== "active" || freshIntent.status !== "open" || isExpired(freshIntent)) return null;
+    listing = freshListing;
+    intent = freshIntent;
+    const scheduling = checkSchedule(listing, intent);
+    if (scheduling.status === "conflict" || (listing.kind === "service" && hasBookingConflict(intent, await providerBookings(tx, [listing.seller_id])))) return null;
+    const result = await settlePair(tx, listing, intent);
+    if (!result.ok) return null;
 
-  // One statement, so both posts are claimed together or not at all.
-  const { rows } = await db.query<DealRow>(
-    `WITH ok AS (
-       SELECT l.id FROM listings l, buy_intents i
-       WHERE l.id = $2 AND l.status = 'active' AND i.id = $3 AND i.status = 'open'
-       FOR UPDATE OF l, i
-     ),
-     hold_listing AS (UPDATE listings SET status = 'pending' WHERE id = $2 AND EXISTS (SELECT 1 FROM ok) RETURNING id),
-     hold_intent  AS (UPDATE buy_intents SET status = 'matched' WHERE id = $3 AND EXISTS (SELECT 1 FROM ok) RETURNING id)
-     INSERT INTO deals (id, listing_id, buy_intent_id, price, currency, seller_confirmed, meetup, expires_at)
-     SELECT $1, $2, $3, $4, $5, $6, $7, LEAST(now() + make_interval(secs => $8), $9::timestamptz)
-     WHERE EXISTS (SELECT 1 FROM hold_listing) AND EXISTS (SELECT 1 FROM hold_intent)
-     RETURNING *`,
-    [
-      shortId("deal"), listing.id, intent.id, result.price, listing.currency, listing.auto_accept,
-      meetingPlace(listing, intent), s.holdHours * 3600, intent.needed_by,
-    ],
-  );
-  const deal = rows[0];
-  if (!deal) return null;
-  // Pairings the engine chose are recorded for learning; a buyer's own pick (browse) is not a ranking decision.
-  if (learn) await recordPairing(db, deal.id, learn.features, learn.arm, learn.model, learn.baseline);
-  await logEvent(db, "paired", null, deal.id, {
-    by, listing_id: listing.id, intent_id: intent.id, price: result.price,
-    rule: result.rule, saved_vs_ask: result.savedVsAsk, score: score == null ? null : +score.toFixed(3),
-    arm: learn?.arm ?? null, model: learn?.model?.version ?? null,
+    // One statement, so both posts are claimed together or not at all.
+    const { rows } = await tx.query<DealRow>(
+      `WITH ok AS (
+         SELECT l.id FROM listings l, buy_intents i
+         WHERE l.id = $2 AND l.status = 'active' AND i.id = $3 AND i.status = 'open'
+         FOR UPDATE OF l, i
+       ),
+       hold_listing AS (UPDATE listings SET status = 'pending' WHERE id = $2 AND EXISTS (SELECT 1 FROM ok) RETURNING id),
+       hold_intent  AS (UPDATE buy_intents SET status = 'matched' WHERE id = $3 AND EXISTS (SELECT 1 FROM ok) RETURNING id)
+       INSERT INTO deals (id, listing_id, buy_intent_id, price, currency, seller_confirmed, meetup, expires_at)
+       SELECT $1, $2, $3, $4, $5, $6, $7, LEAST(now() + make_interval(secs => $8), $9::timestamptz)
+       WHERE EXISTS (SELECT 1 FROM hold_listing) AND EXISTS (SELECT 1 FROM hold_intent)
+       RETURNING *`,
+      [
+        shortId("deal"), listing.id, intent.id, result.price, listing.currency,
+        listing.auto_accept && (listing.kind === "item" || scheduling.status === "verified"),
+        meetingPlace(listing, intent), s.holdHours * 3600, intent.needed_by,
+      ],
+    );
+    const deal = rows[0];
+    if (!deal) return null;
+    // Pairings the engine chose are recorded for learning; a buyer's own pick (browse) is not a ranking decision.
+    if (learn) await recordPairing(tx, deal.id, learn.features, learn.arm, learn.model, learn.baseline);
+    await logEvent(tx, "paired", null, deal.id, {
+      by, listing_id: listing.id, intent_id: intent.id, price: result.price,
+      rule: result.rule, saved_vs_ask: result.savedVsAsk, score: score == null ? null : +score.toFixed(3),
+      arm: learn?.arm ?? null, model: learn?.model?.version ?? null,
+    });
+    return deal;
   });
-  return deal;
 }
 
 /** Items change hands where the seller is; a service happens where the requester needs it. */

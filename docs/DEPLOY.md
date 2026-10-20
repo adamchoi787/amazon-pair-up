@@ -225,3 +225,21 @@ The container defaults are `HOST=0.0.0.0`, `PORT=3000` and `SEED_ON_START=true`.
 Every MCP call writes a log line like `[mcp] tools/call find_matches 200 7ms`.
 In mock mode, tool calls take under 10 ms. With Bedrock, each embedding call adds network
 time, so check the logs after switching and keep calls well under 500 ms.
+
+## Checking the submitted release
+
+Build the browser surfaces before committing (`npm run build:web`). The AWS deploy
+script ships git HEAD and supplies `RELEASE_REVISION` to the process. It now runs
+this read-only check before reporting the release as successful:
+
+```bash
+npm run check:release -- --url https://YOUR-HOST --revision SUBMITTED_COMMIT --expect-ai bedrock --expect-auth oauth
+```
+
+The version, commit and UI fingerprint must match. A reachable app can still be
+an older build. These checks establish release identity and readiness; separately
+rehearse Login with Amazon/judge sign-in, make an actual Bedrock request, and
+invoke AgentCore if claiming that separate runtime. Do not reset a shared market
+for a video take. Scheduling schema changes are additive and applied on startup;
+back up the database before deploying as usual. Legacy unparsed service windows
+remain tentative until explicitly approved by the provider.

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { Db } from "../db/client.js";
 import { logEvent } from "./events.js";
 import { num, type BuyIntentRow, type ListingRow } from "./types.js";
+import { checkSchedule } from "./scheduling.js";
 
 // Learning to pair better. Every proposed deal records the facts the engine
 // saw when it chose that pairing; its outcome (both said yes, or someone said
@@ -107,7 +108,7 @@ export function featuresOf(c: Candidate, tracks: Tracks, now = new Date()): Feat
     budget_headroom: clamp01((max - price) / max),
     same_area: l.loc ? 1 : 0,
     condition_margin: item ? clamp01(((RANK[l.condition] ?? 2) - (RANK[i.min_condition] ?? 0)) / 4) : 0,
-    pre_approved: l.auto_accept ? 1 : 0,
+    pre_approved: l.auto_accept && (item || checkSchedule(l, i).status === "verified") ? 1 : 0,
     urgent: due != null && due < 24 * 3600_000 ? 1 : 0,
     has_availability: l.availability ? 1 : 0,
     offers_delivery: DELIVERY.test(`${l.title} ${l.description}`) ? 1 : 0,
@@ -329,6 +330,8 @@ export async function learningReport(db: Db) {
   ]);
   const m = model.rows[0];
   return {
+    outcome: "mutual_confirmation" as const,
+    outcome_description: "Both sides agreed to a deal. Payment, handover and job completion are not measured.",
     daily: daily.rows.map((r) => ({ day: r.day, outcomes: Number(r.n), completion_rate: Number(r.n) ? Number(r.closed) / Number(r.n) : 0 })).reverse(),
     arms,
     model: m && {

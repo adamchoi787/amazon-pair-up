@@ -9,7 +9,7 @@ Create a Shortcut on the paired iPhone:
 1. Add **Dictate Text**.
 2. Add **Get Contents of URL**, using your server's HTTPS `/api/voice` URL.
    Choose POST, add `Authorization: Bearer apd_…`, and use a JSON request body:
-   `text` = Dictated Text, `time_zone` = `Asia/Hong_Kong` (or your IANA time zone).
+   `text` = Dictated Text, `time_zone` = `America/Los_Angeles` (or your IANA time zone).
 3. Add **Get Dictionary Value**, key `say`, from the response.
 4. Add **Speak Text**, using that value.
 5. Name the Shortcut **PairUp** and enable **Show on Apple Watch**.
@@ -23,7 +23,7 @@ For an arrival automation on iPhone, use **When I arrive at a place** and POST
 to `/api/context` with the same authorization header and JSON:
 
 ```json
-{"source":"phone","kind":"location","place":"Hall 5","time_zone":"Asia/Hong_Kong"}
+{"source":"phone","kind":"location","place":"McCarty Hall","time_zone":"America/Los_Angeles"}
 ```
 
 Show the returned `say` as a notification when it is nonempty. Location stores a

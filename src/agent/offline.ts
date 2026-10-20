@@ -28,7 +28,7 @@ const callAll = (names: string[]): Step => ({
 
 const HELP =
   "You can say things like: sell my TI-84 for 20 dollars, I'll take anything above 15. Or: I need a graphing calculator, maximum 18 dollars. " +
-  "Or: find someone to pick up my lunch from LG7 to Hall 5 by 12:30, 5 dollars. Or: I can do lunch runs on campus for 4 dollars a run.";
+  "Or: find someone to pick up my lunch from the HUB to McCarty Hall by 12:30, 5 dollars. Or: I can do lunch runs on campus for 4 dollars a run.";
 
 const MONEY = String.raw`(?:hk)?\$?\s*(\d+(?:\.\d{1,2})?)`;
 const MIN = String.raw`\b(?:above|over|at least|down to|as low as|minimum(?: of)?|min|no less than|lowest(?: is)?)\s+(?:of\s+)?${MONEY}`;
@@ -185,10 +185,14 @@ function offerService(text: string): Step {
     .match(new RegExp(String.raw`\b(?:i can|i could|i'?m (?:available|free|happy)\b.*?\bto|i offer|offering(?: to)?)\s+(?:do\s+)?(.+?)(?=\s+for\s+${MONEY}|\s*[,.;!?]|\s+(?:at least|minimum|min)\b|$)`, "i"))?.[1]
     ?.trim();
   if (!task) return reply("What can you do for people?");
-  const ask = amount(new RegExp(String.raw`\bfor\s+${MONEY}`, "i"), text) ?? anyAmount(text);
+  const ask = amount(new RegExp(String.raw`\bfor\s+${MONEY}`, "i"), text)
+    ?? amount(/\$\s*(\d+(?:\.\d{1,2})?)/, text)
+    ?? amount(/\b(\d+(?:\.\d{1,2})?)\s*(?:dollars?\s*)?(?:an hour|per hour|\/hr|a job|per job)\b/i, text)
+    ?? anyAmount(text);
   if (ask === undefined) return reply(`How much do you charge for "${task}"?`);
   const min = amount(new RegExp(MIN, "i"), text);
   const location = text.match(PLACE)?.[1];
+  const availability = text.match(/\b(?:weekdays?|weekends?|any day|(?:mon|tues|wednes|thurs|fri|satur|sun)days?)\b(?:\s+only)?(?:[ ,]+(?:from\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s*(?:-|–|to|until)\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?/i)?.[0];
   return call("post_offer", {
     kind: "service",
     title: capitalize(task),
@@ -196,6 +200,7 @@ function offerService(text: string): Step {
     ask_price: ask,
     ...(min !== undefined && min <= ask ? { min_price: min } : {}),
     ...(location ? { location } : {}),
+    ...(availability ? { availability } : {}),
   });
 }
 

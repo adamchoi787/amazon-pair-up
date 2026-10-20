@@ -23,13 +23,16 @@ interface Deal {
   price: number; price_unit: Unit; hours: number | null; total: number | null; ask_price: number; saved_vs_ask: number; currency: string;
   status: "proposed" | "confirmed" | "declined" | "replaced" | "expired" | "withdrawn";
   waiting_for: ("buyer" | "seller")[]; waiting_for_you: boolean;
+  seller_confirmed: boolean;
   meetup: { place: string | null; availability: string | null }; pickup: string | null; needed_by: string | null;
   on_hold_until: string | null;
   price_check: { verdict: "typical" | "below_typical" | "above_typical" | "far_below" | "far_above"; typical_low: number; typical_high: number } | null;
+  scheduling?: { status: "verified" | "needs_confirmation" | "conflict"; starts_at: string | null; ends_at: string | null; time_zone: string; provider_availability: string | null } | null;
 }
 interface Offer {
   offer_id: string; kind: Kind; title: string; condition: string | null; ask_price: number; price_unit: Unit; currency: string;
   location: string | null; status: string; within_budget_at_ask?: boolean; your_min_price?: number;
+  availability?: string | null; time_zone?: string;
 }
 interface Request {
   request_id: string; kind: Kind; need: string; status: string; price_unit: Unit; your_max_price?: number; currency: string;
@@ -154,7 +157,13 @@ function savingsLine(d: Deal) {
 
 /** Where and when: a meet-up for an item; for a service, the route or place and the time. */
 function placeRows(d: Deal) {
-  const time = d.meetup.availability ?? (d.needed_by ? when(d.needed_by) : null);
+  const schedule = d.scheduling;
+  const format = (iso: string, end = false) => new Date(iso).toLocaleString(undefined, {
+    timeZone: schedule?.time_zone, ...(end ? {} : { weekday: "short", month: "short", day: "numeric" }), hour: "numeric", minute: "2-digit",
+  });
+  const time = schedule?.starts_at
+    ? `${format(schedule.starts_at)}${schedule.ends_at ? ` – ${format(schedule.ends_at, schedule.starts_at.slice(0, 10) === schedule.ends_at.slice(0, 10))}` : ""}`
+    : d.needed_by ? `By ${format(d.needed_by)}` : d.meetup.availability;
   if (d.kind === "item") {
     const meet = [d.meetup.place, d.meetup.availability].filter(Boolean).join(" · ");
     return meet ? [h("p", { class: "meet" }, h("span", { class: "label" }, "Meet-up"), meet)] : [];
@@ -163,7 +172,17 @@ function placeRows(d: Deal) {
     d.pickup ? h("p", { class: "meet" }, h("span", { class: "label" }, "Pick up"), d.pickup) : null,
     d.meetup.place ? h("p", { class: "meet" }, h("span", { class: "label" }, d.pickup ? "Drop off" : "Where"), d.meetup.place) : null,
     time ? h("p", { class: "meet" }, h("span", { class: "label" }, "When"), time) : null,
+    schedule ? h("p", { class: "muted small" }, schedule.time_zone) : null,
   ];
+}
+
+function scheduleNote(d: Deal) {
+  if (!d.scheduling || d.status !== "proposed") return null;
+  const s = d.scheduling;
+  return h("div", { class: s.status === "needs_confirmation" && !d.seller_confirmed ? "alert" : "schedule-note", role: "note" },
+    h("strong", {}, s.status === "verified" ? "Fits the stated availability" : d.seller_confirmed ? "Time approved by the helper" : "Time needs the helper's approval"),
+    s.provider_availability ? h("p", { class: "small muted" }, `Provider's hours: ${s.provider_availability}`) : null,
+    s.status === "needs_confirmation" && !d.seller_confirmed ? h("p", { class: "small" }, "This is a tentative match. The helper must check the time before it is booked.") : null);
 }
 
 /** The agreed price against the usual range; a warning for the buyer when it is far off. */
@@ -182,7 +201,7 @@ function priceNote(d: Deal) {
 function dealCard(d: Deal, compact = false) {
   const buyer = d.your_role === "buyer";
   const service = d.kind === "service";
-  const confirmLabel = service && !buyer ? "Take the job" : service ? `Book for ${rate(d.price, d.price_unit, d.currency)}` : `Confirm ${money(d.price, d.currency)}`;
+  const confirmLabel = service && !buyer ? "Confirm I can do this job" : service ? `Confirm ${money(d.total ?? d.price, d.currency)}${d.total == null && d.price_unit === "hour" ? "/hr" : " booking"}` : `Confirm ${money(d.price, d.currency)}`;
   const actions = d.status === "proposed" && d.waiting_for_you
     ? h("div", { class: "actions" },
         button(confirmLabel, "primary", () => act("confirm_deal", { deal_id: d.deal_id }, (r) => { if (r.deal) replaceDeal(r.deal); })),
@@ -196,15 +215,17 @@ function dealCard(d: Deal, compact = false) {
     h("div", { class: "row" }, statusChip(d), d.counterpart ? h("span", { class: "muted" }, `${buyer ? (service ? "By" : "From") : "For"} ${d.counterpart}`) : null),
     h("h2", {}, title),
     service && !buyer ? h("p", { class: "muted small" }, d.title) : null,
-    h("div", { class: "price" }, rate(d.price, d.price_unit, d.currency)),
-    d.price_unit === "hour" && d.total != null && d.hours != null
-      ? h("p", { class: "muted" }, `${money(d.total, d.currency)} for ${d.hours} hour${d.hours === 1 ? "" : "s"}`)
-      : null,
-    h("p", { class: "muted" }, savingsLine(d)),
-    priceNote(d),
-    ...placeRows(d),
-    d.status === "proposed" && d.on_hold_until ? h("p", { class: "muted small" }, `On hold until ${when(d.on_hold_until)}`) : null,
+    h("div", { class: "deal-overview" },
+      h("div", {},
+        h("div", { class: "price" }, rate(d.price, d.price_unit, d.currency)),
+        d.price_unit === "hour" && d.total != null && d.hours != null
+          ? h("p", { class: "muted" }, `${money(d.total, d.currency)} for ${d.hours} hour${d.hours === 1 ? "" : "s"}`) : null,
+        h("p", { class: "muted small" }, savingsLine(d)), priceNote(d)),
+      h("div", { class: "deal-place" }, ...placeRows(d))),
+    scheduleNote(d),
+    d.status === "confirmed" ? h("p", { class: "muted small" }, service ? "Booking agreed. Pay the helper directly after the job." : "Both sides agreed. Check the item and pay directly at handover.") : null,
     actions,
+    d.status === "proposed" && d.on_hold_until ? h("p", { class: "muted small expiry" }, `On hold until ${when(d.on_hold_until)}`) : null,
   );
 }
 
@@ -220,7 +241,8 @@ function offerCard(o: Offer, requestId?: string) {
     h("h3", {}, o.title),
     h("div", { class: "price small-price" }, rate(o.ask_price, o.price_unit, o.currency)),
     o.location ? h("p", { class: "muted small" }, o.location) : null,
-    requestId ? button(o.kind === "service" ? "Book this one" : "Get this one", "secondary", () => act("negotiate", { request_id: requestId, offer_id: o.offer_id }, (r) => {
+    o.kind === "service" && o.availability ? h("p", { class: "muted small" }, `${o.availability} · ${o.time_zone ?? "America/Los_Angeles"}`) : null,
+    requestId ? button(o.kind === "service" ? "Choose this helper" : "See this offer", "secondary", () => act("negotiate", { request_id: requestId, offer_id: o.offer_id }, (r) => {
       if (data) data = { ...data, deal: r.deal ?? null, matches: data.matches?.filter((m) => m.offer_id !== o.offer_id) };
     })) : null,
   );
@@ -338,7 +360,7 @@ function renderRoutines(d:Data) {
   if(!d.routines?.length)return [h('p',{class:'muted'},'No routines learned yet.')];
   return d.routines.map(r=>h('article',{class:'card'},h('h3',{},r.need),h('p',{},r.when),h('p',{class:'muted'},[rate(r.usual_budget,r.price_unit),r.pickup,r.location].filter(Boolean).join(' · ')),
     button('Forget','secondary',()=>{
-      const date=new Intl.DateTimeFormat('en-CA',{timeZone:d.time_zone??'Asia/Hong_Kong',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(r.next_at)).replaceAll('-','');
+      const date=new Intl.DateTimeFormat('en-CA',{timeZone:d.time_zone??'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(r.next_at)).replaceAll('-','');
       void act('dismiss_suggestion',{suggestion_id:'sug_'+r.routine_id+'_'+date,forget:true},()=>{data={...data,routines:data?.routines?.filter(x=>x.routine_id!==r.routine_id)};});
     })));
 }

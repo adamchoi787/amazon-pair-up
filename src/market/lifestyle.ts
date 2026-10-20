@@ -11,7 +11,7 @@ import { num, type Kind, type PriceUnit } from "./types.js";
 // remembered: "forget" stops it, and a routine dismissed twice in two weeks
 // without being accepted goes quiet by itself.
 
-export const DEFAULT_TIME_ZONE = "Asia/Hong_Kong";
+export const DEFAULT_TIME_ZONE = "America/Los_Angeles";
 
 /** How a routine is found and when it is offered. */
 export const ROUTINE_POLICY = {

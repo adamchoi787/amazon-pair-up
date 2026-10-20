@@ -16,15 +16,18 @@ import { createInterface } from "node:readline";
 //
 // Env: PAIRUP_URL (default http://127.0.0.1:3000), PAIRUP_DEVICE_TOKEN (a "bee"
 // device token from the web app's Devices panel; in local development
-// PAIRUP_USER_ID works instead), BEE_API_TOKEN and BEE_API_URL for --poll.
+// PAIRUP_USER_ID works instead), BEE_API_TOKEN and BEE_API_URL for --poll,
+// PAIRUP_TIME_ZONE (the wearer's IANA zone; live modes default to this machine's zone,
+// a replay keeps the zone already stored for the user).
 
 type Json = Record<string, unknown>;
 interface Signal { kind: "todo" | "conversation" | "journal" | "location"; text?: string; place?: string; external_id: string; observed_at?: string }
 
 const PAIRUP = (process.env.PAIRUP_URL ?? "http://127.0.0.1:3000").replace(/\/$/, "");
 const BEE_API = (process.env.BEE_API_URL ?? "https://api.developer.bee.amazon.dev").replace(/\/$/, "");
-const TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const args = process.argv.slice(2);
+const TIME_ZONE = process.env.PAIRUP_TIME_ZONE
+  ?? (args.includes("--replay") ? undefined : Intl.DateTimeFormat().resolvedOptions().timeZone);
 
 const auth = (): Record<string, string> =>
   process.env.PAIRUP_DEVICE_TOKEN
@@ -68,7 +71,7 @@ async function forward(signals: Signal[]) {
   const res = await fetch(`${PAIRUP}/api/context`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...auth() },
-    body: JSON.stringify({ signals: signals.map((s) => ({ ...s, source: "bee", time_zone: TIME_ZONE })) }),
+    body: JSON.stringify({ signals: signals.map((s) => ({ ...s, source: "bee", ...(TIME_ZONE ? { time_zone: TIME_ZONE } : {}) })) }),
   });
   if (!res.ok) {
     console.error(`[bee-bridge] /api/context ${res.status}: ${await res.text()}`);
