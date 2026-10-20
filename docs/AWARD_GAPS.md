@@ -15,7 +15,8 @@ Judging weighs four criteria equally: technical implementation, design, potentia
 | Alexa+ | MCP server plus a web host that plays the Alexa+ conversation | Public sub-three-minute video and the Devpost form |
 | AWS Builder | Bedrock embeddings and Nova Lite, Strands agent for AgentCore Runtime, CloudFront + EC2 + CloudWatch | Screenshots or logs from the live services |
 | Open Source | pairing-core (MIT, Rust/WASM, test vectors) used for every settlement | Contributor username and contribution URL in the form |
-| Bee | Bridge (CLI stream, API poll, replay) and suggestion flow | Real Bee-recorded data, if Tony enters the track |
+| Bee | Bridge (CLI stream, API poll, replay) and suggestion flow | Live data recorded through a Bee device or an Apple Watch running Bee software (the replay file and the iOS Shortcut path are demo aids) |
+| Ring | PairUp Points: Ring Partner API client (devices, Event History), HMAC-verified webhook, three MCP tools, card panel, tests | A Ring Playground token and footage of a confirmed hand-off; check the rules on entering a second primary track |
 | Friction bonus | Concrete SDK and deployment entries in [FRICTION_LOG.md](FRICTION_LOG.md) | Review and paste into the form |
 
 ## What 0.7.0 adds

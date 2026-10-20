@@ -25,7 +25,7 @@ PairUp Points are small unstaffed hand-off spots, each watched by one Ring doorb
 3. Done: `npm run ring:probe` (real Playground call: devices + history, prints the RING_POINT_DEVICES line) and `npm run ring:simulate` (signed Ring v1.1 webhook to the local server, labelled demo).
 4. Done: card panel in `src/apps/view.ts` (Meet at a PairUp Point, arrival chips, I'm here), bundles rebuilt. Not yet checked visually in a browser; rebuild after the merge (build-info.json fingerprint).
 5. Done: offline planner phrases ("I'm here" → check_in_at_point, "meet at a PairUp Point" → choose_meetup_point). Still to do: one sentence about points in the server instructions (server.ts).
-6. Docs: TOOL_CONTRACT.md (3 tools, webhook, retention), skills/pairup/SKILL.md, README, `public/privacy.html` (Ring: type and time only, 24 h; arrivals 30 days), DEMO_SCRIPT.md Ring beat, SUBMISSION.md Ring track text + Ring product feedback, AWARD_GAPS.md.
+6. Done: TOOL_CONTRACT.md, privacy.html, DEMO_SCRIPT.md Ring cut, SUBMISSION.md Ring text + feedback, AWARD_GAPS.md, Bee wording. Still to do: skills/pairup/SKILL.md and README (Ring section, repo map, test count).
 7. Part 1 of the task (Devpost rules into docs/HACKATHON_RULES.md) is not done: Claude in Chrome was not connected and devpost.com returns 403 to fetches. Needs the user's Chrome. Also fix the Bee wording: the Bee track needs live data recorded through a Bee device or an Apple Watch running Bee software; the replay file and the iOS Shortcut path don't qualify.
 
 ## For the user
