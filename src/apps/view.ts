@@ -1,4 +1,5 @@
 import { App, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
+import { CATEGORY_LABEL, categoryOf, icon, type Category, type IconName } from "../design/icons.js";
 
 // The PairUp MCP Apps view. One view for every tool; the layout follows
 // the shape of the tool result:
@@ -42,8 +43,8 @@ interface Fallback { reason: "no_seller" | "over_budget"; new_price: number | nu
 interface TradeIn { category: string; url: string; say: string }
 type Data = Record<string, unknown> & {
   say?: string; fallback?: Fallback | null; trade_in?: TradeIn | null; deal?: Deal | null; next_deal?: Deal | null; deals?: Deal[]; offer?: Offer; request?: Request;
-  suggestions?: {suggestion_id:string;say:string;reason:string;request:{max_price:number|null}}[];
-  routines?: {routine_id:string;need:string;when:string;usual_budget:number;price_unit:Unit;pickup:string|null;location:string|null;next_at:string}[];
+  suggestions?: { suggestion_id: string; say: string; reason: string; request: { max_price: number | null; kind?: Kind; pickup?: string | null } }[];
+  routines?: { routine_id: string; need: string; when: string; usual_budget: number; price_unit: Unit; pickup: string | null; location: string | null; next_at: string }[];
   time_zone?: string;
   request_id?: string; matches?: Offer[]; alternatives?: Offer[]; offers?: Offer[]; requests?: Request[]; waiting_requests?: number;
 };
@@ -52,11 +53,18 @@ const app = new App({ name: "PairUp", version: "1.0.0" }, {}, { autoResize: true
 const root = document.getElementById("root")!;
 let data: Data | null = null;
 let busy = false;
+/** Which button started the call in flight, so only that one shows a spinner. */
+let busyKey = "";
 let note = "";
+/** Fresh results rise in; re-renders for button states stay still. */
+let animate = true;
+/** A deal this user just confirmed: its status and check get a short celebration. */
+let celebrate: string | null = null;
 
 // ---------- tiny DOM helpers (text only, never HTML from data) ----------
 
-function h<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<Record<string, string>> = {}, ...kids: (Node | string | null | false | undefined)[]) {
+type Kid = Node | string | null | false | undefined;
+function h<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<Record<string, string>> = {}, ...kids: Kid[]) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(props)) if (v != null) el.setAttribute(k, v);
   for (const kid of kids) if (kid) el.append(kid);
@@ -84,6 +92,10 @@ function chip(text: string, tone: "accent" | "good" | "muted" | "warn" = "muted"
   return h("span", { class: `chip ${tone}` }, text);
 }
 
+function tile(name: Category | IconName, large = false) {
+  return h("span", { class: large ? "tile lg" : "tile" }, icon(name, large ? 26 : 20));
+}
+
 function statusChip(d: Deal) {
   const service = d.kind === "service";
   if (d.status === "proposed") {
@@ -98,18 +110,26 @@ function statusChip(d: Deal) {
   return chip("Cancelled", "muted");
 }
 
-function button(label: string, kind: "primary" | "secondary" | "danger", onClick: () => void) {
-  const b = h("button", { class: kind, type: "button" }, label) as HTMLButtonElement;
+function button(label: string, kind: "primary" | "secondary" | "danger" | "quiet", onClick: () => void, opts: { key?: string; icon?: IconName; size?: "sm"; title?: string } = {}) {
+  const loading = busy && !!opts.key && opts.key === busyKey;
+  const b = h("button", { class: [kind, opts.size, loading ? "loading" : ""].filter(Boolean).join(" "), type: "button", title: opts.title },
+    opts.icon ? icon(opts.icon, 18) : null, label) as HTMLButtonElement;
   b.disabled = busy;
+  if (loading) b.setAttribute("aria-busy", "true");
   b.addEventListener("click", onClick);
   return b;
 }
 
+function fact(name: IconName, label: string, value: string) {
+  return h("p", { class: "fact" }, icon(name, 18), h("span", { class: "label" }, label), h("span", { class: "value" }, value));
+}
+
 // ---------- actions (tool calls go through the host) ----------
 
-async function act(name: string, args: Record<string, unknown>, after?: (result: Data) => void) {
+async function act(name: string, args: Record<string, unknown>, after?: (result: Data) => void, key = name) {
   if (busy) return;
   busy = true;
+  busyKey = key;
   note = "";
   render();
   try {
@@ -121,6 +141,7 @@ async function act(name: string, args: Record<string, unknown>, after?: (result:
     note = "That didn't go through. Please try again.";
   } finally {
     busy = false;
+    busyKey = "";
     render();
   }
 }
@@ -150,13 +171,13 @@ async function openLink(url: string) {
 function savingsLine(d: Deal) {
   const buyer = d.your_role === "buyer";
   const ask = rate(d.ask_price, d.price_unit, d.currency);
-  if (d.saved_vs_ask <= 0) return d.kind === "item" ? "At the asking price" : "At their rate";
-  if (!buyer) return `Asked ${ask}, agreed inside your limit`;
-  return `You save ${money(d.saved_vs_ask, d.currency)}${d.price_unit === "hour" ? "/hr" : ""} on the ${ask} ask`;
+  if (d.saved_vs_ask <= 0) return h("span", {}, d.kind === "item" ? "At the asking price" : "At their rate");
+  if (!buyer) return h("span", {}, `Asked ${ask}, agreed inside your limit`);
+  return h("span", {}, h("span", { class: "saving" }, `You save ${money(d.saved_vs_ask, d.currency)}${d.price_unit === "hour" ? "/hr" : ""}`), ` on the ${ask} ask`);
 }
 
 /** Where and when: a meet-up for an item; for a service, the route or place and the time. */
-function placeRows(d: Deal) {
+function placeRows(d: Deal): Kid[] {
   const schedule = d.scheduling;
   const format = (iso: string, end = false) => new Date(iso).toLocaleString(undefined, {
     timeZone: schedule?.time_zone, ...(end ? {} : { weekday: "short", month: "short", day: "numeric" }), hour: "numeric", minute: "2-digit",
@@ -165,24 +186,29 @@ function placeRows(d: Deal) {
     ? `${format(schedule.starts_at)}${schedule.ends_at ? ` – ${format(schedule.ends_at, schedule.starts_at.slice(0, 10) === schedule.ends_at.slice(0, 10))}` : ""}`
     : d.needed_by ? `By ${format(d.needed_by)}` : d.meetup.availability;
   if (d.kind === "item") {
-    const meet = [d.meetup.place, d.meetup.availability].filter(Boolean).join(" · ");
-    return meet ? [h("p", { class: "meet" }, h("span", { class: "label" }, "Meet-up"), meet)] : [];
+    return [
+      d.meetup.place ? fact("pin", "Meet-up", d.meetup.place) : null,
+      d.meetup.availability ? fact("clock", "When", d.meetup.availability) : null,
+    ];
   }
   return [
-    d.pickup ? h("p", { class: "meet" }, h("span", { class: "label" }, "Pick up"), d.pickup) : null,
-    d.meetup.place ? h("p", { class: "meet" }, h("span", { class: "label" }, d.pickup ? "Drop off" : "Where"), d.meetup.place) : null,
-    time ? h("p", { class: "meet" }, h("span", { class: "label" }, "When"), time) : null,
-    schedule ? h("p", { class: "muted small" }, schedule.time_zone) : null,
+    d.pickup ? fact("errand", "Pick up", d.pickup) : null,
+    d.meetup.place ? fact("pin", d.pickup ? "Drop off" : "Where", d.meetup.place) : null,
+    time ? fact("clock", "When", time) : null,
+    schedule ? h("p", { class: "fact-note" }, schedule.time_zone) : null,
   ];
 }
 
 function scheduleNote(d: Deal) {
   if (!d.scheduling || d.status !== "proposed") return null;
   const s = d.scheduling;
-  return h("div", { class: s.status === "needs_confirmation" && !d.seller_confirmed ? "alert" : "schedule-note", role: "note" },
-    h("strong", {}, s.status === "verified" ? "Fits the stated availability" : d.seller_confirmed ? "Time approved by the helper" : "Time needs the helper's approval"),
-    s.provider_availability ? h("p", { class: "small muted" }, `Provider's hours: ${s.provider_availability}`) : null,
-    s.status === "needs_confirmation" && !d.seller_confirmed ? h("p", { class: "small" }, "This is a tentative match. The helper must check the time before it is booked.") : null);
+  const pending = s.status === "needs_confirmation" && !d.seller_confirmed;
+  return h("div", { class: pending ? "alert" : "schedule-note", role: "note" },
+    icon(pending ? "clock" : "check", 18),
+    h("div", {},
+      h("strong", {}, s.status === "verified" ? "Fits the stated availability" : d.seller_confirmed ? "Time approved by the helper" : "Time needs the helper's approval"),
+      s.provider_availability ? h("p", { class: "small muted" }, `Provider's hours: ${s.provider_availability}`) : null,
+      pending ? h("p", { class: "small" }, "This is a tentative match. The helper must check the time before it is booked.") : null));
 }
 
 /** The agreed price against the usual range; a warning for the buyer when it is far off. */
@@ -191,41 +217,55 @@ function priceNote(d: Deal) {
   if (!c) return null;
   const usual = `Usually ${money(c.typical_low, d.currency)} to ${rate(c.typical_high, d.price_unit, d.currency)}`;
   if (d.your_role === "buyer" && c.verdict === "far_below") {
-    return h("p", { class: "alert", role: "note" }, h("strong", {}, "Far below the usual price. "),
-      d.kind === "item" ? `${usual}. Meet somewhere public, check it works, and pay only once you have it.` : `${usual}.`);
+    return h("p", { class: "alert", role: "note" }, icon("shield", 18), h("span", {}, h("strong", {}, "Far below the usual price. "),
+      d.kind === "item" ? `${usual}. Meet somewhere public, check it works, and pay only once you have it.` : `${usual}.`));
   }
-  if (d.your_role === "buyer" && c.verdict === "far_above") return h("p", { class: "alert", role: "note" }, h("strong", {}, "Well above the usual price. "), `${usual}.`);
-  return h("p", { class: "muted small" }, usual);
+  if (d.your_role === "buyer" && c.verdict === "far_above") return h("p", { class: "alert", role: "note" }, icon("shield", 18), h("span", {}, h("strong", {}, "Well above the usual price. "), `${usual}.`));
+  return h("span", {}, usual);
 }
 
 function dealCard(d: Deal, compact = false) {
   const buyer = d.your_role === "buyer";
   const service = d.kind === "service";
+  const category = categoryOf(d.kind, d.pickup);
   const confirmLabel = service && !buyer ? "Confirm I can do this job" : service ? `Confirm ${money(d.total ?? d.price, d.currency)}${d.total == null && d.price_unit === "hour" ? "/hr" : " booking"}` : `Confirm ${money(d.price, d.currency)}`;
+  const key = (a: string) => `${a}:${d.deal_id}`;
   const actions = d.status === "proposed" && d.waiting_for_you
     ? h("div", { class: "actions" },
-        button(confirmLabel, "primary", () => act("confirm_deal", { deal_id: d.deal_id }, (r) => { if (r.deal) replaceDeal(r.deal); })),
+        button(confirmLabel, "primary", () => act("confirm_deal", { deal_id: d.deal_id }, (r) => {
+          if (r.deal) { replaceDeal(r.deal); if (r.deal.status === "confirmed") celebrate = d.deal_id; }
+        }, key("confirm")), { key: key("confirm"), icon: "check" }),
         button(service && !buyer ? "Pass" : "Decline", "secondary", () => act("decline_deal", { deal_id: d.deal_id }, (r) => {
           replaceDeal({ ...d, status: "declined", waiting_for: [], waiting_for_you: false });
           if (r.next_deal && data) data = { ...data, deal: r.next_deal, next_deal: null };
-        })))
+        }, key("decline")), { key: key("decline") }))
     : null;
   const title = service && !buyer && d.task ? d.task : d.title;
-  return h("article", { class: compact ? "card compact" : "card" },
-    h("div", { class: "row" }, statusChip(d), d.counterpart ? h("span", { class: "muted" }, `${buyer ? (service ? "By" : "From") : "For"} ${d.counterpart}`) : null),
+  const who = d.counterpart ? `${buyer ? (service ? "By" : "From") : "For"} ${d.counterpart}` : null;
+  const classes = ["card", compact ? "compact" : "", celebrate === d.deal_id ? "celebrate" : ""].filter(Boolean).join(" ");
+  return h("article", { class: classes, "aria-label": title },
+    h("div", { class: "card-head" },
+      tile(category),
+      h("p", { class: "eyebrow" }, h("strong", {}, CATEGORY_LABEL[category]), who ? ` · ${who}` : ""),
+      statusChip(d)),
     h("h2", {}, title),
-    service && !buyer ? h("p", { class: "muted small" }, d.title) : null,
+    service && !buyer ? h("p", { class: "sub" }, d.title) : null,
     h("div", { class: "deal-overview" },
       h("div", {},
         h("div", { class: "price" }, rate(d.price, d.price_unit, d.currency)),
-        d.price_unit === "hour" && d.total != null && d.hours != null
-          ? h("p", { class: "muted" }, `${money(d.total, d.currency)} for ${d.hours} hour${d.hours === 1 ? "" : "s"}`) : null,
-        h("p", { class: "muted small" }, savingsLine(d)), priceNote(d)),
-      h("div", { class: "deal-place" }, ...placeRows(d))),
+        h("div", { class: "price-meta" },
+          d.price_unit === "hour" && d.total != null && d.hours != null
+            ? h("span", {}, `${money(d.total, d.currency)} for ${d.hours} hour${d.hours === 1 ? "" : "s"}`) : null,
+          savingsLine(d),
+          compact ? null : priceNote(d))),
+      h("div", { class: "facts" }, ...placeRows(d),
+        d.status === "proposed" && d.on_hold_until ? fact("lock", "On hold", `until ${when(d.on_hold_until)}`) : null)),
     scheduleNote(d),
-    d.status === "confirmed" ? h("p", { class: "muted small" }, service ? "Booking agreed. Pay the helper directly after the job." : "Both sides agreed. Check the item and pay directly at handover.") : null,
+    d.status === "confirmed" ? h("p", { class: "success", role: "status" }, icon("check", 20),
+      service ? "Booking agreed. Pay the helper directly after the job." : "Both sides agreed. Check the item and pay directly at handover.") : null,
     actions,
-    d.status === "proposed" && d.on_hold_until ? h("p", { class: "muted small expiry" }, `On hold until ${when(d.on_hold_until)}`) : null,
+    !compact && d.status === "proposed" ? h("p", { class: "card-foot" }, icon("shield", 16),
+      service ? "Nothing is booked until you both confirm. Pay the helper directly after the job." : "Nothing is agreed until you both confirm. Pay directly at handover.") : null,
   );
 }
 
@@ -236,15 +276,18 @@ function replaceDeal(next: Deal) {
 }
 
 function offerCard(o: Offer, requestId?: string) {
+  const category = categoryOf(o.kind);
   return h("article", { class: "card option" },
-    h("div", { class: "row" }, chip(o.condition ? pretty(o.condition) : o.price_unit === "hour" ? "hourly" : "per job"), o.within_budget_at_ask ? chip("In budget", "good") : null),
+    h("div", { class: "card-head" }, tile(category),
+      h("p", { class: "eyebrow" }, o.condition ? pretty(o.condition) : o.price_unit === "hour" ? "Hourly" : "Per job"),
+      o.within_budget_at_ask ? chip("In budget", "good") : null),
     h("h3", {}, o.title),
     h("div", { class: "price small-price" }, rate(o.ask_price, o.price_unit, o.currency)),
-    o.location ? h("p", { class: "muted small" }, o.location) : null,
-    o.kind === "service" && o.availability ? h("p", { class: "muted small" }, `${o.availability} · ${o.time_zone ?? "America/Los_Angeles"}`) : null,
+    o.location ? h("p", { class: "sub" }, o.location) : null,
+    o.kind === "service" && o.availability ? h("p", { class: "sub" }, `${o.availability} · ${o.time_zone ?? "America/Los_Angeles"}`) : null,
     requestId ? button(o.kind === "service" ? "Choose this helper" : "See this offer", "secondary", () => act("negotiate", { request_id: requestId, offer_id: o.offer_id }, (r) => {
       if (data) data = { ...data, deal: r.deal ?? null, matches: data.matches?.filter((m) => m.offer_id !== o.offer_id) };
-    })) : null,
+    }, `offer:${o.offer_id}`), { key: `offer:${o.offer_id}` }) : null,
   );
 }
 
@@ -257,26 +300,32 @@ function renderDeal(d: Data) {
     const service = o.kind === "service";
     const waiting = d.waiting_requests ?? 0;
     parts.push(h("article", { class: "card" },
-      h("div", { class: "row" }, chip(service ? "Available" : "Listed", "accent"),
-        waiting ? h("span", { class: "muted" }, `${waiting} ${waiting > 1 ? "people" : "person"} looking`) : null),
+      h("div", { class: "card-head" }, tile(service ? "job" : "sell"),
+        h("p", { class: "eyebrow" }, h("strong", {}, service ? "Your service" : "Your listing"),
+          waiting ? ` · ${waiting} ${waiting > 1 ? "people" : "person"} looking` : ""),
+        chip(service ? "Available" : "Listed", "accent")),
       h("h2", {}, o.title),
-      h("div", { class: "price" }, rate(o.ask_price, o.price_unit, o.currency)),
-      o.your_min_price != null ? h("p", { class: "muted" }, `Private minimum ${rate(o.your_min_price, o.price_unit, o.currency)} · nobody else sees it`) : null,
-      h("p", { class: "muted small" }, service ? "You'll get jobs as people ask." : "You'll be paired with the next buyer who asks."),
+      h("div", { class: "deal-overview" },
+        h("div", {}, h("div", { class: "price" }, rate(o.ask_price, o.price_unit, o.currency))),
+        o.your_min_price != null ? h("div", { class: "facts" }, fact("lock", "Private", `Minimum ${rate(o.your_min_price, o.price_unit, o.currency)} · nobody else sees it`)) : null),
+      h("p", { class: "card-foot" }, icon("sparkle", 16), service ? "You'll get jobs as people ask." : "You'll be paired with the next buyer who asks."),
       d.trade_in ? h("div", { class: "actions" }, button("Amazon Trade-In", "secondary", () => void openLink(d.trade_in!.url))) : null,
     ));
   } else if (d.request) {
     const r = d.request;
     const service = r.kind === "service";
+    const category = categoryOf(r.kind, r.pickup);
     parts.push(h("article", { class: "card" },
-      h("div", { class: "row" }, chip(service ? "Asking" : "Looking", "accent")),
+      h("div", { class: "card-head" }, tile(category),
+        h("p", { class: "eyebrow" }, h("strong", {}, CATEGORY_LABEL[category]), " · Your request"),
+        chip(service ? "Asking" : "Looking", "accent")),
       h("h2", {}, r.need),
-      r.your_max_price != null ? h("p", { class: "muted" }, `Up to ${rate(r.your_max_price, r.price_unit, r.currency)} · ${service ? "helpers" : "sellers"} never see it`) : null,
-      service && (r.pickup || r.location || r.schedule)
-        ? h("p", { class: "meet" }, [r.pickup && r.location ? `${r.pickup} → ${r.location}` : r.pickup ?? r.location, r.schedule].filter(Boolean).join(" · "))
-        : null,
-      h("p", { class: "muted small" }, service ? "You'll be paired as soon as someone offers." : "You'll be paired as soon as a seller lists one."),
-      d.fallback ? h("p", { class: "muted small" }, d.fallback.say) : null,
+      h("div", { class: "facts plain" },
+        r.your_max_price != null ? fact("lock", "Up to", `${rate(r.your_max_price, r.price_unit, r.currency)} · ${service ? "helpers" : "sellers"} never see it`) : null,
+        service && r.pickup && r.location ? fact("errand", "Route", `${r.pickup} → ${r.location}`) : service && (r.pickup || r.location) ? fact("pin", "Where", (r.pickup ?? r.location)!) : null,
+        service && r.schedule ? fact("clock", "When", r.schedule) : null),
+      h("p", { class: "card-foot" }, icon("sparkle", 16), service ? "You'll be paired as soon as someone offers." : "You'll be paired as soon as a seller lists one."),
+      d.fallback ? h("p", { class: "sub spaced" }, d.fallback.say) : null,
       d.fallback ? h("div", { class: "actions" }, button(
         d.fallback.new_price != null ? `New on Amazon · about ${money(d.fallback.new_price, d.fallback.currency)} (demo estimate)` : "Look on Amazon",
         "secondary", () => void openLink(d.fallback!.amazon_url),
@@ -292,16 +341,20 @@ function renderDeal(d: Data) {
   return parts;
 }
 
+function empty(name: IconName, title: string, body: string, example?: string) {
+  return h("div", { class: "empty" }, tile(name, true), h("h3", {}, title), h("p", {}, body), example ? h("span", { class: "try" }, `Try “${example}”`) : null);
+}
+
 function renderOptions(d: Data) {
   const matches = d.matches ?? [];
   if (d.deal) return [dealCard(d.deal), ...(matches.length ? [h("h4", {}, "Other options"), h("div", { class: "carousel" }, ...matches.map((o) => offerCard(o, d.request_id)))] : [])];
-  if (!matches.length) return [h("p", { class: "muted" }, "No other options right now.")];
+  if (!matches.length) return [empty("sparkle", "No other options right now", "Your request stays open. PairUp tells you as soon as someone new can help.")];
   return [h("div", { class: "carousel" }, ...matches.map((o) => offerCard(o, d.request_id)))];
 }
 
 function renderDeals(d: Data) {
   const deals = d.deals ?? [];
-  if (!deals.length) return [h("p", { class: "muted" }, "No deals yet.")];
+  if (!deals.length) return [empty("inbox", "No deals yet", "When someone matches what you asked for, the offer lands here for your yes.", "I need a graphing calculator, max $18")];
   const shown = deals.slice(0, INLINE_MAX).map((x) => dealCard(x, true));
   return deals.length > INLINE_MAX ? [...shown, h("p", { class: "more" }, `And ${deals.length - INLINE_MAX} more`)] : shown;
 }
@@ -310,64 +363,90 @@ const confirming = new Set<string>();
 function renderPosts(d: Data) {
   const live = (s: string) => ["active", "pending", "open", "matched"].includes(s);
   const order = (s: string) => (live(s) ? 0 : 1);
-  const row = (id: string, label: string, sub: string, status: string, statusText: string) => {
+  const row = (id: string, category: Category | "sell", label: string, sub: string, status: string, statusText: string) => {
     const armed = confirming.has(id);
-    return h("article", { class: "card compact" },
-      h("div", { class: "row" }, chip(statusText, live(status) ? "accent" : "muted")),
-      h("h3", {}, label),
-      h("p", { class: "muted small" }, sub),
-      live(status) ? h("div", { class: "actions" }, button(armed ? "Tap again to take it down" : "Take down", armed ? "danger" : "secondary", () => {
-        if (!armed) { confirming.add(id); render(); return; }
-        confirming.delete(id);
-        void act("withdraw_post", { post_id: id }, (r) => {
-          if (!data) return;
-          const status = String(r.status);
-          data = {
-            ...data,
-            offers: data.offers?.map((o) => (o.offer_id === id ? { ...o, status } : o)),
-            requests: data.requests?.map((q) => (q.request_id === id ? { ...q, status } : q)),
-          };
-        });
-      })) : null,
+    return h("article", { class: live(status) ? "card compact post" : "card compact post ended" },
+      tile(category),
+      h("div", { class: "post-text" }, h("h3", {}, label), h("p", { class: "sub" }, sub)),
+      h("div", { class: "post-side" },
+        chip(statusText, live(status) ? "accent" : "muted"),
+        live(status) ? button(armed ? "Tap again to take it down" : "Take down", armed ? "danger" : "secondary", () => {
+          if (!armed) { confirming.add(id); render(); return; }
+          confirming.delete(id);
+          void act("withdraw_post", { post_id: id }, (r) => {
+            if (!data) return;
+            const status = String(r.status);
+            data = {
+              ...data,
+              offers: data.offers?.map((o) => (o.offer_id === id ? { ...o, status } : o)),
+              requests: data.requests?.map((q) => (q.request_id === id ? { ...q, status } : q)),
+            };
+          }, `withdraw:${id}`);
+        }, { key: `withdraw:${id}`, size: "sm" }) : null),
     );
   };
   const items = [
     ...[...(d.offers ?? [])].sort((a, b) => order(a.status) - order(b.status))
-      .map((o) => row(o.offer_id, o.title, `${o.kind === "service" ? "Offering" : "Selling"} · ${rate(o.ask_price, o.price_unit, o.currency)}`, o.status,
+      .map((o) => row(o.offer_id, o.kind === "service" ? "job" : "sell", o.title, `${o.kind === "service" ? "Offering" : "Selling"} · ${rate(o.ask_price, o.price_unit, o.currency)}`, o.status,
         OFFER_STATUS[o.status]?.[o.kind] ?? pretty(o.status))),
     ...[...(d.requests ?? [])].sort((a, b) => order(a.status) - order(b.status))
-      .map((q) => row(q.request_id, q.need, `${q.kind === "service" ? "Asking for help" : "Buying"}${q.your_max_price != null ? ` · up to ${rate(q.your_max_price, q.price_unit, q.currency)}` : ""}`, q.status,
+      .map((q) => row(q.request_id, categoryOf(q.kind, q.pickup), q.need, `${q.kind === "service" ? "Asking for help" : "Buying"}${q.your_max_price != null ? ` · up to ${rate(q.your_max_price, q.price_unit, q.currency)}` : ""}`, q.status,
         REQUEST_STATUS[q.status]?.[q.kind] ?? pretty(q.status))),
   ];
-  if (!items.length) return [h("p", { class: "muted" }, "No offers or requests yet.")];
+  if (!items.length) return [empty("posts", "Nothing posted yet", "Say what you're selling, what you need, or what you can do for people. Your posts show up here.", "Sell my TI-84 for $20")];
   return items.length > INLINE_MAX ? [...items.slice(0, INLINE_MAX), h("p", { class: "more" }, `And ${items.length - INLINE_MAX} more`)] : items;
 }
 
-function renderSuggestions(d:Data) {
-  if(!d.suggestions?.length)return [h('p',{class:'muted'},'Nothing to suggest right now.')];
-  return d.suggestions.map(s=>{
-    const budget=h('input',{type:'number',min:'0.01',max:'100000',step:'0.01','aria-label':'Your budget',placeholder:'Your budget'}) as HTMLInputElement;
-    return h('article',{class:'card'},h('h3',{},s.say),h('p',{class:'muted small'},s.reason),s.request.max_price===null?budget:null,
-      h('div',{class:'actions'},button('Yes','primary',()=>{
-        const max=s.request.max_price??Number(budget.value);
-        if(!(max>0)){note='Enter your budget first.';budget.focus();return;}
-        void act('accept_suggestion',{suggestion_id:s.suggestion_id,max_price:max,idempotency_key:crypto.randomUUID()},r=>{data=r;});
-      }),button('Not now','secondary',()=>void act('dismiss_suggestion',{suggestion_id:s.suggestion_id},()=>{data={...data,suggestions:data?.suggestions?.filter(x=>x.suggestion_id!==s.suggestion_id)};})),
-      button('Forget','secondary',()=>void act('dismiss_suggestion',{suggestion_id:s.suggestion_id,forget:true},()=>{data={...data,suggestions:data?.suggestions?.filter(x=>x.suggestion_id!==s.suggestion_id)};}))));
+function renderSuggestions(d: Data) {
+  if (!d.suggestions?.length) return [empty("sparkle", "Nothing to suggest right now", "PairUp keeps an eye out and asks before it does anything.")];
+  return d.suggestions.map((s) => {
+    const budget = h("input", { type: "number", min: "0.01", max: "100000", step: "0.01", inputmode: "decimal", "aria-label": "Your maximum budget", placeholder: "Budget" }) as HTMLInputElement;
+    const remove = () => { data = { ...data, suggestions: data?.suggestions?.filter((x) => x.suggestion_id !== s.suggestion_id) }; };
+    const key = (a: string) => `${a}:${s.suggestion_id}`;
+    return h("article", { class: "card" },
+      h("div", { class: "card-head" }, tile("sparkle"), h("p", { class: "eyebrow" }, h("strong", {}, "For you"))),
+      h("h3", { class: "spaced" }, s.say),
+      h("p", { class: "sub" }, s.reason),
+      h("div", { class: "actions" },
+        s.request.max_price === null ? h("label", { class: "money-field" }, h("span", {}, "$"), budget) : null,
+        button(s.request.max_price === null ? "Find it" : "Ask now", "primary", () => {
+          const max = s.request.max_price ?? Number(budget.value);
+          if (!(max > 0)) { note = "Enter your budget first."; render(); return; }
+          void act("accept_suggestion", { suggestion_id: s.suggestion_id, max_price: max, idempotency_key: crypto.randomUUID() }, (r) => { data = r; }, key("yes"));
+        }, { key: key("yes") }),
+        button("Not now", "secondary", () => void act("dismiss_suggestion", { suggestion_id: s.suggestion_id }, remove, key("later")), { key: key("later") }),
+        button("Forget", "quiet", () => void act("dismiss_suggestion", { suggestion_id: s.suggestion_id, forget: true }, remove, key("forget")), { key: key("forget"), title: "Stop suggesting this" })));
   });
 }
-function renderRoutines(d:Data) {
-  if(!d.routines?.length)return [h('p',{class:'muted'},'No routines learned yet.')];
-  return d.routines.map(r=>h('article',{class:'card'},h('h3',{},r.need),h('p',{},r.when),h('p',{class:'muted'},[rate(r.usual_budget,r.price_unit),r.pickup,r.location].filter(Boolean).join(' · ')),
-    button('Forget','secondary',()=>{
-      const date=new Intl.DateTimeFormat('en-CA',{timeZone:d.time_zone??'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(r.next_at)).replaceAll('-','');
-      void act('dismiss_suggestion',{suggestion_id:'sug_'+r.routine_id+'_'+date,forget:true},()=>{data={...data,routines:data?.routines?.filter(x=>x.routine_id!==r.routine_id)};});
-    })));
+
+function renderRoutines(d: Data) {
+  if (!d.routines?.length) return [empty("clock", "No routines learned yet", "After a few similar requests at similar times, PairUp offers to ask for you.")];
+  return d.routines.map((r) => h("article", { class: "card compact post" },
+    tile(r.pickup ? "errand" : "clock"),
+    h("div", { class: "post-text" }, h("h3", {}, r.need), h("p", { class: "sub" }, r.when),
+      h("p", { class: "sub" }, [rate(r.usual_budget, r.price_unit), r.pickup, r.location].filter(Boolean).join(" · "))),
+    h("div", { class: "post-side" }, button("Forget", "secondary", () => {
+      const date = new Intl.DateTimeFormat("en-CA", { timeZone: d.time_zone ?? "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(r.next_at)).replaceAll("-", "");
+      void act("dismiss_suggestion", { suggestion_id: "sug_" + r.routine_id + "_" + date, forget: true }, () => { data = { ...data, routines: data?.routines?.filter((x) => x.routine_id !== r.routine_id) }; }, `forget:${r.routine_id}`);
+    }, { key: `forget:${r.routine_id}`, size: "sm" }))));
 }
+
+function skeleton() {
+  const bar = (w: string, hgt: number, cls = "") => {
+    const b = h("div", { class: `sk ${cls}` });
+    Object.assign(b.style, { width: w, height: `${hgt}px` });
+    return b;
+  };
+  return h("div", { class: "card", "aria-busy": "true", "aria-label": "Loading" },
+    h("div", { class: "card-head" }, bar("36px", 36, "round"), bar("40%", 14)),
+    bar("70%", 22, "gap"), bar("28%", 36, "gap"),
+    h("div", { class: "actions" }, bar("100%", 48, "btn"), bar("100%", 48, "btn")));
+}
+
 function render() {
   root.replaceChildren();
   if (!data) {
-    root.append(h("p", { class: "muted" }, "Loading…"));
+    root.append(skeleton());
     return;
   }
   const view = viewFor(data);
@@ -376,7 +455,12 @@ function render() {
     : view === "options" ? renderOptions(data)
     : view === "deals" ? renderDeals(data)
     : view === "posts" ? renderPosts(data) : renderDeal(data);
-  root.append(...parts.filter(Boolean) as Node[]);
+  const nodes = parts.filter(Boolean) as HTMLElement[];
+  nodes.forEach((n, i) => n.style?.setProperty("--i", String(i)));
+  root.classList.toggle("enter", animate);
+  animate = false;
+  celebrate = null;
+  root.append(...nodes);
   if (note) root.append(h("p", { class: "note", role: "status" }, note));
 }
 
@@ -387,6 +471,7 @@ function applyTheme(ctx?: McpUiHostContext) {
 
 app.ontoolresult = (result) => {
   data = (result.structuredContent ?? null) as Data | null;
+  animate = true;
   render();
 };
 app.onhostcontextchanged = (ctx) => applyTheme({ ...app.getHostContext(), ...ctx });

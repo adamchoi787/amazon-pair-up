@@ -1,11 +1,16 @@
 import { Auth, type AppConfig } from './auth.js';
 import { Mcp, resultData } from './mcp.js';
 import { canListen, listen, speak } from './voice.js';
+import { icon, mark, type IconName } from '../design/icons.js';
 
 const $ = (id:string)=>document.getElementById(id)!;
 let auth:Auth, mcp:Mcp, busy=false;
 let action:{kind:'deal'|'suggestion';id:string;budget:number|null}|null=null;
-const say=(text:string,voice=false)=>{$('message').textContent=text;if(voice)speak(text);};
+// Each new line cross-fades in, so a glance shows that something changed.
+const say=(text:string,voice=false)=>{const m=$('message');if(m.textContent!==text){m.textContent=text;m.classList.remove('swap');void m.offsetWidth;m.classList.add('swap');}if(voice)speak(text);};
+for(const slot of document.querySelectorAll<HTMLElement>('[data-icon]'))slot.replaceWith(icon(slot.dataset.icon as IconName,20));
+for(const a of document.querySelectorAll<HTMLElement>('[data-mark]'))a.prepend(mark(Number(a.dataset.mark)));
+const tick=()=>{$('clock').textContent=new Date().toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});};tick();setInterval(tick,15_000);
 const zone=Intl.DateTimeFormat().resolvedOptions().timeZone;
 async function refresh(){
   if(busy)return;
@@ -65,7 +70,8 @@ async function boot(){
   $('mic').hidden=!canListen;
   $('mic').onclick=()=>void run(async()=>{
     const session=listen(text=>say(text||'Listening…'));say('Listening…');
-    const text=await session.done;if(!text)return 'I didn’t hear anything. Try again.';
+    $('mic').classList.add('listening');
+    const text=await session.done.finally(()=>$('mic').classList.remove('listening'));if(!text)return 'I didn’t hear anything. Try again.';
     const r=await auth.fetch('/api/voice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,time_zone:zone})});
     if(!r.ok)throw Error();const data=await r.json();action=null;$('actions').hidden=true;return data.say;
   });
