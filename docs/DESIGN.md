@@ -85,3 +85,16 @@ With `prefers-reduced-motion: reduce`, every duration token becomes 0ms and each
 | `line-strong` on `surface` (input borders) | 3:1 | 3.32:1 | 3.97:1 |
 | `line-strong` on `bg` | 3:1 | 3.08:1 | 4.31:1 |
 | `accent` on `surface-2` (selected controls) | 3:1 | 6.10:1 | 6.67:1 |
+
+## Ring point panel audit
+
+Reviewed against the [Ring UX guide](https://developer.amazon.com/docs/ring/ux-design-guide.html)
+on October 20, 2026. The panel uses the public point name, text-labelled arrival
+states, a clear next action and a persistent event-retention explanation.
+Pending evidence follows the guide's issue → effect → action pattern: waiting
+for Ring, press the doorbell/check again, then ask the point operator to check
+the connection in the Ring app if it stays pending. Tokens and raw device IDs
+stay outside customer-facing cards. The actions have keyboard focus and large
+targets; shared tokens have light/dark contrast tests and reduced-motion rules.
+Presence corroborates a check-in; this prototype performs no identity verification.
+

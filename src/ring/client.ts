@@ -13,7 +13,7 @@ export interface RingDevice { id: string; name: string }
 export interface RingHistoryEvent { id: string; device_id: string; event_type: string; start: number; end: number | null }
 
 export class RingApiError extends Error {
-  constructor(message: string, readonly status: number) {
+  constructor(message: string, readonly status: number, readonly retryAfterSeconds?: number) {
     super(message);
   }
 }
@@ -39,8 +39,14 @@ export class RingClient {
 
   /** GET /v1/devices: the cameras, doorbells and sensors this token can see. */
   async devices(): Promise<RingDevice[]> {
-    const doc = await this.get("/v1/devices");
-    return (doc.data ?? []).map((d) => ({ id: d.id, name: String(d.attributes?.name ?? d.id) }));
+    let path: string | null = "/v1/devices";
+    const out: RingDevice[] = [];
+    for (let page = 0; path && page < 20; page++) {
+      const doc = await this.get(path);
+      out.push(...(doc.data ?? []).map((d) => ({ id: d.id, name: String(d.attributes?.name ?? d.attributes?.description ?? "Ring device") })));
+      path = doc.links?.next ? new URL(doc.links.next, new URL(path, this.base)).href : null;
+    }
+    return out;
   }
 
   /**
@@ -60,15 +66,15 @@ export class RingClient {
         if (opts.since != null && start < opts.since) return out;
         const type = String(e.attributes?.event_type ?? "");
         if (opts.eventTypes?.length && !opts.eventTypes.some((t) => t.split(".")[0] === type)) continue;
-        const end = Number(e.attributes?.end);
+        const end = e.attributes?.end == null ? NaN : Number(e.attributes.end);
         out.push({ id: e.id, device_id: e.relationships?.source?.data?.id ?? deviceId, event_type: type, start, end: Number.isFinite(end) ? end : null });
       }
-      path = doc.links?.next ?? null;
+      path = doc.links?.next ? new URL(doc.links.next, new URL(path, this.base)).href : null;
     }
     return out;
   }
 
-  private async get(path: string): Promise<JsonApiDoc> {
+  private async get(path: string, attempt = 0): Promise<JsonApiDoc> {
     const url = path.startsWith("http") ? path : `${this.base}${path.startsWith("/") ? "" : "/"}${path}`;
     if (new URL(url).origin !== new URL(this.base).origin) throw new RingApiError("Ring returned a link to another host", 502);
     const res = await this.fetchFn(url, {
@@ -76,8 +82,19 @@ export class RingClient {
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) {
-      const hint = res.status === 401 ? "the Ring token is invalid or expired" : res.status === 429 ? "Ring rate limit reached" : `Ring API returned ${res.status}`;
-      throw new RingApiError(hint, res.status);
+      const raw = res.headers.get("retry-after");
+      const seconds = raw && /^\d+(\.\d+)?$/.test(raw) ? Number(raw) : raw ? Math.max(0, (Date.parse(raw) - Date.now()) / 1000) : 1;
+      const retryAfter = Number.isFinite(seconds) ? Math.max(1, Math.ceil(seconds)) : 1;
+      // Keep an interactive check-in responsive. Longer waits are returned to
+      // the caller; a single short retry covers a transient throttle or 5xx.
+      if (attempt === 0 && (res.status === 429 || res.status >= 500) && retryAfter <= 2) {
+        await res.body?.cancel();
+        await new Promise((r) => setTimeout(r, retryAfter * 1000));
+        return this.get(path, attempt + 1);
+      }
+      const hint = res.status === 401 ? "The Ring token expired or is invalid. Ask the point operator to renew the Playground token or reconnect the Ring account."
+        : res.status === 429 ? `Ring rate limit reached. Try again in ${retryAfter} seconds.` : `Ring API returned ${res.status}`;
+      throw new RingApiError(hint, res.status, res.status === 429 ? retryAfter : undefined);
     }
     return (await res.json()) as JsonApiDoc;
   }

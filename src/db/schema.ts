@@ -350,4 +350,7 @@ CREATE TABLE IF NOT EXISTS ring_events (
   received_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS ring_events_point_idx ON ring_events (point_id, occurred_at);
+DELETE FROM ring_events a USING ring_events b
+ WHERE a.request_id IS NOT NULL AND a.request_id = b.request_id AND a.id > b.id;
+CREATE UNIQUE INDEX IF NOT EXISTS ring_events_request_idx ON ring_events (request_id) WHERE request_id IS NOT NULL;
 `;
