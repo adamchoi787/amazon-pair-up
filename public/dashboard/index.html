@@ -4,51 +4,102 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PairUp Live</title>
+<link rel="icon" href="/addon/icon-64.png">
+<link rel="stylesheet" href="/design/tokens.css">
 <!-- Live view of the marketplace. Polls /api/dashboard. Private limits are never sent here. -->
 <style>
-  :root { --bg:#f7f7f5; --fg:#1d1d1b; --muted:#6b6b66; --card:#fff; --line:#e4e4df; --accent:#0a7cff; --ok:#1a8f4c; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#141413; --fg:#ededea; --muted:#9a9a94; --card:#1e1e1c; --line:#2e2e2b; --accent:#4da3ff; --ok:#4cc27e; } }
   * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.45 system-ui, sans-serif; }
-  header { padding:20px 16px 8px; max-width:1200px; margin:auto; }
-  h1 { margin:0; font-size:22px; } header p { margin:4px 0 0; color:var(--muted); }
-  main { display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); padding:16px; max-width:1200px; margin:auto; }
-  section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; min-width:0; }
-  h2 { margin:0 0 10px; font-size:15px; }
-  ul { list-style:none; margin:0; padding:0; max-height:420px; overflow:auto; }
-  li { padding:8px 0; border-top:1px solid var(--line); } li:first-child { border-top:0; }
-  .muted { color:var(--muted); font-size:12px; } .price { font-weight:600; }
-  .tag { display:inline-block; font-size:11px; padding:1px 6px; border-radius:99px; border:1px solid var(--line); margin-left:6px; }
-  .confirmed { color:var(--ok); border-color:var(--ok); } .lock { color:var(--muted); }
-  .wide { grid-column:1 / -1; }
-  .bars { display:flex; align-items:flex-end; gap:3px; height:72px; margin:4px 0 10px; }
-  .bars span { flex:1; min-width:4px; background:var(--accent); border-radius:3px 3px 0 0; opacity:.85; }
-  .stats { display:flex; flex-wrap:wrap; gap:8px 20px; margin-bottom:8px; }
-  .stats b { font-size:18px; display:block; }
-  .under_review { color:#b25e00; border-color:#b25e00; } .suspended { color:#c0392b; border-color:#c0392b; }
-  button { font:inherit; font-size:12px; padding:2px 10px; margin:6px 6px 0 0; border-radius:99px; border:1px solid var(--line); background:var(--bg); color:var(--fg); cursor:pointer; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: var(--weight-regular) var(--text-sm)/var(--leading-normal) var(--font-sans); -webkit-font-smoothing: antialiased;
+  }
+  svg { flex: none; display: inline-block; vertical-align: -3px; }
+  header { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; padding: var(--space-6) var(--space-5) var(--space-2); max-width: 1240px; margin: auto; }
+  .brand { display: flex; align-items: center; gap: var(--space-3); }
+  h1 { margin: 0; font-family: var(--font-display); font-size: var(--text-2xl); letter-spacing: var(--tracking-tight); }
+  .live { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); font-weight: var(--weight-semibold); color: var(--good); background: var(--good-soft); border-radius: var(--radius-pill); padding: 4px 10px; }
+  .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: beat 1.6s var(--ease-in-out) infinite; }
+  @keyframes beat { 50% { opacity: .3; transform: scale(.8); } }
+  header p { flex-basis: 100%; margin: 0; color: var(--fg-muted); display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
+  .private { display: inline-flex; align-items: center; gap: 6px; color: var(--accent-ink); background: var(--accent-soft); border-radius: var(--radius-pill); padding: 3px 10px; font-weight: var(--weight-semibold); font-size: var(--text-xs); }
+  main { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); padding: var(--space-4) var(--space-5) var(--space-8); max-width: 1240px; margin: auto; }
+  section { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: var(--space-5); min-width: 0; box-shadow: var(--shadow-1); }
+  h2 { margin: 0 0 var(--space-3); font-family: var(--font-display); font-size: var(--text-lg); letter-spacing: var(--tracking-tight); display: flex; align-items: center; gap: var(--space-2); }
+  h2 .count { margin-left: auto; font-family: var(--font-sans); font-size: var(--text-xs); color: var(--fg-muted); background: var(--surface-2); border-radius: var(--radius-pill); padding: 2px 8px; font-variant-numeric: tabular-nums; }
+  h2 svg { color: var(--accent-ink); }
+  ul { list-style: none; margin: 0; padding: 0; max-height: 440px; overflow: auto; border-radius: var(--radius-sm); }
+  ul:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+  li { padding: var(--space-3) 0; border-top: 1px solid var(--line); }
+  li:first-child { border-top: 0; padding-top: 0; }
+  .line { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-size: var(--text-md); }
+  .line:has(.kind) { display: grid; grid-template-columns: 26px minmax(0, 1fr); align-items: start; }
+  .body { display: flex; align-items: center; gap: 6px var(--space-2); flex-wrap: wrap; min-height: 26px; }
+  .line .what { font-weight: var(--weight-semibold); }
+  .kind { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--accent-ink); }
+  .muted { color: var(--fg-muted); font-size: var(--text-sm); }
+  li .muted { margin-top: 2px; }
+  .line:has(.kind) + .muted { padding-left: 34px; }
+  .price { font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; }
+  .tag { display: inline-flex; align-items: center; font-size: var(--text-xs); font-weight: var(--weight-semibold); padding: 3px 8px; border-radius: var(--radius-pill); background: var(--surface-2); color: var(--fg-muted); }
+  .tag.proposed, .tag.open, .tag.matched, .tag.pending { background: var(--accent-soft); color: var(--accent-ink); }
+  .tag.confirmed, .tag.active, .tag.fulfilled { background: var(--good-soft); color: var(--good); }
+  .tag.under_review, .tag.expired { background: var(--warn-soft); color: var(--warn); }
+  .tag.suspended { background: var(--danger-soft); color: var(--danger); }
+  .lock { color: var(--accent-ink); }
+  .wide { grid-column: 1 / -1; }
+  .bars { display: flex; align-items: flex-end; gap: 4px; height: 88px; margin: var(--space-3) 0; padding-bottom: 1px; border-bottom: 1px solid var(--line); }
+  .bars span { flex: 1; min-width: 4px; background: var(--accent); border-radius: 4px 4px 0 0; transform-origin: bottom; transition: height var(--dur-slow) var(--ease-out); }
+  .stats { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-8); margin-bottom: var(--space-2); }
+  .stats b { font-family: var(--font-display); font-size: var(--text-2xl); display: block; letter-spacing: var(--tracking-tight); font-variant-numeric: tabular-nums; }
+  .note { margin: 0 0 var(--space-3); }
+  button { font: inherit; font-size: var(--text-sm); font-weight: var(--weight-semibold); min-height: 36px; padding: 0 var(--space-4); margin: var(--space-2) var(--space-2) 0 0; border-radius: var(--radius-pill); border: 1px solid var(--line-strong); background: var(--surface); color: var(--fg); cursor: pointer; }
+  button:hover { background: var(--surface-2); }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .empty { color: var(--fg-muted); padding: var(--space-3) 0; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
 <header>
-  <h1>PairUp live</h1>
-  <p>Everything Alexa+ does through the MCP server. <span class="lock">🔒 Private limits never leave the server.</span></p>
+  <div class="brand"><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9.5" fill="var(--accent)"/><circle cx="12.5" cy="16" r="6.25" fill="var(--accent-fg)"/><circle cx="19.5" cy="16" r="6.25" fill="none" stroke="var(--accent-fg)" stroke-width="2.4"/></svg><h1>PairUp live</h1></div>
+  <span class="live">Live</span>
+  <p>Everything Alexa+ does through the MCP server. <span class="private" id="private-note"></span></p>
 </header>
 <main>
-  <section class="wide"><h2>Learning to pair better</h2><p class="muted">Measures mutual confirmation, not payment, handover or completed work. Seed and simulated activity are not user adoption.</p><div id="learning" class="muted">No resolved proposals yet.</div></section>
-  <section class="wide"><h2>Trust and safety</h2><ul id="review"><li class="muted">No reports or refused posts.</li></ul></section>
-  <section><h2>Deals</h2><ul id="deals"></ul></section>
-  <section><h2>Requests</h2><ul id="intents"></ul></section>
-  <section><h2>Offers</h2><ul id="listings"></ul></section>
-  <section><h2>Agent activity</h2><ul id="events"></ul></section>
+  <section class="wide"><h2 data-icon="sparkle">Learning to pair better</h2><p class="muted note">Measures mutual confirmation, not payment, handover or completed work. Seed and simulated activity are not user adoption.</p><div id="learning" class="muted">No resolved proposals yet.</div></section>
+  <section class="wide"><h2 data-icon="shield">Trust and safety</h2><ul id="review" tabindex="0" aria-label="Trust and safety queue"><li class="empty">No reports or refused posts.</li></ul></section>
+  <section><h2 data-icon="check">Deals <span class="count" id="n-deals"></span></h2><ul id="deals" tabindex="0" aria-label="Deals"></ul></section>
+  <section><h2 data-icon="inbox">Requests <span class="count" id="n-intents"></span></h2><ul id="intents" tabindex="0" aria-label="Requests"></ul></section>
+  <section><h2 data-icon="sell">Offers <span class="count" id="n-listings"></span></h2><ul id="listings" tabindex="0" aria-label="Offers"></ul></section>
+  <section><h2 data-icon="clock">Agent activity</h2><ul id="events" tabindex="0" aria-label="Agent activity"></ul></section>
 </main>
 <script>
+// Icons from src/design/icons.ts (same grid and stroke), inlined: this page has no build step.
+const ICON = {
+  item: '<path d="M5.5 8.5h13l-1.1 11a1.5 1.5 0 0 1-1.5 1.35H8.1a1.5 1.5 0 0 1-1.5-1.35z"/><path d="M9 10.5V7a3 3 0 0 1 6 0v3.5"/>',
+  errand: '<circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="6" r="2.2"/><path d="M8.2 18H15a3.25 3.25 0 0 0 0-6.5H9a3.25 3.25 0 0 1 0-6.5h6.8"/>',
+  job: '<circle cx="9.5" cy="7.5" r="3.5"/><path d="M3 20a6.5 6.5 0 0 1 13 0"/><path d="m15.5 11.5 2 2 4-4"/>',
+  sell: '<path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7a1 1 0 0 1 .7.3l7.6 7.6a1 1 0 0 1 0 1.4l-7.7 7.7a1 1 0 0 1-1.4 0l-7.6-7.6a1 1 0 0 1-.3-.7z"/><circle cx="8.5" cy="8.5" r="1.5"/>',
+  lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
+  shield: '<path d="M12 3.5 5 6.2v5.3c0 4.3 3 7.6 7 9 4-1.4 7-4.7 7-9V6.2z"/><path d="m9 12 2.2 2.2L15.5 10"/>',
+  sparkle: '<path d="M12 3.5c.6 3.9 2.6 5.9 6.5 6.5-3.9.6-5.9 2.6-6.5 6.5-.6-3.9-2.6-5.9-6.5-6.5 3.9-.6 5.9-2.6 6.5-6.5z"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  inbox: '<path d="M4 13.5 6.3 6a1.5 1.5 0 0 1 1.4-1h8.6a1.5 1.5 0 0 1 1.4 1L20 13.5V18a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18z"/><path d="M4 13.5h4.5l1.2 2h4.6l1.2-2H20"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+};
+const svg = (name, size = 18) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[name]}</svg>`;
+for (const h of document.querySelectorAll("h2[data-icon]")) h.insertAdjacentHTML("afterbegin", svg(h.dataset.icon));
 const $ = (id) => document.getElementById(id);
+$("private-note").innerHTML = `${svg("lock", 14)} Private limits never leave the server`;
+const LOCK = `<span class="lock" title="Private, never sent here">${svg("lock", 14)}</span>`;
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
 const money = (v, c) => (c === "USD" ? "$" : c + " ") + Number(v).toFixed(Number(v) % 1 ? 2 : 0);
-const time = (t) => new Date(t).toLocaleTimeString();
+const time = (t) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 const unit = (u) => (u === "hour" ? "/hr" : u === "job" ? " per job" : "");
-const kindTag = (k) => (k === "service" ? `<span class="tag">service</span> ` : "");
+/** Item, errand or job, the same icons the app and card use. */
+const kind = (k, pickup) => { const c = k === "service" ? (pickup ? "errand" : "job") : "item"; return `<span class="kind" title="${c}">${svg(c, 16)}</span>`; };
+const tag = (s) => `<span class="tag ${esc(s)}">${esc(String(s).replace("_", " "))}</span>`;
+const empty = (text) => `<li class="empty">${text}</li>`;
 // Deployed dashboards need DASHBOARD_TOKEN: open the page as /#token=<token>.
 const auth = () => { const token = new URLSearchParams(location.hash.slice(1)).get("token"); return token ? { Authorization: `Bearer ${token}` } : {}; };
 // A reviewer's decision: reinstate (back to pairing) or suspend.
@@ -62,16 +113,17 @@ async function refresh() {
   try {
     const d = await (await fetch("/api/dashboard", { headers: auth() })).json();
     if (d.review_queue?.length) {
-      $("review").innerHTML = d.review_queue.map((u) => `<li>${esc(u.display_name)} <span class="muted">${esc(u.user_id)}</span> <span class="tag ${esc(u.review_status)}">${esc(u.review_status.replace("_", " "))}</span>
+      $("review").innerHTML = d.review_queue.map((u) => `<li><div class="line"><span class="what">${esc(u.display_name)}</span> <span class="muted">${esc(u.user_id)}</span> ${tag(u.review_status)}</div>
         <div class="muted">${u.reporters} reporter${u.reporters === 1 ? "" : "s"}${u.reasons.length ? " · " + esc(u.reasons.join(", ").replaceAll("_", " ")) : ""} · ${u.blocked_posts} refused post${u.blocked_posts === 1 ? "" : "s"} · ${u.rating == null ? "no ratings" : `${u.rating}★ from ${u.ratings}`}</div>
         ${u.review_status === "active" && !u.reporters ? "" : `<button data-user="${esc(u.user_id)}" data-decision="reinstate">Reinstate</button>${u.review_status === "suspended" ? "" : `<button data-user="${esc(u.user_id)}" data-decision="suspend">Suspend</button>`}`}</li>`).join("");
     }
-    $("deals").innerHTML = d.deals.map((x) => `<li><span class="price">${money(x.price, x.currency)}${unit(x.price_unit)}</span> ${kindTag(x.kind)}${esc(x.title)}
-      <span class="tag ${x.status}">${esc(x.status)}</span><div class="muted">buyer ${esc(x.buyer_id)} · seller ${esc(x.seller_id)} · ${esc([x.pickup, x.meetup].filter(Boolean).join(" → "))}</div></li>`).join("") || "<li class=muted>No deals yet</li>";
-    $("intents").innerHTML = d.intents.map((x) => `<li>${kindTag(x.kind)}${esc(x.need)} <span class="tag">${esc(x.source)}</span> <span class="tag">${esc(x.status)}</span>
-      <div class="muted">${esc(x.buyer_id)} · budget <span class="lock">🔒</span> · ${time(x.created_at)}</div></li>`).join("") || "<li class=muted>None</li>";
-    $("listings").innerHTML = d.listings.map((x) => `<li>${kindTag(x.kind)}${esc(x.title)} <span class="price">${money(x.ask_price, x.currency)}${unit(x.price_unit)}</span> <span class="tag">${esc(x.status)}</span>
-      <div class="muted">${esc(x.seller_id)} · ${esc(x.kind === "service" ? "" : x.condition)} · ${esc(x.location ?? "")} · reserve <span class="lock">🔒</span></div></li>`).join("");
+    $("n-deals").textContent = d.deals.length; $("n-intents").textContent = d.intents.length; $("n-listings").textContent = d.listings.length;
+    $("deals").innerHTML = d.deals.map((x) => `<li><div class="line">${kind(x.kind, x.pickup)}<span class="body"><span class="what">${esc(x.title)}</span> <span class="price">${money(x.price, x.currency)}${unit(x.price_unit)}</span> ${tag(x.status)}</span></div>
+      <div class="muted">buyer ${esc(x.buyer_id)} · seller ${esc(x.seller_id)}${[x.pickup, x.meetup].some(Boolean) ? " · " + esc([x.pickup, x.meetup].filter(Boolean).join(" → ")) : ""}</div></li>`).join("") || empty("No deals yet");
+    $("intents").innerHTML = d.intents.map((x) => `<li><div class="line">${kind(x.kind, x.pickup)}<span class="body"><span class="what">${esc(x.need)}</span> <span class="tag">${esc(x.source)}</span> ${tag(x.status)}</span></div>
+      <div class="muted">${esc(x.buyer_id)} · budget ${LOCK} · ${time(x.created_at)}</div></li>`).join("") || empty("No requests yet");
+    $("listings").innerHTML = d.listings.map((x) => `<li><div class="line">${kind(x.kind)}<span class="body"><span class="what">${esc(x.title)}</span> <span class="price">${money(x.ask_price, x.currency)}${unit(x.price_unit)}</span> ${tag(x.status)}</span></div>
+      <div class="muted">${[esc(x.seller_id), x.kind === "service" ? "" : esc(x.condition), esc(x.location ?? "")].filter(Boolean).join(" · ")} · reserve ${LOCK}</div></li>`).join("") || empty("No offers yet");
     const L = d.learning;
     if (L && L.daily.length) {
       const pct = (r) => Math.round(r * 100) + "%";
@@ -82,7 +134,7 @@ async function refresh() {
          <div class="bars" title="Share of proposed deals that both sides confirmed, per day">${L.daily.map((x) => `<span style="height:${Math.max(4, x.completion_rate * 100)}%" title="${esc(x.day)}: ${pct(x.completion_rate)} of ${x.outcomes}"></span>`).join("")}</div>
          ${L.model ? `<div class="muted">What closes deals here: ${L.model.drivers.slice(0, 4).map((x) => `${esc(x.feature.replaceAll("_", " "))} (${x.weight > 0 ? "+" : ""}${x.weight.toFixed(2)})`).join(" · ")}</div>` : ""}`;
     }
-    $("events").innerHTML = d.events.map((x) => `<li>${esc(x.kind.replaceAll("_", " "))}<div class="muted">${esc(x.actor_id)} · ${time(x.created_at)} · ${esc(JSON.stringify(x.detail))}</div></li>`).join("");
+    $("events").innerHTML = d.events.map((x) => `<li><div class="line"><span class="what">${esc(x.kind.replaceAll("_", " "))}</span></div><div class="muted">${esc(x.actor_id)} · ${time(x.created_at)} · ${esc(JSON.stringify(x.detail))}</div></li>`).join("") || empty("Nothing yet");
   } catch (e) { console.error(e); }
 }
 refresh(); setInterval(refresh, 2000);
