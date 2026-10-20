@@ -6,7 +6,7 @@
 > final "yes".
 
 **Track:** Alexa+ (self-hosted MCP server, spec 2025-11-25, Streamable HTTP)
-**Mini challenge:** AWS Builder (Amazon Bedrock embeddings + intent extraction, AWS hosting)
+**Mini challenge:** AWS Builder (Amazon Bedrock, a Strands Agents agent on Bedrock AgentCore Runtime, CloudFront + EC2 + CloudWatch)
 **Bee:** "Proactive Context Mode" turns real-world context into requests
 **Try it:** https://d3cxpkmhl89rw9.cloudfront.net/app/ · MCP endpoint `https://d3cxpkmhl89rw9.cloudfront.net/mcp` (OAuth 2.1)
 
@@ -90,6 +90,7 @@ npm start            # web app on http://127.0.0.1:3000/, MCP server at /mcp, op
 npm run smoke        # (second terminal) plays the TI-84 demo over real MCP
 npm test             # unit + end-to-end tests (in-memory Postgres + pgvector)
 npm run simulate     # the learning loop on a simulated market, day by day
+cd agents/agentcore && npm install && npm test   # the Strands agent against a real server
 ```
 
 Local dev uses **PGlite** — real Postgres + **pgvector** embedded in Node,
@@ -157,10 +158,43 @@ flowchart TB
 | `get_deal_status` | Deals and jobs waiting for your yes first, with counterpart, place and time |
 | `list_my_posts` / `withdraw_post` | Your offers and requests; take one down, releasing any deal it held |
 
-Every tool declares an output schema and annotations. Deals nobody answers expire (by the request's deadline at the latest)
+Every tool declares an output schema and annotations, and every write takes an
+optional `idempotency_key` so a retried call never posts or confirms twice. Deals nobody answers expire (by the request's deadline at the latest)
 and both posts are paired again; per-user posting limits and per-caller rate limits
 protect the market. Pairing rules, schemas, limits and privacy rules:
 [docs/TOOL_CONTRACT.md](docs/TOOL_CONTRACT.md).
+
+## Built for agents
+
+Any MCP host or agent framework can find AmazonPairUp, learn it and use it safely
+without a human wiring it up:
+
+| | |
+|---|---|
+| **Agent Skill** | [skills/amazonpairup/SKILL.md](skills/amazonpairup/SKILL.md), in the open SKILL.md format and served at `/skills/amazonpairup/SKILL.md`: which tool for which sentence, how to read a deal, the rules, error codes, a worked example |
+| **Server card** | `/.well-known/mcp/server-card.json`: endpoint, auth, instructions, and every tool, prompt and view with schemas, read from the live server |
+| **llms.txt** | `/llms.txt`: the same in Markdown, with the rules an agent must follow |
+| **Prompts** | `sell_something`, `find_something`, `whats_new` show up as starters in Claude, VS Code and the MCP Inspector |
+| **Safe retries** | `idempotency_key` on every write; a retry returns the first result |
+| **Speakable errors** | Every result and error has a `say` sentence; errors an agent can act on carry a `code` |
+| **Strands + AgentCore** | [agents/agentcore](agents/agentcore): a Strands Agents voice agent on Amazon Bedrock AgentCore Runtime whose only tools are this server's, with a code-level guard that blocks `confirm_deal` until the user says yes |
+
+## Production readiness
+
+- **AWS:** CloudFront (HTTPS, HTTP/3, security headers) → EC2 Graviton with an IAM
+  role (no access keys), encrypted EBS with daily snapshots, auto-recovery, deploys
+  through Systems Manager with atomic release switching. [docs/DEPLOY.md](docs/DEPLOY.md)
+- **Observability:** JSON logs in CloudWatch with a request id per call (`X-Request-Id`),
+  CloudWatch metrics for MCP latency, tool failures and 5xx, alarms with email alerts,
+  Embedded Metric Format for per-tool latency.
+- **Reliability:** `/ready` checks the database before traffic switches; graceful
+  shutdown drains calls in flight; holds expire and re-pair on a timer; Bedrock
+  failures fall back to local parsing and the offline planner.
+- **Safety:** OAuth 2.1 with PKCE, Origin validation, CDN-only origin, per-caller rate
+  limits, per-user posting limits, bounded inputs, private limits redacted in one
+  place and leak-tested.
+- **Tests:** 91 server tests (unit, end-to-end over MCP, HTTP, OAuth, schemas, privacy,
+  idempotency) plus the Strands agent against a real server, on every push.
 
 ## Repo map
 
@@ -171,6 +205,8 @@ src/
   auth/oauth.ts          OAuth 2.1 account linking (PKCE, protected-resource metadata)
   mcp/server.ts          MCP tool definitions
   mcp/schemas.ts         output schemas for every tool
+  mcp/prompts.ts         MCP prompts (sell_something, find_something, whats_new)
+  mcp/discovery.ts       server card and llms.txt, read from the live tool list
   mcp/apps.ts            the MCP Apps view (ui://amazonpairup/market.html)
   agent/                 the web app's assistant step: Bedrock tool use, offline planner, confirm guard
   market/pairing.ts      pairing engine: pair on every post, atomic holds, release and re-pair
@@ -180,6 +216,8 @@ src/
   market/learning.ts     learning to pair better: features, model, guarded rollout
   market/service.ts      business operations behind each tool
   market/views.ts        the only place rows become output (privacy redaction)
+  market/idempotency.ts  retry-safe writes (idempotency_key)
+  http/log.ts            JSON logs, CloudWatch Embedded Metric Format, request ids
   ai/                    mock + Bedrock embeddings and intent extraction
   db/                    PGlite / Postgres client, schema, seeding
 src/web/                 the web app: OAuth PKCE sign-in, MCP client, MCP Apps host, voice
@@ -187,11 +225,13 @@ src/apps/                the MCP Apps view (deal card, options, deals, posts)
 public/app/              web app shell + built bundle (npm run build:web)
 public/mcp-apps/         built single-file MCP Apps view
 public/dashboard/        operations dashboard
-data/seed-listings.json  seed market: items for sale and services on offer
+data/seed-listings.json  seed market: 162 posts from 22 people, items and services
+skills/amazonpairup/     the Agent Skill (SKILL.md)
+agents/agentcore/        Strands Agents voice agent for Amazon Bedrock AgentCore Runtime
 scripts/                 seed, smoke test, add-on assets
 docs/                    contract, award plan, Alexa+ setup, deploy, demo script, submission, friction log
 vendor/pairing-core/     prebuilt pairing-core module (refresh: node scripts/sync-pairing-core.mjs)
-Dockerfile, deploy/      container image and Lightsail config
+Dockerfile, deploy/      container image, AWS CloudFormation + deploy scripts, Lightsail config
 ```
 
 ## Plan

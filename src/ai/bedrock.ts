@@ -5,6 +5,7 @@ import {
 } from "@aws-sdk/client-bedrock-runtime";
 import { z } from "zod";
 import type { Config } from "../config.js";
+import { log } from "../http/log.js";
 import { CONDITIONS, type Ai, type ExtractedIntent } from "./types.js";
 import { mockExtractIntent } from "./mock.js";
 
@@ -99,7 +100,7 @@ export function createBedrockAi(cfg: Config): Ai {
         return sanitizeIntent(JSON.parse(json), text);
       } catch (err) {
         // Throttling, an outage or unparseable output: the local parser keeps requests working.
-        console.warn("[ai] Bedrock intent extraction failed, using the local parser:", (err as Error).message);
+        log("warn", "Bedrock intent extraction failed; using the local parser", { error: (err as Error).message });
         return mockExtractIntent(text, now);
       }
     },

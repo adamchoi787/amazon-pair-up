@@ -54,6 +54,46 @@ test("requests from an allowed Origin are accepted", async () => {
   assert.equal((await initialize({ Origin: "https://simulator.example" })).status, 200);
 });
 
+test("every response carries a request id, and a caller's own id is echoed", async () => {
+  const fresh = await initialize();
+  assert.match(fresh.headers.get("x-request-id") ?? "", /^[0-9a-f-]{36}$/);
+  const given = await initialize({ "X-Request-Id": "alexa-req-12345678" });
+  assert.equal(given.headers.get("x-request-id"), "alexa-req-12345678");
+  const junk = await initialize({ "X-Request-Id": "bad id with spaces" });
+  assert.notEqual(junk.headers.get("x-request-id"), "bad id with spaces");
+});
+
+test("/ready checks the database", async () => {
+  const res = await fetch(`${base}/ready`);
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { ok: true });
+});
+
+test("the server card describes the live tool surface", async () => {
+  const res = await fetch(`${base}/.well-known/mcp/server-card.json`);
+  assert.equal(res.status, 200);
+  const card = await res.json();
+  assert.equal(card.protocolVersion, "2025-11-25");
+  assert.equal(card.serverInfo.name, "amazon-pairup");
+  assert.match(card.transport.endpoint, /\/mcp$/);
+  const names = card.tools.map((t: { name: string }) => t.name);
+  for (const t of ["post_offer", "post_request", "confirm_deal", "decline_deal", "withdraw_post"]) assert.ok(names.includes(t), t);
+  assert.ok(card.tools.every((t: { outputSchema?: unknown }) => t.outputSchema), "every tool has an output schema");
+  assert.ok(card.prompts.some((p: { name: string }) => p.name === "find_something"));
+  assert.match(card.instructions, /confirm_deal only after an explicit yes/);
+});
+
+test("llms.txt and the Agent Skill are served for agents", async () => {
+  const llms = await fetch(`${base}/llms.txt`);
+  assert.equal(llms.status, 200);
+  const text = await llms.text();
+  assert.match(text, /^# AmazonPairUp/);
+  assert.match(text, /`post_request`/);
+  const skill = await fetch(`${base}/skills/amazonpairup/SKILL.md`);
+  assert.equal(skill.status, 200);
+  assert.match(await skill.text(), /^---\nname: amazonpairup\n/);
+});
+
 test("GET and DELETE on /mcp return 405 (stateless server)", async () => {
   assert.equal((await fetch(`${base}/mcp`)).status, 405);
   assert.equal((await fetch(`${base}/mcp`, { method: "DELETE" })).status, 405);

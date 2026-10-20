@@ -2,10 +2,13 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import { z } from "zod";
 import { CONDITIONS } from "../ai/index.js";
+import { log, metric } from "../http/log.js";
+import { once } from "../market/idempotency.js";
 import * as market from "../market/service.js";
 import type { Deps } from "../market/service.js";
 import { KINDS, SERVICE_UNITS } from "../market/types.js";
 import { registerViews, VIEWS, type ViewName } from "./apps.js";
+import { registerPrompts } from "./prompts.js";
 import { outputs } from "./schemas.js";
 
 // The tool surface Alexa+ (or any MCP host) sees. Descriptions say when to
@@ -34,13 +37,21 @@ const confirmPrice = z.boolean().optional().describe(
   "Only after an error with code 'confirm_price': the user heard the usual range and confirmed this price anyway",
 );
 
+const idempotencyKey = z.string().regex(/^[A-Za-z0-9._:-]{8,64}$/).optional().describe(
+  "Optional, 8-64 characters, unique per action (e.g. a UUID). Send the same key when retrying after a timeout: " +
+    "the first result comes back and nothing is posted or changed twice.",
+);
+
 // Closed world: every tool acts only on this marketplace.
 const writes = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
 const reads = { readOnlyHint: true, idempotentHint: true, openWorldHint: false };
 
+/** Shown in initialize and in the server card (/.well-known/mcp/server-card.json). */
+export const SERVER_INFO = { name: "amazon-pairup", title: "AmazonPairUp", version: "0.5.0" };
+
 export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
   const server = new McpServer(
-    { name: "amazon-pairup", title: "AmazonPairUp", version: "0.4.0" },
+    SERVER_INFO,
     {
       instructions:
         "AmazonPairUp pairs people directly, by voice: people who need something with people who have it or can do it. " +
@@ -56,7 +67,8 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
         "A buyer gets one such offer per offer; after a no, the asking price stands (negotiate with max_price on a yes). " +
         "A price far from what similar things go for returns an error with code 'confirm_price': read its 'say', then " +
         "call again with confirm_price: true if the user confirms, or with the price they meant. Every result has " +
-        "a 'say' field: one short sentence you can speak as is.",
+        "a 'say' field: one short sentence you can speak as is. Write tools take an optional idempotency_key: " +
+        "send a fresh one per action and the same one on a retry, so nothing is posted or confirmed twice.",
     },
   );
 
@@ -69,6 +81,15 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
     if (!userId) throw new market.MarketError("I don't know who's speaking. Please link your account.");
     return userId;
   };
+
+  /** A tool that changes the market: identified, and retry-safe with an idempotency_key. */
+  const write = <A extends { user_id?: string; idempotency_key?: string }>(
+    tool: string, args: A, fn: (userId: string) => Promise<object>, view?: ViewName,
+  ) =>
+    run(tool, () => {
+      const userId = who(args.user_id);
+      return once(deps.db, { userId, tool, key: args.idempotency_key, args: args as Record<string, unknown> }, () => fn(userId));
+    }, view);
 
   registerAppTool(
     server,
@@ -98,11 +119,12 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
         location: text(120).optional().describe("Items: meet-up area. Services: the area the user covers, e.g. 'HKUST campus'. Requests there rank higher"),
         availability: text(120).optional().describe("When the user can meet or work, e.g. 'weekdays 11am-2pm'. Shown on the deal"),
         confirm_price: confirmPrice,
+        idempotency_key: idempotencyKey,
       },
       outputSchema: outputs.post_offer,
       annotations: writes,
     },
-    (args) => run(() => market.postOffer(deps, { ...args, user_id: who(args.user_id) }), "market"),
+    (args) => write("post_offer", args, (userId) => market.postOffer(deps, { ...args, user_id: userId }), "market"),
   );
 
   registerAppTool(
@@ -135,11 +157,12 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
         quantity: z.number().int().positive().max(1000).optional().describe("Items: how many"),
         source: z.enum(["voice", "bee_context"]).optional().describe("'bee_context' when inferred from Bee ambient context"),
         confirm_price: confirmPrice,
+        idempotency_key: idempotencyKey,
       },
       outputSchema: outputs.post_request,
       annotations: writes,
     },
-    (args) => run(() => market.postRequest(deps, { ...args, user_id: who(args.user_id) }), "market"),
+    (args) => write("post_request", args, (userId) => market.postRequest(deps, { ...args, user_id: userId }), "market"),
   );
 
   registerAppTool(
@@ -159,7 +182,7 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       outputSchema: outputs.find_matches,
       annotations: reads,
     },
-    (args) => run(() => market.findMatches(deps, who(args.user_id), args.request_id, args.limit), "market"),
+    (args) => run("find_matches", () => market.findMatches(deps, who(args.user_id), args.request_id, args.limit), "market"),
   );
 
   registerAppTool(
@@ -176,11 +199,12 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       inputSchema: {
         user_id: userIdArg, request_id: id, offer_id: id,
         max_price: price.optional().describe("Raise the request's PRIVATE budget first, e.g. to the asking price the user just agreed to. Only upward."),
+        idempotency_key: idempotencyKey,
       },
       outputSchema: outputs.negotiate,
       annotations: writes,
     },
-    (args) => run(() => market.negotiateDeal(deps, who(args.user_id), args.request_id, args.offer_id, args.max_price), "market"),
+    (args) => write("negotiate", args, (userId) => market.negotiateDeal(deps, userId, args.request_id, args.offer_id, args.max_price), "market"),
   );
 
   registerAppTool(
@@ -192,11 +216,11 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       description:
         "Record the user's yes to a proposed deal. ONLY call after the user explicitly says yes. The deal closes, " +
         "with where and when to meet, once both sides have confirmed.",
-      inputSchema: { user_id: userIdArg, deal_id: id },
+      inputSchema: { user_id: userIdArg, deal_id: id, idempotency_key: idempotencyKey },
       outputSchema: outputs.confirm_deal,
       annotations: writes,
     },
-    (args) => run(() => market.confirmDeal(deps, who(args.user_id), args.deal_id), "market"),
+    (args) => write("confirm_deal", args, (userId) => market.confirmDeal(deps, userId, args.deal_id), "market"),
   );
 
   registerAppTool(
@@ -208,11 +232,11 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       description:
         "Record the user's no to a proposed deal. Both posts go back on the market and are re-paired; the result " +
         "includes the user's next best offer when there is one.",
-      inputSchema: { user_id: userIdArg, deal_id: id },
+      inputSchema: { user_id: userIdArg, deal_id: id, idempotency_key: idempotencyKey },
       outputSchema: outputs.decline_deal,
       annotations: { ...writes, destructiveHint: true },
     },
-    (args) => run(() => market.declineDeal(deps, who(args.user_id), args.deal_id), "market"),
+    (args) => write("decline_deal", args, (userId) => market.declineDeal(deps, userId, args.deal_id), "market"),
   );
 
   registerAppTool(
@@ -228,7 +252,7 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       outputSchema: outputs.get_deal_status,
       annotations: reads,
     },
-    (args) => run(() => market.getDealStatus(deps, who(args.user_id), args.deal_id), "market"),
+    (args) => run("get_deal_status", () => market.getDealStatus(deps, who(args.user_id), args.deal_id), "market"),
   );
 
   registerAppTool(
@@ -244,7 +268,7 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       outputSchema: outputs.list_my_posts,
       annotations: reads,
     },
-    (args) => run(() => market.listMyPosts(deps, who(args.user_id)), "market"),
+    (args) => run("list_my_posts", () => market.listMyPosts(deps, who(args.user_id)), "market"),
   );
 
   server.registerTool(
@@ -254,13 +278,14 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       description:
         "Take down one of the user's offers or cancel one of their requests. A deal it was holding is released and " +
         "the other person is paired again. Confirm with the user first.",
-      inputSchema: { user_id: userIdArg, post_id: id.describe("offer_id or request_id from list_my_posts") },
+      inputSchema: { user_id: userIdArg, post_id: id.describe("offer_id or request_id from list_my_posts"), idempotency_key: idempotencyKey },
       outputSchema: outputs.withdraw_post,
       annotations: { ...writes, destructiveHint: true, idempotentHint: true },
     },
-    (args) => run(() => market.withdrawPost(deps, who(args.user_id), args.post_id)),
+    (args) => write("withdraw_post", args, (userId) => market.withdrawPost(deps, userId, args.post_id)),
   );
 
+  registerPrompts(server);
   return server;
 }
 
@@ -269,9 +294,13 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
  * act on become speakable tool errors; anything unexpected is logged and the
  * user still hears a sentence, so Alexa never meets an empty result.
  */
-async function run(fn: () => Promise<object>, view?: ViewName) {
+async function run(tool: string, fn: () => Promise<object>, view?: ViewName) {
+  const start = performance.now();
+  const done = (outcome: "ok" | "user_error" | "error") =>
+    metric("tool", { Tool: tool }, { ToolLatencyMs: Math.round(performance.now() - start), ToolErrors: outcome === "error" ? 1 : 0 }, { outcome }, { text: false });
   try {
     const result = (await fn()) as Record<string, unknown>;
+    done("ok");
     return {
       content: [{ type: "text" as const, text: JSON.stringify(result) }],
       structuredContent: result,
@@ -280,7 +309,8 @@ async function run(fn: () => Promise<object>, view?: ViewName) {
     };
   } catch (err) {
     const known = err instanceof market.MarketError;
-    if (!known) console.error("[tool] unexpected error", err);
+    done(known ? "user_error" : "error");
+    if (!known) log("error", "tool failed", { tool, err });
     const say = known ? err.message : "Sorry, something went wrong on my side. Please try again in a moment.";
     const body = known && err.code ? { say, code: err.code, ...err.data } : { say };
     return { isError: true, content: [{ type: "text" as const, text: JSON.stringify(body) }] };

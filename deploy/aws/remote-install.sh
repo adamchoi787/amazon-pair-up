@@ -31,6 +31,37 @@ cd "$DIR"
 HOME=/root PATH=/usr/local/bin:$PATH npm ci --omit=dev --no-audit --no-fund --loglevel=error
 chmod -R a+rX "$DIR"
 
+# Logs to CloudWatch (best effort: without the agent, logs stay in journald).
+# The service appends its JSON lines to a file the agent ships to /amazonpairup/app.
+setup_cloudwatch() {
+  rpm -q amazon-cloudwatch-agent >/dev/null 2>&1 || dnf -y -q install amazon-cloudwatch-agent >/dev/null
+  install -d -o amazonpairup -g amazonpairup -m 755 /var/log/amazonpairup
+  mkdir -p /etc/systemd/system/amazonpairup.service.d
+  cat > /etc/systemd/system/amazonpairup.service.d/logs.conf <<'CONF'
+[Service]
+StandardOutput=append:/var/log/amazonpairup/app.log
+StandardError=append:/var/log/amazonpairup/app.log
+CONF
+  cat > /etc/logrotate.d/amazonpairup <<'CONF'
+/var/log/amazonpairup/app.log {
+  daily
+  rotate 3
+  compress
+  missingok
+  notifempty
+  copytruncate
+}
+CONF
+  cat > /opt/aws/amazon-cloudwatch-agent/etc/amazonpairup.json <<'CONF'
+{ "logs": { "logs_collected": { "files": { "collect_list": [
+  { "file_path": "/var/log/amazonpairup/app.log", "log_group_name": "/amazonpairup/app", "log_stream_name": "{instance_id}" }
+] } } } }
+CONF
+  /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s     -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazonpairup.json >/dev/null
+  systemctl daemon-reload
+}
+setup_cloudwatch || echo "warning: CloudWatch log shipping is not set up; logs stay in journald" >&2
+
 # Switch atomically and restart
 ln -sfn "$DIR" /opt/amazonpairup/current.next
 mv -Tf /opt/amazonpairup/current.next /opt/amazonpairup/current
@@ -39,7 +70,7 @@ systemctl restart amazonpairup
 
 PORT=$(grep -E '^PORT=' /etc/amazonpairup.env | cut -d= -f2)
 for _ in $(seq 1 90); do
-  if curl -fsS "http://127.0.0.1:${PORT:-8080}/health"; then
+  if curl -fsS "http://127.0.0.1:${PORT:-8080}/ready"; then
     echo
     echo "release $RELEASE is live"
     ls -1dt /opt/amazonpairup/releases/* | tail -n +4 | xargs -r rm -rf
@@ -48,5 +79,5 @@ for _ in $(seq 1 90); do
   sleep 2
 done
 echo "release $RELEASE did not become healthy; recent logs:" >&2
-journalctl -u amazonpairup -n 80 --no-pager >&2
+tail -n 80 /var/log/amazonpairup/app.log 2>/dev/null >&2 || journalctl -u amazonpairup -n 80 --no-pager >&2
 exit 1

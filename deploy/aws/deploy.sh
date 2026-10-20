@@ -6,7 +6,8 @@
 #   AWS_PROFILE=amazonpairup AWS_REGION=us-east-1 deploy/aws/deploy.sh
 #
 # Optional: STACK (default amazonpairup), AGENT_MODEL / INTENT_MODEL (Bedrock model or
-# inference profile ids, default us.amazon.nova-lite-v1:0), INSTANCE_TYPE.
+# inference profile ids, default us.amazon.nova-lite-v1:0), INSTANCE_TYPE, ALERT_EMAIL
+# (an address that gets CloudWatch alarm emails).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 # Git Bash on Windows rewrites arguments that look like paths ("/amazonpairup/…")
@@ -20,6 +21,7 @@ STACK=${STACK:-amazonpairup}
 AGENT_MODEL=${AGENT_MODEL:-us.amazon.nova-lite-v1:0}
 INTENT_MODEL=${INTENT_MODEL:-$AGENT_MODEL}
 INSTANCE_TYPE=${INSTANCE_TYPE:-t4g.small}
+ALERT_EMAIL=${ALERT_EMAIL:-}
 awsx() { aws --profile "$PROFILE" --region "$REGION" "$@"; }
 step() { printf '\n==> %s\n' "$*"; }
 
@@ -48,7 +50,7 @@ awsx cloudformation deploy \
   --template-file deploy/aws/amazonpairup.yaml \
   --capabilities CAPABILITY_IAM \
   --no-fail-on-empty-changeset \
-  --parameter-overrides "OriginSecret=$ORIGIN_SECRET" "InstanceType=$INSTANCE_TYPE"
+  --parameter-overrides "OriginSecret=$ORIGIN_SECRET" "InstanceType=$INSTANCE_TYPE" "AlertEmail=$ALERT_EMAIL"
 out() { awsx cloudformation describe-stacks --stack-name "$STACK" --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
 BASE=$(out PublicBaseUrl); ORIGIN=$(out OriginHost); INSTANCE=$(out InstanceId); BUCKET=$(out ReleaseBucket); PORT=$(out AppPort)
 echo "app: $BASE/app/   instance: $INSTANCE"
@@ -85,6 +87,7 @@ BEDROCK_EMBEDDING_MODEL_ID=amazon.titan-embed-text-v2:0
 BEDROCK_INTENT_MODEL_ID=$INTENT_MODEL
 BEDROCK_AGENT_MODEL_ID=$AGENT_MODEL
 EMBEDDING_DIM=1024
+LOG_FORMAT=json
 EOF
 )
 node -e '

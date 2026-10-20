@@ -3,6 +3,7 @@
 | Path | When | Cost | URL |
 |---|---|---|---|
 | **AWS (production)** | The live app for judges and users, through Nov 20 | About $18/month | `https://<id>.cloudfront.net/app/` |
+| **AgentCore agent** | The Strands voice agent on Amazon Bedrock AgentCore Runtime, using the production MCP server | Pay per use | `InvokeAgentRuntime` |
 | **Cloudflare quick tunnel** | Sharing a laptop server for a few minutes | Free | Changes every run |
 | **AWS Lightsail container** | Older single-container path | About $7/month | `*.amazonlightsail.com` |
 
@@ -17,7 +18,9 @@ Browser / MCP clients (Alexa+, Claude, the web app)
      ├─ AmazonPairUp (MCP server, web app, agent) on port 8080
      ├─ embedded Postgres + pgvector on an encrypted gp3 volume, daily snapshots (7 kept)
      ├─ IAM role → Amazon Bedrock (Titan Text Embeddings V2, Amazon Nova Lite)
+     ├─ CloudWatch agent → log group /amazonpairup/app (JSON lines, 30 days)
      └─ Systems Manager for deploys; no SSH, no key pair, IMDSv2 only
+   CloudWatch: metric filters (MCP latency, tool failures, 5xx) → alarms → SNS email
 ```
 
 Everything is in [deploy/aws/amazonpairup.yaml](../deploy/aws/amazonpairup.yaml) (CloudFormation).
@@ -44,13 +47,25 @@ AWS_PROFILE=amazonpairup AWS_REGION=us-east-1 deploy/aws/deploy.sh
 
 The script creates or updates the stack, uploads the committed code (`git HEAD`),
 installs it on the instance through SSM, switches releases atomically, waits for
-`/health`, and prints the app URL. The first run takes about 10 minutes (CloudFront).
+`/ready` (the app answers and its database is up), and prints the app URL. The first run takes about 10 minutes (CloudFront).
 Settings: `AGENT_MODEL` / `INTENT_MODEL` (Bedrock model or inference profile ids,
-default `us.amazon.nova-lite-v1:0`), `INSTANCE_TYPE`, `STACK`.
+default `us.amazon.nova-lite-v1:0`), `INSTANCE_TYPE`, `STACK`, `ALERT_EMAIL` (gets an
+email when an alarm fires; confirm the subscription once).
 
 **Operate:**
 
-- Logs: Systems Manager → Session Manager → the instance → `journalctl -u amazonpairup -f`.
+- Logs: CloudWatch Logs, group `/amazonpairup/app`. Each line is JSON with a
+  `requestId` (also returned as the `X-Request-Id` header), so one call can be
+  followed end to end. Logs Insights, slowest tool calls today:
+  `fields Tool, ToolLatencyMs | filter msg = "tool" | sort ToolLatencyMs desc | limit 20`.
+  On the instance: `tail -f /var/log/amazonpairup/app.log`.
+- Metrics and alarms: namespace `AmazonPairUp/Logs` (`McpLatency`, `ToolFailures`,
+  `ServerErrors`) from metric filters, and `AmazonPairUp` from the Embedded Metric
+  Format lines (per-tool `ToolLatencyMs`, `ToolErrors`) where EMF is extracted.
+  Alarms: tool failures (3 in 5 min), HTTP 5xx (5 in 5 min), MCP p95 latency above
+  1.5 s for 15 min, plus the instance recovery alarm.
+- Shutdown is graceful: on a restart the server stops taking connections and lets
+  calls in flight finish (up to 10 s) before closing the database.
 - Dashboard: `https://<id>.cloudfront.net/dashboard/#token=<value of /amazonpairup/dashboard-token>`.
 - Rollback: the last three releases stay in `/opt/amazonpairup/releases`; point
   `/opt/amazonpairup/current` at one and `systemctl restart amazonpairup`.
@@ -66,8 +81,26 @@ instances behind the same distribution.
 Check any deployment with:
 
 ```bash
-curl https://<id>.cloudfront.net/health
+curl https://<id>.cloudfront.net/ready
+curl https://<id>.cloudfront.net/.well-known/mcp/server-card.json
 ```
+
+---
+
+## AgentCore agent (Strands Agents on Amazon Bedrock AgentCore Runtime)
+
+[agents/agentcore](../agents/agentcore) is a voice agent built with Strands Agents
+that uses the production MCP server as its tools, packaged for AgentCore Runtime
+(ARM64 container, `/invocations` and `/ping` on port 8080):
+
+```bash
+AWS_PROFILE=amazonpairup AWS_REGION=us-east-1 agents/agentcore/deploy.sh
+PAIRUP_TOKEN=<access token> agents/agentcore/invoke.sh "I need a graphing calculator today, max 18 dollars"
+```
+
+The script needs Docker with buildx. It pushes the image to ECR, creates an
+execution role limited to Bedrock model calls, ECR pulls and logs, and creates or
+updates the runtime. Details: [agents/agentcore/README.md](../agents/agentcore/README.md).
 
 ---
 

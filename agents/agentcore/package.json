@@ -1,0 +1,28 @@
+{
+  "name": "amazonpairup-agentcore",
+  "version": "0.1.0",
+  "description": "AmazonPairUp voice agent built with Strands Agents, hosted on Amazon Bedrock AgentCore Runtime, using the AmazonPairUp MCP server as its tools.",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "chat": "tsx src/chat.ts",
+    "check": "tsx src/check.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@strands-agents/sdk": "^1.21.0",
+    "bedrock-agentcore": "^0.4.6",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3"
+  }
+}

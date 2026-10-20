@@ -46,3 +46,70 @@ job.
 With Bee connected, real-world context such as "exam tomorrow,
 calculator broke" becomes a proactive request, so Alexa can suggest a deal
 before the user asks.
+
+## AWS section draft (AWS Builder)
+
+AmazonPairUp runs on AWS end to end, and every AWS piece does real work in the
+product:
+
+- **Amazon Bedrock, Titan Text Embeddings V2.** Every offer, request and
+  reference price is embedded (1024 dimensions) and stored in Postgres with
+  pgvector. Pairing ranks candidates by semantic similarity plus full-text
+  match, so "graphing calculator" finds a TI-84 and skips a scientific Casio.
+- **Amazon Bedrock, Amazon Nova Lite.** Turns a spoken sentence into a
+  structured request (kind, budget, flat fee or hourly rate, pickup, drop-off,
+  time window, hours), and runs the web app's assistant through the Converse
+  API with tool use over our own MCP tools. Output is validated field by field,
+  with a local parser and an offline planner as fallbacks.
+- **Strands Agents on Amazon Bedrock AgentCore Runtime.** A voice agent
+  ([agents/agentcore](../agents/agentcore)) built with the Strands TypeScript SDK
+  discovers its tools from our MCP server over Streamable HTTP and calls them
+  with the user's own token. Hooks outside the model block `confirm_deal` until
+  the user says yes and add an `idempotency_key` to every write. It is packaged
+  for AgentCore Runtime (ARM64, `/invocations` and `/ping`) with one deploy script.
+- **Hosting.** CloudFormation stack: CloudFront (HTTPS, HTTP/3, security
+  headers) in front of a Graviton EC2 instance with an IAM role (no access
+  keys), encrypted EBS with daily snapshots (Data Lifecycle Manager), automatic
+  instance recovery, releases in S3, deploys and secrets through Systems Manager
+  and Parameter Store.
+- **CloudWatch.** JSON logs with a request id per call, metric filters for MCP
+  latency, tool failures and 5xx, alarms to SNS email, and Embedded Metric
+  Format lines for per-tool latency.
+- **Development workflow.** Built with Claude Code.
+
+## Product feedback drafts
+
+Drafted from what we hit while building; edit each one so it matches your own
+experience before submitting.
+
+**MCP TypeScript SDK (+ MCP Apps extension).** Used for the server (Streamable
+HTTP, stateless, protocol 2025-11-25), tool output schemas, prompts, the MCP
+Apps view, and an in-process client for tests and the server card. Worked well:
+`registerTool` with zod input and output schemas, `InMemoryTransport` for fast
+end-to-end tests, and the Express helper with DNS-rebinding protection. Needs
+work: there is no standard way to publish a server card or an idempotency
+convention for write tools, so every server invents its own. Would use again: yes.
+
+**Amazon Bedrock.** Used for Titan Text Embeddings V2 and Nova Lite (intent
+extraction and tool use through Converse). Worked well: one IAM role on the
+instance, no keys in the app; Converse tool use mapped directly onto MCP tool
+schemas. Needs work: [your experience with model access and quotas on a new
+account]. Would use again: yes.
+
+**Strands Agents (TypeScript).** Used for the AgentCore voice agent. Worked
+well: `McpClient` connected to our existing server with only a URL and headers,
+and `BeforeToolCallEvent` made the "confirm only on a yes" rule a few lines of
+code. Needs work: the stream event shape changed (`modelStreamUpdateEvent`
+wrappers) and the AgentCore README example no longer compiles against it (see
+friction log). Would use again: yes.
+
+**Amazon Bedrock AgentCore Runtime (TypeScript SDK).** Used to host the Strands
+agent. Worked well: `BedrockAgentCoreApp` gives the runtime contract, streaming
+and session ids in one object. Needs work: local calls need two headers the
+README never mentions (see friction log). [Add your deploy experience.]
+
+**AWS hosting (CloudFormation, EC2, CloudFront, SSM, CloudWatch).** Worked well:
+SSM deploys without SSH or key pairs; CloudFront in front of one instance gave
+HTTPS and HTTP/3 with no certificate work. Needs work: DLM validation errors
+surface only at stack creation and roll the whole stack back; the AWS CLI under
+Git Bash rewrites parameter names (both in the friction log).

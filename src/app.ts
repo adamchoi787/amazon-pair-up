@@ -6,9 +6,11 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { agentMode, handleAgentTurn } from "./agent/index.js";
 import { oauthRouter, sendUnauthorized, userForAccessToken, WEB_CLIENT_ID, webRedirectUri } from "./auth/oauth.js";
 import type { Config } from "./config.js";
+import { accessLog, log, requestId } from "./http/log.js";
 import { rateLimit } from "./http/rateLimit.js";
 import { dashboard, type Deps } from "./market/service.js";
-import { createMcpServer } from "./mcp/server.js";
+import { llmsTxt, serverCard } from "./mcp/discovery.js";
+import { createMcpServer, SERVER_INFO } from "./mcp/server.js";
 
 // HTTP surface:
 //   /mcp            Streamable HTTP, stateless (a fresh McpServer + transport per
@@ -17,6 +19,8 @@ import { createMcpServer } from "./mcp/server.js";
 //                   or the offline planner); the web app runs the tools itself over /mcp
 //   /app/           the AmazonPairUp web app
 //   /dashboard/     operations view (see DASHBOARD_TOKEN)
+//   /health         liveness; /ready also checks the database (for load balancers)
+//   /.well-known/mcp/server-card.json, /llms.txt, /skills/…  discovery for agents
 // Stateless suits Lambda / AgentCore / App Runner and needs no sticky sessions.
 
 /** Authenticated (with a user unless it's an anonymous local-dev call), or rejected. */
@@ -31,17 +35,47 @@ export function createApp(deps: Deps, cfg: Config) {
   // Stateless MCP responses end once the result is written, so compressing them
   // only shrinks the transfer (the MCP Apps view is ~0.5 MB of HTML, ~4× smaller gzipped).
   app.use(compression({ threshold: 1024 }));
+  app.use(requestId);
+  app.use((_req, res, next) => {
+    res.set("X-Content-Type-Options", "nosniff");
+    next();
+  });
 
   if (cfg.originSecret) {
     app.use((req, res, next) => {
-      if (req.path === "/health" || sameSecret(req.header("x-origin-verify") ?? "", cfg.originSecret)) return next();
+      if (req.path === "/health" || req.path === "/ready" || sameSecret(req.header("x-origin-verify") ?? "", cfg.originSecret)) return next();
       res.status(403).json({ error: "forbidden" });
     });
   }
 
+  const started = Date.now();
   app.get("/health", (_req, res) => {
-    res.json({ ok: true, ai: deps.ai.mode, auth: cfg.authMode, agent: agentMode(cfg) });
+    res.json({
+      ok: true, version: SERVER_INFO.version, ai: deps.ai.mode, auth: cfg.authMode, agent: agentMode(cfg),
+      uptime_s: Math.round((Date.now() - started) / 1000),
+    });
   });
+
+  // Readiness: the process is up and the database answers. A load balancer or
+  // deploy script should route traffic only once this returns 200.
+  app.get("/ready", async (_req, res) => {
+    try {
+      await deps.db.query("SELECT 1");
+      res.set("Cache-Control", "no-store").json({ ok: true });
+    } catch (err) {
+      log("error", "readiness check failed", { err });
+      res.status(503).json({ ok: false });
+    }
+  });
+
+  // Discovery for agents and registries (src/mcp/discovery.ts).
+  app.get("/.well-known/mcp/server-card.json", async (req, res) => {
+    res.set("Cache-Control", "public, max-age=300").json(await serverCard(deps, cfg, req.header("host")));
+  });
+  app.get("/llms.txt", async (req, res) => {
+    res.set("Cache-Control", "public, max-age=300").type("text/markdown").send(await llmsTxt(deps, cfg, req.header("host")));
+  });
+  app.use("/skills", express.static("skills", { setHeaders: (res) => res.type("text/markdown") }));
 
   // What the web app needs to sign in: the auth mode and, with OAuth, its client.
   app.get("/api/app-config", (_req, res) => {
@@ -76,19 +110,8 @@ export function createApp(deps: Deps, cfg: Config) {
     next();
   };
 
-  // One log line per call, to watch the Alexa+ latency budget (< 500 ms round trip).
-  const timing = (label: string): express.RequestHandler => (req, res, next) => {
-    const start = performance.now();
-    res.on("finish", () => {
-      const body = req.body as { method?: string; params?: { name?: string } } | undefined;
-      const what = [body?.method, body?.params?.name].filter(Boolean).join(" ") || req.method;
-      console.log(`[${label}] ${what} ${res.statusCode} ${Math.round(performance.now() - start)}ms`);
-    });
-    next();
-  };
-
-  app.use("/mcp", timing("mcp"), checkOrigin, rateLimit(cfg.mcpCallsPerMinute));
-  app.use("/api/agent", timing("agent"), checkOrigin, rateLimit(cfg.mcpCallsPerMinute));
+  app.use("/mcp", accessLog("mcp"), checkOrigin, rateLimit(cfg.mcpCallsPerMinute));
+  app.use("/api/agent", accessLog("agent"), checkOrigin, rateLimit(cfg.mcpCallsPerMinute));
 
   app.post("/mcp", async (req, res) => {
     const who = await caller(req);
@@ -104,7 +127,7 @@ export function createApp(deps: Deps, cfg: Config) {
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
     } catch (err) {
-      console.error("MCP request failed", err);
+      log("error", "MCP request failed", { requestId: res.locals.requestId, err });
       if (!res.headersSent) {
         res.status(500).json({ jsonrpc: "2.0", error: { code: -32603, message: "Internal error" }, id: null });
       }
@@ -147,7 +170,7 @@ export function createApp(deps: Deps, cfg: Config) {
       res.set("Cache-Control", "no-store").json(turn);
     } catch (err) {
       const status = (err as { status?: number }).status ?? 500;
-      if (status >= 500) console.error("[agent] failed", err);
+      if (status >= 500) log("error", "agent step failed", { requestId: res.locals.requestId, err });
       res.status(status).json({ error: status >= 500 ? "The assistant is unavailable right now." : (err as Error).message });
     }
   });

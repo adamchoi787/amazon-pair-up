@@ -7,7 +7,7 @@ Identity and auth depend on `AUTH_MODE`:
 
 Every successful result is JSON (as text **and** `structuredContent`) with a `say` field: one sentence Alexa can speak as is.
 Every tool declares an `outputSchema` ([src/mcp/schemas.ts](../src/mcp/schemas.ts)) and annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint: false`).
-Errors come back as `isError: true` with `{ "say": "..." }`: a sentence the user can act on, or a short apology when something unexpected failed (details go to the server log). An error an agent can act on also carries a `code`: `confirm_price` (see [Price check](#price-check)).
+Errors come back as `isError: true` with `{ "say": "..." }`: a sentence the user can act on, or a short apology when something unexpected failed (details go to the server log). An error an agent can act on also carries a `code`: `confirm_price` (see [Price check](#price-check)), `idempotency_conflict` or `in_progress` (see [Retries](#retries-idempotency_key)).
 Inputs are bounded (text lengths, prices up to 100,000, quantities up to 1,000, hours up to 336).
 
 ## One market for things and services
@@ -78,6 +78,43 @@ call. A post with no counterpart waits and is paired when one arrives.
   a provider says yes to each job. An item becomes `sold`; a service offer stays
   `active` and is paired with the next waiting request. The request becomes
   `fulfilled`.
+
+## Retries: `idempotency_key`
+
+Voice hosts and agents retry when a response is slow or lost. Every tool that
+changes the market (`post_offer`, `post_request`, `negotiate`, `confirm_deal`,
+`decline_deal`, `withdraw_post`) takes an optional `idempotency_key` (8–64
+characters of `A-Z a-z 0-9 . _ : -`, e.g. a UUID):
+
+- The first call with a key runs and its result is stored for 24 hours.
+- A retry with the same key and the same arguments returns that result
+  unchanged; nothing is posted, paired or confirmed twice.
+- The same key with different arguments returns error `idempotency_conflict`.
+- A retry that arrives while the first call is still running returns error
+  `in_progress`; retry again with the same key.
+- Errors are not stored, so after a `confirm_price` error the same key can be
+  sent again with `confirm_price: true`.
+
+Keys are scoped to the user, so two users can never collide.
+
+## Prompts
+
+Hosts that list MCP prompts (Claude, VS Code, the MCP Inspector) show three
+starters: `sell_something` (`what`, `price`, optional private `lowest`),
+`find_something` (`need`, private `budget`) and `whats_new`.
+
+## Discovery
+
+| URL | What it is |
+|---|---|
+| `/.well-known/mcp/server-card.json` | Server card: name, version, protocol, `/mcp` endpoint, authentication, instructions, and every tool (with input and output schemas), prompt and view, read from the live server |
+| `/llms.txt` | The same in Markdown for agents that read the web, with the rules an agent must follow |
+| `/skills/amazonpairup/SKILL.md` | The Agent Skill ([skills/amazonpairup/SKILL.md](../skills/amazonpairup/SKILL.md)) |
+| `/.well-known/oauth-protected-resource` | OAuth 2.1 metadata (RFC 9728), with `AUTH_MODE=oauth` |
+| `/health`, `/ready` | Liveness, and readiness including the database |
+
+Every response carries `X-Request-Id` (the caller's own, when it sends a valid
+one), and every log line for that request has the same id.
 
 ## Price check
 

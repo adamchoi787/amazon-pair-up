@@ -64,10 +64,13 @@ text, images and video alone, so the video and description carry most of the wei
 | Hosted endpoint live to Nov 20 | ✅ live since Oct 20: https://d3cxpkmhl89rw9.cloudfront.net/app/ (CloudFront + EC2, us-east-1) | Run the TI-84 demo there daily |
 | Pairing engine, one-turn deals, output schemas | ✅ on `main` | — |
 | OAuth, Origin check, container, add-on assets | ✅ on `main` | — |
-| AWS Builder "documented integrations" | ⚠️ Bedrock live in production (Titan Text Embeddings V2; Nova Lite for intent and agent) | Add AgentCore/Strands; write the AWS section |
+| AWS Builder "documented integrations" | ✅ Bedrock live in production (Titan Text Embeddings V2; Nova Lite for intent and agent). Strands Agents + AgentCore Runtime agent built and tested (Oct 20). CloudWatch logs, metrics and alarms in the stack. AWS section drafted in SUBMISSION.md | Run `agents/agentcore/deploy.sh` and `deploy/aws/deploy.sh` (ships the CloudWatch changes) with your credentials |
+| Agent Skill (SKILL.md) | ✅ `skills/amazonpairup/SKILL.md`, served at `/skills/amazonpairup/SKILL.md` (Oct 20) | — |
+| Agent friendliness | ✅ server card, llms.txt, MCP prompts, `idempotency_key` on writes, request ids (Oct 20) | — |
+| Seed market 150+ | ✅ 162 posts from 22 people, 30 services (Oct 20) | — |
 | Open Source entry | ⚠️ `pairing-core` built and used by the server (separate local repo, next to this one) | Create the public GitHub repo and push before submitting |
-| Friction log | ⚠️ 2 entries (AWS CLI under Git Bash, DLM validation) | Keep recording as they happen |
-| Product feedback per tool | ❌ | Draft from real experience |
+| Friction log | ⚠️ 4 entries (AWS CLI under Git Bash, DLM validation, two AgentCore SDK entries) | Keep recording as they happen |
+| Product feedback per tool | ⚠️ Drafts for MCP SDK, Bedrock, Strands, AgentCore, AWS hosting in SUBMISSION.md | Check them against your own experience and edit |
 | Video under 3 min | ❌ | Record Thu |
 | Bee | ❌ no device known | Roadmap line unless you have a device |
 

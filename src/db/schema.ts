@@ -142,6 +142,19 @@ CREATE TABLE IF NOT EXISTS ranking_models (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Retry-safe writes (src/market/idempotency.ts): the first result for each
+-- caller's idempotency_key, replayed to retries for 24 hours.
+CREATE TABLE IF NOT EXISTS idempotent_calls (
+  user_id     TEXT NOT NULL,
+  key         TEXT NOT NULL,
+  tool        TEXT NOT NULL,
+  args_hash   TEXT NOT NULL,
+  result      JSONB,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, key)
+);
+CREATE INDEX IF NOT EXISTS idempotent_calls_age_idx ON idempotent_calls (created_at);
+
 -- Append-only audit trail; powers the dashboard.
 CREATE TABLE IF NOT EXISTS events (
   id          BIGSERIAL PRIMARY KEY,

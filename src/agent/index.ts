@@ -1,4 +1,5 @@
 import type { Config } from "../config.js";
+import { log } from "../http/log.js";
 import type { Deps } from "../market/service.js";
 import { bedrockTurn } from "./bedrock.js";
 import { planOffline, WITHDRAW } from "./offline.js";
@@ -36,7 +37,7 @@ export async function handleAgentTurn(deps: Deps, cfg: Config, body: unknown): P
       step = await bedrockTurn(cfg, messages, await toolSpecs(deps));
     } catch (err) {
       // Throttling or an outage: the offline planner keeps the app usable.
-      console.warn("[agent] Bedrock step failed, using the offline planner:", (err as Error).message);
+      log("warn", "Bedrock agent step failed; using the offline planner", { error: (err as Error).message });
       step = planOffline(messages);
     }
   } else {

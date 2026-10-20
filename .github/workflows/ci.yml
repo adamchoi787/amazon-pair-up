@@ -18,3 +18,23 @@ jobs:
       - run: npm test
       - name: Committed browser bundles match the sources
         run: npm run build:web && git diff --exit-code -- public/app/app.js public/mcp-apps
+
+  agentcore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            agents/agentcore/package-lock.json
+      - run: npm ci
+      - run: npm ci
+        working-directory: agents/agentcore
+      - run: npm run typecheck
+        working-directory: agents/agentcore
+      - name: Strands agent against a real server (scripted model, no AWS)
+        run: npm test
+        working-directory: agents/agentcore

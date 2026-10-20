@@ -12,6 +12,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY src ./src
 COPY data ./data
 COPY public ./public
+COPY skills ./skills
 
 # Listen on all interfaces inside the container. Set ALLOWED_HOSTS to the public
 # hostname at deploy time for DNS-rebinding protection.

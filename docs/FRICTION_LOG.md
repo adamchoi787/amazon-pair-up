@@ -23,6 +23,28 @@ confusing than expected. Write it at the time it happens; you won't remember it 
 
 <!-- newest first -->
 
+### AgentCore TypeScript quick start does not compile against the current Strands SDK
+- **Who / when:** Tony + Claude, Tue Oct 20, 10:55 HKT
+- **Tool / API / SDK:** `bedrock-agentcore` 0.4.6 (TypeScript), `@strands-agents/sdk` 1.21.0
+- **Task attempted:** Host our Strands agent on AgentCore Runtime, starting from the quick start in the `bedrock-agentcore` README.
+- **Steps taken:** Copied the streaming handler: `for await (const event of agent.stream(prompt)) if (event.type === 'modelContentBlockDeltaEvent' && event.delta?.type === 'textDelta') …`; ran `tsc`.
+- **Expected:** The quick start compiles with the Strands version its peer dependency allows (`>=1.5.0`).
+- **Actual:** `TS2367: This comparison appears to be unintentional`. In Strands 1.21, `agent.stream()` yields `modelStreamUpdateEvent` wrappers, and the text delta sits in `event.event`. In plain JavaScript the README code runs but never yields any text, so the agent looks silent.
+- **Severity:** minor
+- **Workaround:** `if (event.type === "modelStreamUpdateEvent" && event.event.type === "modelContentBlockDeltaEvent" && event.event.delta.type === "textDelta") yield event.event.delta.text`.
+- **Suggestion:** Update the README example (and samples) to the current event shape, or export a helper such as `textDeltas(agent.stream(...))`; pin the peer range to the versions the README is tested against.
+
+### AgentCore Runtime app: local calls fail with 406 and 400 before reaching the handler
+- **Who / when:** Tony + Claude, Tue Oct 20, 10:58 HKT
+- **Tool / API / SDK:** `bedrock-agentcore` 0.4.6, `BedrockAgentCoreApp` (TypeScript)
+- **Task attempted:** Test our agent's `/invocations` locally before deploying, with curl.
+- **Steps taken:** `curl -X POST localhost:8080/invocations -H "Content-Type: application/json" -d '{"prompt":"any news?"}'`.
+- **Expected:** The handler runs, as with a hosted runtime call.
+- **Actual:** First `406` ("Streaming response requires Accept: text/event-stream header"), then `400` ("Missing sessionId. Provide via x-amzn-bedrock-agentcore-runtime-session-id header or request body"). Neither header is mentioned in the package README, which has no local invocation example.
+- **Severity:** minor
+- **Workaround:** Send `Accept: text/event-stream` and `X-Amzn-Bedrock-AgentCore-Runtime-Session-Id` on local calls (see `agents/agentcore/README.md`).
+- **Suggestion:** Add a "call it locally" curl line to the quick start, and generate a session id for local calls when none is given (with a warning) instead of rejecting them.
+
 ### DLM description pattern only checked at stack creation
 - **Who / when:** Tony + Claude, Tue Oct 20, 08:57 HKT
 - **Tool / API / SDK:** CloudFormation, Data Lifecycle Manager (`AWS::DLM::LifecyclePolicy`)

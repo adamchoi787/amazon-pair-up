@@ -21,9 +21,14 @@ Parameters:
   AppPort:
     Type: Number
     Default: 8080
+  AlertEmail:
+    Type: String
+    Default: ""
+    Description: Optional. Gets an email when an alarm fires (confirm the subscription once).
 
 Conditions:
   IsUsEast1: !Equals [!Ref "AWS::Region", us-east-1]
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, ""]]
 
 Resources:
   # ---------- release artifacts ----------
@@ -59,6 +64,7 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
       Policies:
         - PolicyName: amazonpairup
           PolicyDocument:
@@ -201,6 +207,107 @@ Resources:
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions: [!Sub "arn:aws:automate:${AWS::Region}:ec2:recover"]
 
+  # ---------- logs, metrics and alarms ----------
+  # The app writes JSON lines (LOG_FORMAT=json); the CloudWatch agent ships them
+  # here (deploy/aws/remote-install.sh). Metric filters turn them into metrics.
+  AppLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /amazonpairup/app
+      RetentionInDays: 30
+
+  McpLatencyMetric:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref AppLogGroup
+      FilterPattern: '{ $.msg = "request" && $.Route = "mcp" }'
+      MetricTransformations:
+        - MetricNamespace: AmazonPairUp/Logs
+          MetricName: McpLatency
+          MetricValue: $.LatencyMs
+          Unit: Milliseconds
+
+  ToolFailureMetric:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref AppLogGroup
+      FilterPattern: '{ $.msg = "tool" && $.outcome = "error" }'
+      MetricTransformations:
+        - MetricNamespace: AmazonPairUp/Logs
+          MetricName: ToolFailures
+          MetricValue: "1"
+          DefaultValue: 0
+
+  ServerErrorMetric:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref AppLogGroup
+      FilterPattern: '{ $.msg = "request" && $.status >= 500 }'
+      MetricTransformations:
+        - MetricNamespace: AmazonPairUp/Logs
+          MetricName: ServerErrors
+          MetricValue: "1"
+          DefaultValue: 0
+
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: AmazonPairUp alarms
+
+  AlarmEmail:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlertEmail
+    Properties:
+      TopicArn: !Ref AlarmTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+  ToolFailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: AmazonPairUp tools failed unexpectedly (users heard an apology)
+      Namespace: AmazonPairUp/Logs
+      MetricName: ToolFailures
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  ServerErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: AmazonPairUp answered with HTTP 5xx
+      Namespace: AmazonPairUp/Logs
+      MetricName: ServerErrors
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  # Alexa+ budgets about 500 ms for a round trip; warn when the slow tail stays above it.
+  McpLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: AmazonPairUp MCP p95 latency above 1.5 s for 15 minutes
+      Namespace: AmazonPairUp/Logs
+      MetricName: McpLatency
+      ExtendedStatistic: p95
+      Period: 300
+      EvaluationPeriods: 3
+      Threshold: 1500
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
   # ---------- backups ----------
   SnapshotRole:
     Type: AWS::IAM::Role
@@ -281,3 +388,7 @@ Outputs:
     Value: !Ref ReleaseBucket
   AppPort:
     Value: !Ref AppPort
+  LogGroup:
+    Value: !Ref AppLogGroup
+  AlarmTopicArn:
+    Value: !Ref AlarmTopic
