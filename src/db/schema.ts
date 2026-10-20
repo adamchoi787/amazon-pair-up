@@ -110,6 +110,17 @@ ALTER TABLE listings    ADD COLUMN IF NOT EXISTS ref_source TEXT;
 ALTER TABLE listings    ADD COLUMN IF NOT EXISTS price_flag TEXT;
 ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS price_flag TEXT;
 
+-- One offer below the asking price per buyer and listing. Once a budget below
+-- the ask fails, that buyer gets the listing only at the asking price, so
+-- retrying with rising budgets can't find the seller's minimum.
+CREATE TABLE IF NOT EXISTS failed_offers (
+  listing_id  TEXT NOT NULL REFERENCES listings(id),
+  buyer_id    TEXT NOT NULL REFERENCES users(id),
+  offered     NUMERIC(10,2) NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (listing_id, buyer_id)
+);
+
 -- Learning to pair better (src/market/learning.ts). What the engine saw when it
 -- proposed each deal, and the ranking models trained on how those deals ended.
 -- ranking_models.status: champion | retired | rejected | rolled_back.

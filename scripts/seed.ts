@@ -6,7 +6,7 @@ import { seedMarketplace } from "../src/db/seed.js";
 
 let db = await openDb(config);
 if (process.argv.includes("--reset")) {
-  await db.query(`DROP TABLE IF EXISTS events, pairing_features, ranking_models, deals, buy_intents, listings, users, reference_prices CASCADE`);
+  await db.query(`DROP TABLE IF EXISTS events, failed_offers, pairing_features, ranking_models, deals, buy_intents, listings, users, reference_prices CASCADE`);
   await db.close();
   db = await openDb(config); // re-runs migrations
   console.log("Reset all tables.");

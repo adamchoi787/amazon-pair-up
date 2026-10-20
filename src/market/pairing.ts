@@ -22,6 +22,9 @@ import { num, type BuyIntentRow, type DealRow, type ListingRow } from "./types.j
 //     expire, switched or withdrew) is never offered that listing lower, by any
 //     later request: declining and asking again with smaller budgets can't
 //     step down to the seller's minimum
+//   - a buyer gets one offer below the asking price per listing: once it fails,
+//     that buyer gets the listing only at the asking price, so asking again with
+//     rising budgets can't climb up to the seller's minimum either
 //   - expired requests (needed_by in the past) are not paired
 
 // Candidates that pass every hard constraint; the ranking picks among them.
@@ -122,13 +125,32 @@ export async function walkAwayFloor(db: Db, listingId: string, buyerId: string) 
   return num(rows[0]?.floor) ?? 0;
 }
 
-/** Settle one listing/request pair inside both private limits and the buyer's walk-away floor. */
+/** Whether this buyer already made an offer below the ask for this listing that failed. */
+async function offerFailed(db: Db, listingId: string, buyerId: string) {
+  const { rows } = await db.query(`SELECT 1 FROM failed_offers WHERE listing_id = $1 AND buyer_id = $2`, [listingId, buyerId]);
+  return rows.length > 0;
+}
+
+/** Remember a failed offer below the ask. The buyer's first one for a listing is the one that counts. */
+export async function recordFailedOffer(db: Db, listingId: string, buyerId: string, offered: number) {
+  await db.query(
+    `INSERT INTO failed_offers (listing_id, buyer_id, offered) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+    [listingId, buyerId, offered],
+  );
+}
+
+/**
+ * Settle one listing/request pair inside both private limits and the buyer's
+ * floor: the best price they walked away from, or the full ask once their offer
+ * below it failed.
+ */
 export async function settlePair(db: Db, listing: ListingRow, intent: BuyIntentRow): Promise<NegotiationResult> {
+  const ask = num(listing.ask_price)!;
   return negotiate({
-    askPrice: num(listing.ask_price)!,
+    askPrice: ask,
     sellerMin: num(listing.min_price)!,
     buyerMax: num(intent.max_price)!,
-    floor: await walkAwayFloor(db, listing.id, intent.buyer_id),
+    floor: (await offerFailed(db, listing.id, intent.buyer_id)) ? ask : await walkAwayFloor(db, listing.id, intent.buyer_id),
   });
 }
 

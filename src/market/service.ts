@@ -3,7 +3,7 @@ import { toVector, type Db } from "../db/client.js";
 import { logEvent, shortId } from "./events.js";
 import { findIntentsForListing, findMatchesForIntent } from "./matching.js";
 import {
-  expireHolds, isExpired, pairIntent, pairListing, propose, release, repairAfter, settlePair, type PairingSettings,
+  expireHolds, isExpired, pairIntent, pairListing, propose, recordFailedOffer, release, repairAfter, settlePair, type PairingSettings,
 } from "./pairing.js";
 import { learningReport } from "./learning.js";
 import { DEFAULT_PRICE_POLICY, priceBand, verdict, type PriceBand, type PricePolicy } from "./pricing.js";
@@ -46,6 +46,8 @@ export class MarketError extends Error {
 }
 
 const ALTERNATIVES = 4;
+/** Relevant offers a new request is checked against when it can't afford them. */
+const OUT_OF_REACH = 50;
 
 const pairing = (cfg: MarketSettings): PairingSettings => ({
   threshold: cfg.matchThreshold,
@@ -64,7 +66,7 @@ export async function ensureUser(db: Db, userId: string, displayName?: string) {
   );
 }
 
-/** Per-user posting limits. They also stop a buyer from probing a seller's minimum with many budgets. */
+/** Per-user posting limits against floods. Budget probing is stopped by the one-offer rule (failed_offers). */
 async function checkPostingLimits(deps: Deps, userId: string, kind: "offer" | "request") {
   const { db, cfg } = deps;
   const { rows } = await db.query<{ recent: number; open_requests: number }>(
@@ -246,6 +248,11 @@ export async function postRequest(deps: Deps, input: PostRequestInput) {
   const paired = await pairIntent(db, rows[0], pairing(cfg), "buyer");
   const intentRow = await getIntent(db, id);
   const alternatives = await findMatchesForIntent(db, intentRow, { limit: ALTERNATIVES, threshold: cfg.matchThreshold });
+  // This budget is the buyer's one offer below the ask for every relevant offer
+  // it can't close with; from now on they get those at the asking price.
+  const outOfReach = await findMatchesForIntent(db, intentRow, { limit: OUT_OF_REACH, threshold: cfg.matchThreshold, priceBlocked: true });
+  for (const m of outOfReach) await recordFailedOffer(db, m.id, input.user_id, maxPrice);
+  const closest = outOfReach[0];
   const deal = paired ? dealView(await getDealWithParties(db, paired.deal.id), input.user_id) : null;
   const budget = rate(maxPrice, unit, intentRow.currency);
   // A budget far below the usual range rarely finds anyone: say so, so the user can decide.
@@ -256,9 +263,13 @@ export async function postRequest(deps: Deps, input: PostRequestInput) {
   return {
     request: requestView(intentRow, input.user_id),
     deal,
-    alternatives: alternatives.map((m) => matchView(m, intentRow, input.user_id)),
+    // With nothing in reach, the closest offers at their asking price, the one named in `say` first.
+    alternatives: (deal ? alternatives : [...outOfReach, ...alternatives].slice(0, ALTERNATIVES)).map((m) => matchView(m, intentRow, input.user_id)),
     say: deal
       ? buyerOfferLine(deal, "found")
+      : closest
+        ? `Got it: ${need}, up to ${budget}. ${closest.title} ${service ? "charges" : "is asking"} ${rate(num(closest.ask_price)!, closest.price_unit, closest.currency)}, ` +
+          `and ${service ? "they" : "the seller"} can't go as low as your budget. Want ${service ? "them at that rate" : "it at that price"}? Otherwise I'll keep looking.`
       : service
         ? `Got it: ${need}, up to ${budget}. Nobody's free for it yet, so I'll keep asking and pair you as soon as someone offers. Helpers won't see your budget.${lowBudget}`
         : `Got it: ${need}, up to ${budget}. Nothing fits yet, so I'll keep looking and pair you as soon as a seller lists one. Sellers won't see your budget.${lowBudget}`,
@@ -284,11 +295,15 @@ export async function findMatches(deps: Deps, userId: string, requestId: string,
 
 // ---------- Deal-making ----------
 
-/** The buyer picks a specific offer: settle it, replacing any deal the request already holds. */
-export async function negotiateDeal(deps: Deps, userId: string, requestId: string, offerId: string) {
+/**
+ * The buyer picks a specific offer: settle it, replacing any deal the request
+ * already holds. `maxPrice` raises the request's budget first ("Want it at that
+ * price?" "Yes.").
+ */
+export async function negotiateDeal(deps: Deps, userId: string, requestId: string, offerId: string, maxPrice?: number) {
   const { db, cfg } = deps;
   await sweep(deps);
-  const intent = await getOwnIntent(db, userId, requestId);
+  let intent = await getOwnIntent(db, userId, requestId);
   if (intent.status === "fulfilled" || intent.status === "cancelled") throw new MarketError("That request is already closed.");
   if (isExpired(intent)) throw new MarketError("That request's deadline has passed. Want to post a new one?");
   const listing = await getListing(db, offerId);
@@ -304,13 +319,25 @@ export async function negotiateDeal(deps: Deps, userId: string, requestId: strin
   if (listing.status !== "active") {
     throw new MarketError(listing.status === "pending" ? "That one is on hold for someone else right now." : "That offer is no longer available.");
   }
+  if (maxPrice != null && maxPrice !== num(intent.max_price)) {
+    if (maxPrice < num(intent.max_price)!) throw new MarketError("A request's budget can only go up. For a lower one, post a new request.");
+    await db.query(`UPDATE buy_intents SET max_price = $2 WHERE id = $1`, [requestId, maxPrice]);
+    intent = await getIntent(db, requestId);
+  }
 
   const preview = await settlePair(db, listing, intent);
   if (!preview.ok) {
+    // A failure means the budget was below the ask. That was this buyer's one
+    // offer below it, so the public asking price is all that's left to say.
+    await recordFailedOffer(db, offerId, userId, num(intent.max_price)!);
     await logEvent(db, "negotiation_failed", userId, offerId, { intent_id: requestId });
-    // Deliberately vague: never reveal how far apart the limits are.
-    const who = listing.kind === "item" ? "The seller" : "They";
-    return { deal: null, say: `${who} can't meet your budget on this one. Want to try another option or raise your limit?` };
+    const ask = rate(num(listing.ask_price)!, listing.price_unit, listing.currency);
+    return {
+      deal: null,
+      say: listing.kind === "item"
+        ? `The seller can't go that low. It's ${ask}. Want it at that price?`
+        : `They can't go that low. They charge ${ask}. Want them at that rate?`,
+    };
   }
 
   // Open the new deal before offering the released post to anyone else, so it

@@ -187,16 +187,57 @@ test("choosing another option moves the request's single deal to it", async () =
   for (const c of [s1, s2, buyer]) await c.close();
 });
 
-test("no overlap returns a speakable refusal without numbers", async () => {
+test("no overlap names only the public asking price, and a yes buys at it", async () => {
   const seller = await clientAs("seller2");
   const buyer = await clientAs("buyer2");
   const { offer: listing } = await seller.call("post_offer", { title: "Rice cooker", category: "kitchen", ask_price: 30, min_price: 25 });
   const req = await buyer.call("post_request", { need: "rice cooker", max_price: 20 });
   assert.equal(req.deal, null, "below the reserve: not paired");
+  assert.match(req.say, /Rice cooker is asking \$30, .*Want it at that price\?/);
+  assert.equal(req.alternatives[0].offer_id, listing.offer_id, "the closest offer is listed at its asking price");
+  assert.equal(req.alternatives[0].within_budget_at_ask, false);
   const neg = await buyer.call("negotiate", { request_id: req.request.request_id, offer_id: listing.offer_id });
   assert.equal(neg.deal, null);
-  assert.ok(!/\d/.test(neg.say), "no numbers in refusal");
+  assert.equal(neg.say, "The seller can't go that low. It's $30. Want it at that price?");
+  assert.ok(!/25/.test(req._raw + neg._raw), "the seller's minimum never shows");
+
+  const lower = await buyer.call("negotiate", { request_id: req.request.request_id, offer_id: listing.offer_id, max_price: 15 });
+  assert.ok(lower._isError, "a request's budget only goes up");
+  const yes = await buyer.call("negotiate", { request_id: req.request.request_id, offer_id: listing.offer_id, max_price: 30 });
+  assert.equal(yes.deal.price, 30);
+  await buyer.call("decline_deal", { deal_id: yes.deal.deal_id });
   for (const c of [seller, buyer]) await c.close();
+});
+
+test("one offer below the asking price: rising budgets can't climb to the seller's minimum", async () => {
+  const seller = await clientAs("seller_speaker");
+  const prober = await clientAs("prober_speaker");
+  const { offer } = await seller.call("post_offer", { title: "Bluetooth speaker", category: "audio", ask_price: 40, min_price: 30 });
+
+  // Step up from below: the first no fixes the price at the ask for this buyer.
+  const first = await prober.call("post_request", { need: "bluetooth speaker", max_price: 20 });
+  assert.equal(first.deal, null);
+  for (const budget of [28, 31, 35, 39.99]) {
+    const again = await prober.call("post_request", { need: "bluetooth speaker", max_price: budget });
+    assert.equal(again.deal, null, `$${budget} clears the $30 minimum, but this buyer's offer already failed`);
+    assert.match(again.say, /asking \$40/);
+    const neg = await prober.call("negotiate", { request_id: again.request.request_id, offer_id: offer.offer_id });
+    assert.equal(neg.deal, null);
+    await prober.call("withdraw_post", { post_id: again.request.request_id });
+  }
+
+  // The rule is per listing: a new listing gets this buyer's first offer, made by a request already waiting.
+  const waiting = await prober.call("post_request", { need: "bluetooth speaker", max_price: 33 });
+  assert.equal(waiting.deal, null);
+  const second = await seller.call("post_offer", { title: "Bluetooth speaker, second one", category: "audio", ask_price: 40, min_price: 30 });
+  assert.equal(second.deal?.price, 33);
+  await prober.call("withdraw_post", { post_id: waiting.request.request_id });
+
+  // Another buyer's first offer still clears the minimum.
+  const other = await clientAs("other_speaker");
+  const fair = await other.call("post_request", { need: "bluetooth speaker", max_price: 32 });
+  assert.equal(fair.deal?.price, 32);
+  for (const c of [seller, prober, other]) await c.close();
 });
 
 test("a seller without auto-accept gives the final yes", async () => {

@@ -34,6 +34,8 @@ const fromCents = (cents: number) => cents / 100;
  * So the seller's minimum never moves the price (a deal reveals only that it is
  * at most the price), a budget at or above the ask never moves the price, and a
  * buyer who walks away can't come back lower to step down toward the minimum.
+ * A buyer whose offer below the ask failed gets floor = ask (src/market/pairing.ts),
+ * so stepping up from below can't find the minimum either.
  *
  * Example (demo script): ask 20, seller min 15, buyer max 18 → 18, $2 below asking.
  * Amounts are dollars (or another currency's major unit) with at most two decimals.

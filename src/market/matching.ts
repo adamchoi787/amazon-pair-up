@@ -5,7 +5,8 @@ import type { BuyIntentRow, ListingRow } from "./types.js";
 // and listing → waiting requests) with the same constraints and the same score:
 //   1. hard constraints  — available, not your own, same kind (item or service)
 //                          and price unit, enough quantity, condition >= wanted (items),
-//                          a deal is possible (seller min <= buyer max; evaluated
+//                          a deal is possible (seller min <= buyer max, and the
+//                          full ask once this buyer's lower offer failed; evaluated
 //                          server-side, never exposed), request not expired, and
 //                          the pair was not declined or left to expire before
 //   2. semantic score    — pgvector cosine similarity of the stored embeddings
@@ -21,6 +22,14 @@ export const WEIGHTS = { semantic: 0.6, keyword: 0.25, price: 0.1, location: 0.0
 
 const CONDITION_RANK = `CASE %s WHEN 'new' THEN 4 WHEN 'like_new' THEN 3 WHEN 'good' THEN 2 WHEN 'fair' THEN 1 ELSE 0 END`;
 const rank = (col: string) => CONDITION_RANK.replace("%s", col);
+
+/**
+ * A deal is possible: the seller's minimum is within the budget, and once this
+ * buyer's offer below the ask failed (failed_offers), only the ask itself is.
+ */
+const priceFits = (l: string, budget: string, buyer: string) =>
+  `(${l}.min_price <= ${budget} AND (${l}.ask_price <= ${budget} OR NOT EXISTS (
+     SELECT 1 FROM failed_offers f WHERE f.listing_id = ${l}.id AND f.buyer_id = ${buyer})))`;
 
 const SCORE = `(${WEIGHTS.semantic} * semantic + ${WEIGHTS.keyword} * keyword
                + ${WEIGHTS.price} * price_fit + ${WEIGHTS.location} * loc)::float8`;
@@ -48,12 +57,17 @@ const toScores = <T extends Scores>(r: T): T => ({
   score: Number(r.score),
 });
 
-/** Offers that could serve this request, best first. Uses the request's stored embedding. */
+/**
+ * Offers that could serve this request, best first. Uses the request's stored
+ * embedding. With `priceBlocked`, the relevant offers that pass every other
+ * constraint but can't close at this budget instead.
+ */
 export async function findMatchesForIntent(
   db: Db,
   intent: BuyIntentRow,
-  opts: { limit: number; threshold: number },
+  opts: { limit: number; threshold: number; priceBlocked?: boolean },
 ): Promise<MatchRow[]> {
+  const fits = priceFits("l", "$2", "$3");
   const { rows } = await db.query<MatchRow>(
     `
     WITH q AS (
@@ -75,7 +89,7 @@ export async function findMatchesForIntent(
         AND l.seller_id <> $3
         AND l.kind = $9 AND l.price_unit = $10
         AND l.quantity >= $4
-        AND l.min_price <= $2
+        AND ${opts.priceBlocked ? `NOT ${fits}` : fits}
         AND (l.kind = 'service' OR ${rank("l.condition")} >= ${rank("$6")})
         AND l.embedding IS NOT NULL
         AND NOT EXISTS (SELECT 1 FROM deals d
@@ -122,7 +136,7 @@ export async function findIntentsForListing(
         AND i.buyer_id <> l.seller_id
         AND l.kind = i.kind AND l.price_unit = i.price_unit
         AND l.quantity >= i.quantity
-        AND l.min_price <= i.max_price
+        AND ${priceFits("l", "i.max_price", "i.buyer_id")}
         AND (l.kind = 'service' OR ${rank("l.condition")} >= ${rank("i.min_condition")})
         AND l.embedding IS NOT NULL
         AND i.embedding IS NOT NULL

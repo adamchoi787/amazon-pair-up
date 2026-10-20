@@ -82,7 +82,8 @@ text, images and video alone, so the video and description carry most of the wei
 - Done: MCP Apps view `ui://amazonpairup/market.html` on every UI tool (definition and result `_meta`), rendered by the web app; confirm guard on the agent.
 - Done for production use: offers expire after `DEAL_HOLD_HOURS` and both posts
   re-pair (also on a background timer); users list and withdraw their posts;
-  per-user posting limits (which also block budget probing) and per-caller HTTP
+  one offer below the asking price per buyer and listing (budgets can't be
+  stepped toward the seller's minimum); per-user posting limits and per-caller HTTP
   rate limits; bounded inputs; token-protected dashboard; field-by-field
   validation of Bedrock output with a local fallback; unexpected errors still
   return a spoken sentence; CI on every push.

@@ -68,7 +68,7 @@ test("behind a CDN, only requests with the origin secret reach the app", async (
   assert.equal((await fetch(`${base}/health`)).status, 200, "health checks need no secret");
 });
 
-test("posting limits stop floods and budget probing", async () => {
+test("posting limits stop floods", async () => {
   const deps: Deps = { db, ai: createMockAi(DIM), cfg: { matchThreshold: 0.35, postsPerHour: 3, maxOpenRequests: 2 } };
   await postRequest(deps, { user_id: "prober", need: "rice cooker", max_price: 10 });
   await postRequest(deps, { user_id: "prober", need: "rice cooker", max_price: 11 });

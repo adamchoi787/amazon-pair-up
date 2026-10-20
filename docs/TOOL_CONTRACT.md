@@ -46,7 +46,11 @@ call. A post with no counterpart waits and is paired when one arrives.
   least the seller's minimum. So the seller's minimum never moves the price, and
   a budget at or above the ask never does either. A buyer who walked away from
   a price for a listing (declined, let it expire, switched or withdrew) is never
-  offered that listing lower, by any later request. Settlement runs in
+  offered that listing lower, by any later request. A buyer gets one offer
+  below the asking price per listing: once a budget below the ask fails (a
+  `negotiate` that returns no deal, or a new request that can't afford a
+  relevant offer), that buyer gets the listing only at the asking price, so
+  rising budgets can't climb to the seller's minimum. Settlement runs in
   pairing-core, a Rust library compiled to WebAssembly
   ([negotiation.ts](../src/market/negotiation.ts), `vendor/pairing-core`), in
   integer cents. For hourly work the rule applies to the rate and `total` is the
@@ -149,15 +153,15 @@ All output goes through [views.ts](../src/market/views.ts); the tests fail on an
 
 ### `post_request`
 `need` and/or `raw_request`*, `max_price` (required unless stated in `raw_request`; per hour for hourly work), `kind`, `price_unit`, `hours`, `pickup`, `location`, `schedule`, `needed_by` (ISO 8601, in the future: an item's deadline or a job's start), `min_condition` (items), `quantity` (items), `source` (`voice|bee_context`), `confirm_price` (only after a `confirm_price` error)
-→ `{ request, deal | null, alternatives: [offer + within_budget_at_ask + score] (up to 4), say }`. Structured args win; `raw_request` is parsed to fill the gaps, including kind, unit, hours, pickup, place and time ("find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5").
+→ `{ request, deal | null, alternatives: [offer + within_budget_at_ask + score] (up to 4), say }`. With no deal, `alternatives` and `say` also name the closest offers the budget can't reach, at their asking price. Structured args win; `raw_request` is parsed to fill the gaps, including kind, unit, hours, pickup, place and time ("find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5").
 
 ### `find_matches`
 `request_id`*, `limit` (1–10, default 3)
 → `{ request_id, matches, say }`. The offer currently proposed to the request is not repeated.
 
 ### `negotiate`
-`request_id`*, `offer_id`*
-→ `{ deal | null, say }`. Settles that offer by the same rule and replaces the request's current deal. `deal: null` when no price fits both limits.
+`request_id`*, `offer_id`*, `max_price` (raises the request's budget first; only upward)
+→ `{ deal | null, say }`. Settles that offer by the same rule and replaces the request's current deal. `deal: null` when no price fits both limits; `say` then names the public asking price ("The seller can't go that low. It's $20. Want it at that price?"), and on a yes the agent calls again with `max_price` set to it.
 
 ### `confirm_deal`
 `deal_id`*. Call **only after the user explicitly says yes.**

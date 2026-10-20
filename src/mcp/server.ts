@@ -53,6 +53,7 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
         "when one arrives, so use get_deal_status for news and list_my_posts / withdraw_post to manage posts. Private " +
         "limits (min_price, max_price) are never shown to the other side; never ask for or reveal them. Prices are settled " +
         "by a fixed rule, never by haggling: the asking price, or a lower budget as an offer the seller's minimum accepts. " +
+        "A buyer gets one such offer per offer; after a no, the asking price stands (negotiate with max_price on a yes). " +
         "A price far from what similar things go for returns an error with code 'confirm_price': read its 'say', then " +
         "call again with confirm_price: true if the user confirms, or with the price they meant. Every result has " +
         "a 'say' field: one short sentence you can speak as is.",
@@ -169,12 +170,17 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       title: "Get this one instead",
       description:
         "Settle a specific offer the user picked from the options, by the same fixed rule. It replaces the deal the request already " +
-        "holds and returns a proposed deal; ask the user, then call confirm_deal. Returns deal: null when no price fits both limits.",
-      inputSchema: { user_id: userIdArg, request_id: id, offer_id: id },
+        "holds and returns a proposed deal; ask the user, then call confirm_deal. Returns deal: null when no price fits both limits. " +
+        "A buyer gets one offer below the asking price per offer; after a no, 'say' names the asking price, and on a yes call " +
+        "again with max_price set to it.",
+      inputSchema: {
+        user_id: userIdArg, request_id: id, offer_id: id,
+        max_price: price.optional().describe("Raise the request's PRIVATE budget first, e.g. to the asking price the user just agreed to. Only upward."),
+      },
       outputSchema: outputs.negotiate,
       annotations: writes,
     },
-    (args) => run(() => market.negotiateDeal(deps, who(args.user_id), args.request_id, args.offer_id), "market"),
+    (args) => run(() => market.negotiateDeal(deps, who(args.user_id), args.request_id, args.offer_id, args.max_price), "market"),
   );
 
   registerAppTool(

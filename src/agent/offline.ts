@@ -103,6 +103,11 @@ function onUtterance(messages: AgentMessage[], text: string): Step {
     if (DECLINE.test(text)) return reply("Okay, I've left it. Tell me the price whenever you're ready.");
   }
 
+  // "The seller can't go that low. It's $20. Want it at that price?": a yes buys at the asking price.
+  const atAsk = pendingAskingPrice(messages);
+  if (atAsk && isExplicitYes(text)) return call("negotiate", atAsk);
+  if (atAsk && DECLINE.test(text)) return reply("Okay. I'll keep looking.");
+
   if (DECLINE.test(text)) {
     const deal = latestOpenDeal(messages, false);
     return deal ? call("decline_deal", { deal_id: deal }) : reply("Okay. What would you like to do instead?");
@@ -176,10 +181,12 @@ function resultJson(r: ToolResultBlock["toolResult"]): Json {
   return {};
 }
 
-function toolNameFor(messages: AgentMessage[], toolUseId: string) {
-  for (const m of messages) for (const b of m.content) if (isToolUse(b) && b.toolUse.toolUseId === toolUseId) return b.toolUse.name;
+function toolUseFor(messages: AgentMessage[], toolUseId: string) {
+  for (const m of messages) for (const b of m.content) if (isToolUse(b) && b.toolUse.toolUseId === toolUseId) return b.toolUse;
   return undefined;
 }
+
+const toolNameFor = (messages: AgentMessage[], toolUseId: string) => toolUseFor(messages, toolUseId)?.name;
 
 function previousAssistantText(messages: AgentMessage[]) {
   for (let i = messages.length - 2; i >= 0; i--) {
@@ -194,7 +201,8 @@ function* resultsNewestFirst(messages: AgentMessage[]) {
     const blocks = messages[i].content.filter(isToolResult);
     for (let j = blocks.length - 1; j >= 0; j--) {
       const r = blocks[j].toolResult;
-      yield { tool: toolNameFor(messages, r.toolUseId), status: r.status ?? "success", data: resultJson(r) };
+      const use = toolUseFor(messages, r.toolUseId);
+      yield { tool: use?.name, input: use?.input ?? {}, status: r.status ?? "success", data: resultJson(r) };
     }
   }
 }
@@ -227,6 +235,21 @@ function pendingPriceCheck(messages: AgentMessage[]) {
       }
       return undefined;
     }
+  }
+  return undefined;
+}
+
+/** If the newest result offered the asking price after a no, the negotiate call a yes makes. */
+function pendingAskingPrice(messages: AgentMessage[]) {
+  for (const r of resultsNewestFirst(messages)) {
+    const d = r.data as { deal?: unknown; say?: unknown; request?: { request_id?: string }; alternatives?: { offer_id: string; ask_price: number }[] };
+    if (r.status === "error" || d.deal || !/Want (it at that price|them at that rate)\?/.test(String(d.say))) return undefined;
+    if (r.tool === "post_request" && d.request?.request_id && d.alternatives?.[0]) {
+      return { request_id: d.request.request_id, offer_id: d.alternatives[0].offer_id, max_price: d.alternatives[0].ask_price };
+    }
+    const ask = amount(new RegExp(String.raw`\b(?:It's|charge)\s+${MONEY}`, "i"), String(d.say));
+    if (r.tool === "negotiate" && ask !== undefined) return { request_id: r.input.request_id, offer_id: r.input.offer_id, max_price: ask };
+    return undefined;
   }
   return undefined;
 }

@@ -45,6 +45,10 @@ limit. One deterministic rule settles every deal instead, in
   shows only that the minimum was at most the price. A buyer who walks away
   from an offer never gets that listing cheaper later, so declining and asking
   again lower can't find the minimum.
+- **One offer below the asking price per buyer and listing.** After a no, the
+  asking price stands for that buyer ("The seller can't go that low. It's $20.
+  Want it at that price?"), so stepping a budget up from below can't find the
+  minimum either. Every other buyer still gets their own first offer.
 - **The buyer's budget stays secret whenever it covers the ask.** A lower budget
   is the buyer's offer, so the seller sees it as the price.
 

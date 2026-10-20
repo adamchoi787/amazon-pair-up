@@ -211,6 +211,16 @@ test("a buyer who forgets the budget is asked, and the answer completes the requ
   await buyer.close();
 });
 
+test("a budget below the seller's minimum hears the asking price, and a yes buys at it", async () => {
+  const seller = await session("u_kettle_seller");
+  const buyer = await session("u_kettle_buyer");
+  await seller.say("Sell my electric kettle for $25. I'll take anything above $20.");
+  const heard = await buyer.say("I need an electric kettle, maximum $15");
+  assert.match(heard, /^Got it: .*kettle, up to \$15\. Electric kettle is asking \$25, and the seller can't go as low as your budget\. Want it at that price\?/);
+  assert.equal(await buyer.say("Yes"), "Got it: Electric kettle for $25. Should I confirm it?");
+  for (const s of [seller, buyer]) await s.close();
+});
+
 test("tools declare the AmazonPairUp MCP Apps view, and the view is served", async () => {
   const s = await session("u_viewer");
   const withUi = s.tools.filter((t) => (t._meta as { ui?: { resourceUri?: string } } | undefined)?.ui?.resourceUri === "ui://amazonpairup/market.html");
