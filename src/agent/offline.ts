@@ -8,7 +8,8 @@ import {
 // step: look at the conversation, then either request MCP tool calls or reply.
 // It understands the core voice flows: selling an item, offering a service,
 // asking for an item or for help, yes/no on an offer, more options, news,
-// listing and withdrawing posts, and short follow-ups when a price or budget
+// listing and withdrawing posts, meet-up or Amazon Hub delivery for an item
+// deal, and short follow-ups when a price or budget
 // was missing.
 
 type Json = Record<string, unknown>;
@@ -89,6 +90,9 @@ const STATUS = /\b(news|status|my (deals?|jobs?)|any (offers|deals|buyers|seller
 const SUGGEST = /\b(anything i (need|should get)|what do you suggest|any (suggestions|ideas)|suggest something|what might i need|for me today)\b/i;
 const ROUTINES = /\b(what do you know about me|my (routines|habits)|what have you (learned|noticed))\b/i;
 const FORGET = /\b(forget (it|that|this)|don'?t (suggest|ask) (that|this|it) again|never suggest|stop suggesting)\b/i;
+// "Deliver it", "can they ship it", "send it to my locker"; "I'll meet up".
+const DELIVER = /\b(deliver (it|that)|have it delivered|ship (it|that)|can (they|you|he|she|the seller) (ship|send|deliver)\b|send it to (me|my locker)|to my locker|locker delivery)\b/i;
+const MEET = /\b(i'?ll meet( (them|up|in person))?|meet (up )?instead|let'?s meet( up)?|meet in person)\b/i;
 const MORE = /\b((more|other) (options|ones|choices)|what else|anything else|show me (more|others|alternatives)|alternatives)\b/i;
 const SELL = /\b(sell|selling|list my|get rid of)\b/i;
 // "I can do lunch runs on campus", "I'm free on Saturday to help at events"
@@ -139,6 +143,12 @@ function onUtterance(messages: AgentMessage[], text: string): Step {
   if (ROUTINES.test(text)) return call("get_my_routines", {});
   if (SUGGEST.test(text)) return call("get_suggestions", {});
 
+  // After an item deal was read (before yes or no: "yes, deliver it" switches, it never confirms), the buyer can switch between a meet-up and Amazon Hub delivery.
+  const wantsDelivery = DELIVER.test(text);
+  if (wantsDelivery || MEET.test(text)) {
+    const deal = latestItemDeal(messages);
+    if (deal) return call("choose_handoff", { deal_id: deal, method: wantsDelivery ? "delivery" : "meetup" });
+  }
   if (DECLINE.test(text)) {
     const deal = latestOpenDeal(messages, false);
     return deal ? call("decline_deal", { deal_id: deal }) : reply("Okay. What would you like to do instead?");
@@ -319,6 +329,19 @@ function latestOpenDeal(messages: AgentMessage[], mustAwaitUser: boolean) {
   }
   return undefined;
 }
+
+/** The newest proposed item deal the user buys that can switch to Amazon Hub delivery. */
+function latestItemDeal(messages: AgentMessage[]) {
+  for (const r of resultsNewestFirst(messages)) {
+    const d = r.data as { deal?: ItemDeal | null; next_deal?: ItemDeal | null; deals?: ItemDeal[] };
+    for (const deal of [d.next_deal, d.deal, ...(d.deals ?? [])]) {
+      if (deal?.deal_id && deal.kind === "item" && deal.status === "proposed" && deal.your_role === "buyer" && deal.delivery) return deal.deal_id;
+    }
+  }
+  return undefined;
+}
+
+interface ItemDeal extends DealLike { kind?: string; your_role?: string; delivery?: unknown }
 
 function latestRequest(messages: AgentMessage[]) {
   for (const r of resultsNewestFirst(messages)) {

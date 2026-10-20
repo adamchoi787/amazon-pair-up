@@ -137,6 +137,10 @@ PairUp learns regular requests from your own history and offers them shortly bef
 
 Lifestyle code: src/market/lifestyle.ts and context.ts; device tokens: src/auth/devices.ts and src/http/devices.ts; voice loop: src/agent/runner.ts; browser: src/web/watch.ts and lifestyle-ui.ts; Bee bridge: scripts/bee-bridge.ts.
 
+## Delivery
+
+Item deals change hands at an Amazon Hub point, or the buyer can have the item delivered. The deal card shows "Deliver to my locker" with the fee, and a buyer can say "deliver it" or "send it to my locker". The seller drops it at an Amazon Hub Counter, the buyer collects it from an Amazon Hub Locker with a pickup code, and neither sees the other's address. The price stays the settled one; the fee is added to the total. See [Delivery](docs/DELIVERY.md).
+
 ## Run it (2 minutes, no database or AWS needed)
 
 ```bash
@@ -145,7 +149,7 @@ npm run reset        # create tables + load seed listings
 npm start            # web app on http://127.0.0.1:3000/, MCP server at /mcp, operations dashboard at /dashboard/
 npm run smoke        # (second terminal) plays the TI-84 demo over real MCP
 npm run check:release # read-only comparison of the running release and this checkout
-npm test             # unit + end-to-end tests (in-memory Postgres + pgvector)
+npm test             # 150 unit + end-to-end tests (in-memory Postgres + pgvector)
 npm run simulate     # the learning loop on a simulated market, day by day
 cd agents/agentcore && npm install && npm test   # the Strands agent against a real server
 ```
@@ -294,7 +298,7 @@ src/
   market/learning.ts     learning to pair better: features, model, guarded rollout
   market/policy.ts       what may be posted: keyword rules + embedding match (data/policy.json)
   market/trust.ts        reports, review status and the review queue
-  market/amazon.ts       hand-offs to Amazon: search fallback, Trade-In, Hub meet-up points
+  market/amazon.ts       hand-offs to Amazon: search fallback, Trade-In, Hub meet-up points, Hub delivery
   market/service.ts      business operations behind each tool
   market/views.ts        the only place rows become output (privacy redaction)
   market/idempotency.ts  retry-safe writes (idempotency_key)
