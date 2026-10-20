@@ -64,7 +64,7 @@ The checked-in application history begins October 18, 2026, inside the August 31
 | Ring PairUp Points and Hub delivery workflow | `abed8b3`, `81256df`, `df22de9` — October 20 |
 | Shared design and two-device rehearsal | `b2f7fa2`, `e4144a3` — October 20 |
 
-Project source: [rairurairu/amazon-pair-up](https://github.com/rairurairu/amazon-pair-up). The final local preparation commits must be pushed before submission. PairUp models Hub delivery with labelled demo rates, locations and references; live carrier booking is a future integration.
+Project source: [rairurairu/amazon-pair-up](https://github.com/rairurairu/amazon-pair-up). Release [v0.8.0](https://github.com/rairurairu/amazon-pair-up/tree/v0.8.0) is pushed and deployed at `6895b52`, with passing CI and public release checks; [EVIDENCE.md](EVIDENCE.md) records live AWS responses. PairUp models Hub delivery with labelled demo rates, locations and references; live carrier booking is a future integration. Production currently offers judge demo sign-in; Login with Amazon needs its security-profile credentials.
 
 ## Track declaration answer
 
@@ -104,9 +104,9 @@ Use the complete per-tool answer in [PRODUCT_FEEDBACK.md](PRODUCT_FEEDBACK.md), 
 
 ## Final submission checks
 
-- [ ] Public repository with license and commit history.
-- [ ] Current release deployed; `npm run check:release -- --url <public-origin> --revision <submitted-commit> --expect-ai bedrock --expect-auth oauth` passes.
-- [ ] A real Bedrock request recorded (and an AgentCore invocation, if the video shows it).
+- [x] Public repository with MIT license and pushed commit history.
+- [x] Release `v0.8.0` deployed; commit `6895b52`, version, readiness and asset identity checks pass.
+- [x] A real Bedrock request and hosted AgentCore version 2 invocation recorded in EVIDENCE.md; finish the observed AgentCore spoken-response quality gap before showing that path in the video.
 - [ ] Judge sign-in rehearsed in a fresh browser session.
 - [ ] Public English YouTube or Vimeo demo under three minutes.
 - [ ] Description and per-tool feedback reviewed against your own experience.

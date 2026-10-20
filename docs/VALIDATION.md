@@ -1,6 +1,27 @@
 # PairUp 0.8.0 validation
 
-October 20, 2026 HKT. Windows, Node.js v24.14.1. Code release: `21fd4eb`, merged locally into main. Deployment and real device evidence are recorded separately below.
+October 20, 2026 HKT. Windows, Node.js v24.14.1. Original local code validation: `21fd4eb`. Pushed and deployed release: `v0.8.0`, commit `6895b521f50453819a9ba55b5c1f73914f6f17f9`. Later documentation-only commits record the evidence without changing the release tag.
+
+## Live release follow-up
+
+The user authorized push, deployment and real AWS evidence collection on October 20, overriding the earlier handoff's local-preparation boundary.
+
+| Check | Result |
+|---|---|
+| Release publication | `main` and annotated tag `v0.8.0` pushed; public GitHub repo has MIT license |
+| GitHub CI for `6895b52` | [Passed](https://github.com/rairurairu/amazon-pair-up/actions/runs/39441306891): root tests, clean Linux installs/typechecks, browser bundle comparison and AgentCore checks |
+| Local verification repeated | Server/browser and AgentCore typechecks pass; browser build matches committed assets; root **175/175** and AgentCore **4/4** tests pass |
+| Recovery snapshot | EBS snapshot `snap-090f26166800f4a41` completed before deployment; daily DLM policy remains enabled |
+| Web deployment | SSM release `20261020144053-6895b52`; CloudFormation reported no infrastructure changes |
+| Public release verification | Version 0.8.0, full revision, UI fingerprint, asset manifest, app shell, database readiness, Bedrock mode and OAuth all pass |
+| Live Bedrock preflight | Titan Text Embeddings V2: **1024 dimensions**; Nova Lite extracted calculator intent with budget 18 and selected `post_offer` in the tool-use probe; the returned write was not executed |
+| AgentCore deployment | Runtime `amazonpairup_agent-DsoU3B38yY`, **version 2 READY**; ARM64 image tag `20261020144137`, ECR digest `sha256:bcc5e49b1f34ebe34dfc75753455e737fbd106b7b75b7be873249b7eed479e6c` |
+| Live authenticated inference | Collector **passed**: hosted Bedrock and actual AgentCore stream. AgentCore returned reasoning text without a separate spoken answer for this prompt; response quality remains a gap. See [EVIDENCE.md](EVIDENCE.md) |
+| Judge authentication | Fresh isolated judge-demo OAuth authorization-code flow with S256 PKCE passed. Evidence credentials revoked after collection. Browser UI rehearsal remains separate |
+| Observability | App and CloudWatch agent active; fresh deployment log records confirmed in CloudWatch; four alarms OK. SNS topic has **zero subscribers** |
+| Production integration configuration | Login with Amazon client ID/secret and Ring access token/point-device mapping/HMAC key are absent. Judge demo sign-in is enabled |
+
+Local command logs are ignored `codex-live-*.log` files. Public runtime evidence is committed in EVIDENCE.md. No post or deal was created by the AWS probes.
 
 ## Checks completed
 
@@ -45,8 +66,7 @@ These were local mock-market and signed local-simulator checks. They establish U
 
 ## External evidence still needed
 
-- The public endpoint was checked read-only during preparation. It reports **0.7.0**, a different asset fingerprint, Bedrock configuration and OAuth. Deploy 0.8.0 and run the checker with the full submitted revision.
-- Run the actual Bedrock evidence request and optional AgentCore cloud invocation after deployment. See [EVIDENCE.md](EVIDENCE.md). Configured Bedrock mode alone does not prove inference succeeded.
-- Rehearse real Login with Amazon / judge-demo sign-in and record official Ring Playground or device interaction.
+- Public 0.8.0 deployment and live AWS evidence are recorded above and in [EVIDENCE.md](EVIDENCE.md). Recollect if the application release changes.
+- Rehearse judge-demo sign-in in a fresh browser. Configure Login with Amazon before claiming that path is live. Supply the missing Ring settings and record official Ring Playground or device interaction.
 - Tony confirmed no real Bee source. The public-source search found no verified eligible recording corpus; see [BEE_DATA_SOURCES.md](BEE_DATA_SOURCES.md). Enter Bee after obtaining valid provenance or an organizer-approved alternative.
 - Record and submit the integrated public English video under three minutes, fill the feedback/contribution fields and keep judge access available through the judging period. Any pilot numbers must come from an actual observed pilot.

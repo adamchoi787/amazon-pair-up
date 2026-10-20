@@ -1,5 +1,7 @@
 # Handoff to Codex, round 2 (2026-10-20, HKT evening)
 
+> Release follow-up: Tony subsequently authorized push, deployment and live AWS checks. `v0.8.0` at `6895b52` is pushed and deployed; AgentCore version 2 is READY. See EVIDENCE.md for the passing provenance collector and its observed spoken-answer limitation, and AWARD_GAPS.md for remaining gates. The no-push/no-AWS instructions below describe the earlier preparation scope.
+
 > Codex follow-up: local 0.8.0 preparation is documented in VALIDATION.md and RECORDING_CHECKLIST.md. The status table records each item. No push, deploy, upstream publication or AWS runtime call was performed. Tony confirmed no Bee data source; online source research found no verified eligible dataset, so that entry remains evidence-gated.
 
 `main` is at `aa5ff24` (PairUp 0.7.0 + PairUp Points with Ring + Amazon Hub
