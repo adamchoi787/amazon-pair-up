@@ -5,6 +5,7 @@ import { icon, mark, type IconName } from '../design/icons.js';
 
 const $ = (id:string)=>document.getElementById(id)!;
 let auth:Auth, mcp:Mcp, busy=false;
+let pointDeal:string|null=null;
 let action:{kind:'deal'|'suggestion';id:string;budget:number|null}|null=null;
 // Each new line cross-fades in, so a glance shows that something changed.
 const say=(text:string,voice=false)=>{const m=$('message');if(m.textContent!==text){m.textContent=text;m.classList.remove('swap');void m.offsetWidth;m.classList.add('swap');}if(voice)speak(text);};
@@ -14,9 +15,18 @@ const tick=()=>{$('clock').textContent=new Date().toLocaleTimeString(undefined,{
 const zone=Intl.DateTimeFormat().resolvedOptions().timeZone;
 async function refresh(){
   if(busy)return;
-  const deals=resultData(await mcp.call('get_deal_status',{})).deals as {deal_id:string;title:string;price:number;waiting_for_you:boolean;status:string}[];
+  const deals=resultData(await mcp.call('get_deal_status',{})).deals as {deal_id:string;title:string;price:number;total:number|null;waiting_for_you:boolean;status:string;meetup:{point?:{name:string;status:string;you:string;them:string}|null};delivery?:{selected:boolean;pick_up:{name:string};drop_off:{name:string}}|null}[];
+  pointDeal=null;$('checkin').hidden=true;
   const deal=deals.find(d=>d.status==='proposed'&&d.waiting_for_you);
-  if(deal){action={kind:'deal',id:deal.deal_id,budget:null};say(`${deal.title} for $${deal.price}. Confirm?`);}
+  const meeting=deals.find(d=>d.status==='confirmed'&&d.meetup.point);
+  const delivery=deals.find(d=>d.status==='confirmed'&&d.delivery?.selected);
+  if(deal){action={kind:'deal',id:deal.deal_id,budget:null};say(`${deal.title} for $${deal.total??deal.price}. Confirm?`);}
+  else if(meeting){
+    action=null;const p=meeting.meetup.point!;pointDeal=meeting.deal_id;
+    say(p.status==='both_here'?`${p.name}. Both here. Go ahead with the hand-off.`:`${p.name}. You: ${p.you==='confirmed'?'here, Ring confirmed':p.you==='checked_in'?'waiting for Ring':'on the way'}. Them: ${p.them==='confirmed'?'here, Ring confirmed':'on the way'}. Press the doorbell when you arrive.`);
+    $('checkin').hidden=p.you==='confirmed';
+  }
+  else if(delivery){action=null;say(`${delivery.title}. Demo delivery quote: drop off at ${delivery.delivery!.drop_off.name}, pick up at ${delivery.delivery!.pick_up.name}. Total $${delivery.total??delivery.price}.`);}
   else{
     const list=resultData(await mcp.call('get_suggestions',{})).suggestions as {suggestion_id:string;say:string;from:string;request:{need:string;max_price:number|null}}[];
     const s=list[0];action=s?{kind:'suggestion',id:s.suggestion_id,budget:s.request.max_price}:null;
@@ -66,6 +76,11 @@ async function boot(){
   }
   mcp=new Mcp(auth);await mcp.connect();
   $('yes').onclick=()=>void answer(true);$('no').onclick=()=>void answer(false);
+  $('checkin').onclick=()=>void (async()=>{
+    if(!pointDeal)return;
+    await run(async()=>{const r=await mcp.call('check_in_at_point',{deal_id:pointDeal,idempotency_key:crypto.randomUUID()});return String(resultData(r).say??'Please try again.');});
+    await refresh();
+  })().catch(()=>say('Could not refresh. Try again.'));
   $('refresh').onclick=()=>void refresh().catch(()=>say('Could not refresh. Try again.'));
   $('mic').hidden=!canListen;
   $('mic').onclick=()=>void run(async()=>{

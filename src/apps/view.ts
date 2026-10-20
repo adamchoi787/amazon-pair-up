@@ -1,4 +1,4 @@
-import { App, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
+import { App, applyHostStyleVariables, applyHostFonts, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import { CATEGORY_LABEL, categoryOf, icon, type Category, type IconName } from "../design/icons.js";
 
 // The PairUp MCP Apps view. One view for every tool; the layout follows
@@ -230,8 +230,9 @@ function pointPanel(d: Deal) {
     h("strong", {}, p.status === "both_here" ? "Both here. Go ahead with the hand-off." : "PairUp Point with Ring"),
     h("p", {}, p.name),
     h("div", { class: "row" }, label("You", p.you), label(d.counterpart ?? "Them", p.them)),
-    h("p", { class: "small muted" }, "Press the Ring doorbell when you arrive. Ring reports only the time of the press; no video is kept."),
-    p.you === "checked_in" ? h("p", { class: "small" }, "Waiting for a recent Ring event. Press the doorbell, then check again. If events are unavailable, ask the point operator to check the connection in the Ring app.") : null,
+    p.you === "not_here" ? h("p", { class: "small" }, "Press the doorbell when you arrive, then tap I'm here.") : null,
+    p.you === "checked_in" ? h("p", { class: "small" }, "Waiting for Ring. Press the doorbell, then tap I'm here again. If it stays pending, ask the point operator to check the connection in the Ring app.") : null,
+    h("p", { class: "small muted" }, "PairUp keeps presence events for 24 hours. No video is requested."),
     d.status === "confirmed" && p.you !== "confirmed"
       ? h("div", { class: "actions" }, button("I'm here", "primary", () => act("check_in_at_point", { deal_id: d.deal_id }, () => refresh(d.deal_id))))
       : null);
@@ -325,6 +326,7 @@ function dealCard(d: Deal, compact = false) {
 
 function replaceDeal(next: Deal) {
   if (!data) return;
+  if (!data.deal && !data.deals) data = { ...data, deal: next };
   if (data.deal?.deal_id === next.deal_id || data.next_deal?.deal_id === next.deal_id) data = { ...data, deal: next, next_deal: null };
   if (data.deals) data = { ...data, deals: data.deals.map((x) => (x.deal_id === next.deal_id ? next : x)) };
 }
@@ -521,12 +523,18 @@ function render() {
 function applyTheme(ctx?: McpUiHostContext) {
   const theme = ctx?.theme ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
   document.documentElement.dataset.theme = theme;
+  document.documentElement.dataset.displayMode = ctx?.displayMode ?? "inline";
+  if (ctx?.styles?.variables) applyHostStyleVariables(ctx.styles.variables);
+  if (ctx?.styles?.css?.fonts) applyHostFonts(ctx.styles.css.fonts);
+  const safe = ctx?.safeAreaInsets;
+  document.body.style.padding = safe ? `${safe.top + 2}px ${safe.right + 2}px ${safe.bottom + 6}px ${safe.left + 2}px` : "2px 2px 6px";
 }
 
 app.ontoolresult = (result) => {
   data = (result.structuredContent ?? null) as Data | null;
   animate = true;
   render();
+  if (typeof data?.deal_id === "string" && data.point && !data.deal) refresh(data.deal_id);
 };
 app.onhostcontextchanged = (ctx) => applyTheme({ ...app.getHostContext(), ...ctx });
 

@@ -74,7 +74,7 @@ const writes = { readOnlyHint: false, destructiveHint: false, idempotentHint: fa
 const reads = { readOnlyHint: true, idempotentHint: true, openWorldHint: false };
 
 /** Shown in initialize and in the server card (/.well-known/mcp/server-card.json). */
-export const SERVER_INFO = { name: "pairup", title: "PairUp", version: "0.7.0" };
+export const SERVER_INFO = { name: "pairup", title: "PairUp", version: "0.8.0" };
 
 export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
   const server = new McpServer(

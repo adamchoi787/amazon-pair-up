@@ -14,7 +14,7 @@ import { MY_DEALS, MY_POSTS } from "./subscriptions.js";
 // so the card can never drift from what /mcp actually serves.
 
 export const PROTOCOL_VERSION = "2025-11-25";
-const REPO = "https://github.com/adamchoi787/voice-market-mcp";
+const REPO = "https://github.com/rairurairu/amazon-pair-up";
 
 interface Surface {
   instructions?: string;

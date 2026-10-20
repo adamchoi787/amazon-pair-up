@@ -27,10 +27,12 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
   return e;
 };
 
-const WRITES = new Set(["post_offer", "post_request", "negotiate", "confirm_deal", "decline_deal", "withdraw_post", "choose_handoff", "accept_suggestion", "dismiss_suggestion", "report_user", "rate_deal"]);
+const WRITES = new Set(["post_offer", "post_request", "negotiate", "confirm_deal", "decline_deal", "withdraw_post", "choose_handoff", "choose_meetup_point", "check_in_at_point", "accept_suggestion", "dismiss_suggestion", "report_user", "rate_deal"]);
 const MAX_STEPS = 6;
 
 const params = new URLSearchParams(location.search);
+const previewTheme = params.get("theme");
+if (previewTheme === "light" || previewTheme === "dark") document.documentElement.dataset.theme = previewTheme;
 const slot = (params.get("device") ?? Auth.slotFromRedirect() ?? "").replace(/[^a-z0-9_-]/gi, "").slice(0, 24);
 const signInAs = (params.get("as") ?? "").trim().slice(0, 40);
 const market = "BroadcastChannel" in window ? new BroadcastChannel("pairup.market") : null;
@@ -88,7 +90,7 @@ function showSignIn(error: string | null) {
 
 async function start() {
   $("signin").hidden = true;
-  $("app").hidden = false;
+  $("app").hidden = true;
   mcp = new Mcp(auth);
   try {
     await mcp.connect();
@@ -122,6 +124,7 @@ async function start() {
   });
   if (market) market.onmessage = () => void refreshInbox();
 
+  $("app").hidden = false;
   greet();
   await refreshInbox();
   await refreshSuggestions(mcp, () => void refreshInbox());
@@ -275,8 +278,11 @@ async function addView(parent: HTMLElement, uri: string, input: Record<string, u
 
 /** Offers that appear in this conversation are already in front of the user. */
 function markSeen(r: CallToolResult) {
-  const data = resultData(r) as { deal?: { deal_id?: string } | null; next_deal?: { deal_id?: string } | null };
-  for (const d of [data.deal, data.next_deal]) if (d?.deal_id) seenWaiting.add(d.deal_id);
+  const data = resultData(r) as { deal?: { deal_id?: string; status?: string } | null; next_deal?: { deal_id?: string; status?: string } | null };
+  for (const d of [data.deal, data.next_deal]) if (d?.deal_id) {
+    seenWaiting.add(d.deal_id);
+    if (d.status === "confirmed") seenConfirmed.add(d.deal_id);
+  }
 }
 
 /** A button inside a card called a tool: say the result and refresh what changed. */

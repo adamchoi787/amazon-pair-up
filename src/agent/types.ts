@@ -39,6 +39,7 @@ export interface AgentTurn {
   /** "tool_use": run the tool calls over MCP and send the results back. */
   stop: "tool_use" | "end_turn";
   mode: "bedrock" | "offline";
+  inference?: "bedrock" | "offline" | "tool_result";
 }
 
 export const isText = (b: Block): b is TextBlock => "text" in b;
