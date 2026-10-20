@@ -1,5 +1,7 @@
 # Handoff to Codex, round 2 (2026-10-20, HKT evening)
 
+> Codex follow-up: local 0.8.0 preparation is documented in VALIDATION.md and RECORDING_CHECKLIST.md. The status table records each item. No push, deploy, upstream publication or AWS runtime call was performed. Tony confirmed no Bee data source; online source research found no verified eligible dataset, so that entry remains evidence-gated.
+
 `main` is at `aa5ff24` (PairUp 0.7.0 + PairUp Points with Ring + Amazon Hub
 delivery). Typecheck is clean and `npm test` passes 155/155. The job now: land
 the unmerged work, close the repo gaps, and make use of the hackathon resources
@@ -69,11 +71,9 @@ when it passes, and tick it in the status table at the end.
 | B10 | **Fire TV** | Not our track | No work. |
 | B11 | Community forum, dev.to, YouTube, office hours, newsletter | Human channels | Draft one short dev.to post at `docs/posts/devto.md` ("Settling a deal between two private limits in an MCP server") for Tony to review and publish. Nothing else. |
 
-## C. Rules Tony must confirm
+## C. Rules resolved in this audit
 
-Devpost returns 403 to fetches, so Tony reads the rules signed in and pastes
-the relevant parts into `docs/HACKATHON_RULES.md`. Codex then updates
-[AWARD_GAPS.md](AWARD_GAPS.md) and [SUBMISSION.md](SUBMISSION.md) to match:
+The live rules, overview, FAQ and updates were accessible October 20. See [HACKATHON_RULES.md](HACKATHON_RULES.md), [AWARD_GAPS.md](AWARD_GAPS.md) and [SUBMISSION.md](SUBMISSION.md). Primary Track(s) permits the declared multi-track approach; Bee requires actual device-recorded data; the overview accepts a new additional open-source project. The original questions are retained below for context:
 
 - Can one project enter Alexa+ and also Ring, or must the Ring work be framed
   inside the Alexa+ entry?
@@ -92,20 +92,20 @@ record the video, real pilot numbers only, Devpost form with per-tool feedback.
 
 | Item | Status |
 |---|---|
-| A1 design pass merged | open |
-| A2 demo page | open |
-| A3 superseded branches checked | open |
-| A4 Ring/delivery browser check | open |
-| A5 housekeeping | open |
-| A6 release check 0.8.0 | open |
-| B1 Agent Skills spec | open |
-| B2 Streamable HTTP conformance | open |
-| B3 Builder Tools feedback | open |
-| B4–B6 Ring starter, UX guide, webhooks | open |
-| B7 Bee CLI and Skill | open |
-| B8 upstream contributions | open |
-| B9 evidence script | open |
-| B11 dev.to draft | open |
+| A1 design pass merged | done — b2f7fa2 via codex/design-integration |
+| A2 demo page | done — e4144a3, separate sessions and UW prompts |
+| A3 superseded branches checked | done — BRANCH_AUDIT.md; missing parsed-request optimization ported |
+| A4 Ring/delivery browser check | done locally — phone/light/dark card, arrivals and watch; see VALIDATION.md |
+| A5 housekeeping | done — 08d2bc5; vendor package remains untouched |
+| A6 release check 0.8.0 | done locally — 175 root + 4 AgentCore tests, clean installs, byte-exact builds, smoke/readiness and 0.8.0; hosted deploy/evidence remains Tony |
+| B1 Agent Skills spec | done — YAML/live-tool tests and official MCP Apps Skill audit |
+| B2 Streamable HTTP conformance | done — focused HTTP tests and headless Inspector; see RESOURCE_AUDIT.md |
+| B3 Builder Tools feedback | done — 1.0.17 installed locally and searched over stdio MCP |
+| B4–B6 Ring starter, UX guide, webhooks | done — comparison, retries/pagination, UI guidance and request-id dedupe |
+| B7 Bee CLI and Skill | done locally — flags verified, official Skill recipe; real data sourcing unresolved (BEE_DATA_SOURCES.md) |
+| B8 upstream contributions | drafts complete — three issue bodies and two apply-checked patches; Tony publishes if desired |
+| B9 evidence script | collector complete — mock run rejected as evidence; actual cloud run pending Tony |
+| B11 dev.to draft | done — docs/posts/devto.md, unpublished |
 
 ---
 

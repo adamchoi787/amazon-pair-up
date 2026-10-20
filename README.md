@@ -7,7 +7,7 @@
 > by a fixed rule inside limits each side set privately, and asks both for a
 > final "yes".
 
-**Track:** Alexa+ (self-hosted MCP server, spec 2025-11-25, Streamable HTTP)
+**Tracks:** Alexa+ leads (self-hosted MCP server, spec 2025-11-25, Streamable HTTP); Ring adds arrival confirmation; Bee adds education and productivity context when real Bee-recorded data is shown. See [entry evidence](docs/AWARD_GAPS.md).
 **Mini challenges:** Open Source ([pairing-core](https://github.com/rairurairu/pairing-core)), AWS Builder (Amazon Bedrock, a Strands Agents agent on Bedrock AgentCore Runtime, CloudFront + EC2 + CloudWatch)
 **Bee:** need snippets become suggestions; the included replay uses labelled demo data.
 **Try it:** https://d3cxpkmhl89rw9.cloudfront.net/app/ · MCP endpoint `https://d3cxpkmhl89rw9.cloudfront.net/mcp` (OAuth 2.1)
@@ -15,7 +15,9 @@
 **Launch market:** the University of Washington campus in Seattle (U District,
 Capitol Hill, Fremont, Ballard, Northgate), US dollars, Pacific time.
 
-**Release 0.7.0:** every helper is checked against the requested work window,
+**Release 0.8.0:** shared design across the app, cards, watch and dashboard; a
+two-device recording page; Ring arrivals on the watch; and audited transport,
+Skill and SDK integrations. Every helper is checked against the requested work window,
 bookings never overlap, and each post carries its own time zone. The web app
 plays the Alexa+ conversation in any browser. `npm run check:release` confirms
 that the hosted endpoint runs this exact commit. [Validation](docs/VALIDATION.md)
@@ -176,7 +178,7 @@ npm run reset        # create tables + load seed listings
 npm start            # web app on http://127.0.0.1:3000/, MCP server at /mcp, operations dashboard at /dashboard/
 npm run smoke        # (second terminal) plays the TI-84 demo over real MCP
 npm run check:release # read-only comparison of the running release and this checkout
-npm test             # 155 unit + end-to-end tests (in-memory Postgres + pgvector)
+npm test             # 175 unit + end-to-end tests (in-memory Postgres + pgvector)
 npm run simulate     # the learning loop on a simulated market, day by day
 cd agents/agentcore && npm install && npm test   # the Strands agent against a real server
 ```
@@ -304,7 +306,7 @@ without a human wiring it up:
 - **Tests:** unit and integration checks over MCP/HTTP, OAuth, schemas, privacy,
   idempotency, schedule compatibility, overlapping bookings and concurrent approvals;
   PairUp Points with Ring (client, presence rule, webhook signature, two-person check-in);
-  155 tests in `npm test`, plus scripted Strands conversations against a real server. CI runs on every push.
+  175 tests in `npm test`, plus scripted Strands conversations against a real server. CI runs on every push.
 
 ## Repo map
 
@@ -361,3 +363,17 @@ See [docs/AWARD_GAPS.md](docs/AWARD_GAPS.md) for the award analysis and the day-
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Spec conformance and recording preparation
+
+- MCP 2025-11-25 Streamable HTTP: foreign Origin returns 403; unsupported protocol versions return 400; POST requires JSON and SSE Accept types and exactly one message. Arrays are rejected with 400/-32600.
+- Initialized sessions support GET SSE and DELETE; unknown or expired sessions return 404. Stateless GET/DELETE returns 405. The browser reinitializes after session loss and retains write retry keys.
+- Agent Skill: real YAML parsing validates allowed fields, directory/name agreement, description limits, metadata and references; a live tool-list test checks coverage. The format has no standard HTTP discovery path; the documented /skills endpoint remains in the server card and llms.txt.
+- MCP Apps: SDK initialization/auto-resize, host theme variables/fonts, safe-area padding, inline/fullscreen/pip layout and bounded initialization cleanup. Audited with the official MCP Apps Agent Skill.
+- Official MCP Inspector headless tools/list succeeds locally: zero schema portability errors, 168 portability warnings across 18 tools. Focused spec tests supply additional coverage. See [resource audit](docs/RESOURCE_AUDIT.md) and [validation](docs/VALIDATION.md).
+
+The [two-device demo](public/app/demo.html) uses separate sessions and current UW users. For local previews, append ?theme=light or ?theme=dark to /app/; the watch screen keeps its dark palette. [Recording checklist](docs/RECORDING_CHECKLIST.md), [submission answers](docs/SUBMISSION.md), [per-tool feedback](docs/PRODUCT_FEEDBACK.md), [friction log](docs/FRICTION_LOG.md) and [feature requests](docs/FEATURE_REQUESTS.md) cover the form fields.
+
+Ring references: [canonical starter](https://github.com/AmazonAppDev/ring-api-helloworld), [API](https://developer.amazon.com/docs/ring/api-documentation.html), [UX guide](https://developer.amazon.com/docs/ring/ux-design-guide.html). The client uses the same origin/Bearer/JSON:API model and adds bounded retries, pagination and signed request-id dedupe. Local simulated webhooks are labelled rehearsal data.
+
+After deploying the submitted commit, Tony runs npm run evidence -- --url <public-origin> with PAIRUP_TOKEN in the environment; add --agentcore-arn for an actual AWS CLI invocation. The collector requires successful Bedrock inference, checks deployed commit/assets and redacts the token. [Live evidence](docs/EVIDENCE.md) remains pending. [Bee data sourcing](docs/BEE_DATA_SOURCES.md) records why a verified real Bee source is still required.

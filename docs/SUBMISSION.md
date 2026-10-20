@@ -1,11 +1,13 @@
 # PairUp submission package
 
-Primary track: **Alexa+**. Mini challenges: **AWS Builder** and **Open Source**.
-Deadline: October 23, 2026, 12:00 PDT.
+Lead track: **Alexa+**. Also enter **Ring**, and **Bee** when its real device-data recording is complete. Enter both **AWS Builder** and **Open Source** mini challenges. We declare multiple tracks for one coherent project; award limits remain one track prize and one mini-challenge prize. The rules explicitly request Primary Track(s): [verified requirements](HACKATHON_RULES.md).
+Deadline: October 23, 2026, 12:00 PDT = October 24, 03:00 HKT.
 
 ## Description for Devpost
 
 ### Inspiration
+The original idea was “Carousell for agents”: a personal agent should be able to find an item nearby and settle a deal. Building it turned that into a two-sided C2C system where a buyer's standing need is as useful as a seller's listing. The same mechanism then grew to support what people can do—lunch runs, errands and event help—and the practical hand-off, through demo Amazon Hub pickup/delivery choices and Ring-backed PairUp Points. Bee adds the moment before the request: noticing an exam-related need and preparing it for approval. The commit history below records that evolution.
+
 A student at the University of Washington needs a graphing calculator for tomorrow's exam. Someone in the next dorm has one in a drawer. Finding each other today means a listing, a group-chat thread, a round of haggling and a meet-up to arrange. Small errands work the same way: carrying a $5 lunch from the HUB to McCarty Hall is a two-minute walk, and arranging it takes longer than doing it.
 
 PairUp lets people just say what they need, what they have or what they can do. It starts on the UW campus in Seattle. Requests stay open, so the right person can turn up an hour or a day later.
@@ -13,7 +15,7 @@ PairUp lets people just say what they need, what they have or what they can do. 
 Our three goals: **faster and cheaper to buy what you need, make personal business great, and C2C in the future.**
 
 ### What it does
-A seller says, “Sell my TI-84 for $20. I'll take anything above $15.” A buyer says, “I need a graphing calculator today, max $18.” PairUp proposes the TI-84 at $18, names an Amazon Hub Counter on campus for the hand-off, and asks the buyer for a yes. The seller's minimum stays private and the buyer's budget becomes their offer.
+A seller says, “Sell my TI-84 for $20. I'll take anything above $15.” A buyer says, “I need a graphing calculator in good condition near UW campus today, max $18.” PairUp proposes the TI-84 at $18, names a demo Amazon Hub Counter on campus for the hand-off, and asks the buyer for a yes. The seller's minimum stays private and the buyer's budget becomes their offer.
 
 The same conversation books help. “Find someone to pick up my lunch from the HUB to McCarty Hall by 12:30, $5” reaches a student already doing lunch runs. “Get me a helper for the event on Saturday 2-6pm, $10 an hour” shows the rate, the $40 total, the date in Pacific time and whose yes is still needed. PairUp checks the whole work window against each helper's stated hours and keeps one person's bookings from overlapping. When a helper's hours are open-ended, the card marks the time as tentative and the helper approves it directly.
 
@@ -46,6 +48,32 @@ The test suite covers matching, pricing, privacy, scheduling, OAuth, MCP transpo
 ### What's next
 Run the UW pilot, measure task success and points of confusion, then open the next Seattle campuses and neighborhoods. Connect the Amazon Hub locator and live retail prices in place of the demo lists.
 
+### Built during the hackathon
+
+The checked-in application history begins October 18, 2026, inside the August 31–October 23 submission window. All milestones below are in that history. “Carousell for agents” is the founder's description of the original idea; the commits establish the implementation changes.
+
+| Milestone | Commit evidence |
+|---|---|
+| First Alexa+ marketplace MCP | `51ed52f` — October 18, initial VoiceMarket scaffold |
+| Symmetric C2C pairing from either side | `d582278`, `9ce7f8e`, `8a41971` — October 19 |
+| Auditable shared price rule and browser MCP host | `75a68f8`, `122a7d6` — October 19 |
+| Services: errands, delivery and one-time jobs | `574726a` — October 20 |
+| Amazon search, Trade-In and demo Hub meetup options | `29d19ff` — October 20 |
+| Bee context, learned routines and watch flow | `fe8c3dc`, `8ce80c8`, `07048a1` — October 20 |
+| Scheduling, US-first UW market and release identity | `ceaeadf` — October 20 |
+| Ring PairUp Points and Hub delivery workflow | `abed8b3`, `81256df`, `df22de9` — October 20 |
+| Shared design and two-device rehearsal | `b2f7fa2`, `e4144a3` — October 20 |
+
+Project source: [rairurairu/amazon-pair-up](https://github.com/rairurairu/amazon-pair-up). The final local preparation commits must be pushed before submission. PairUp models Hub delivery with labelled demo rates, locations and references; live carrier booking is a future integration.
+
+## Track declaration answer
+
+Alexa+ is our primary story: an MCP server and Agent Skill make a complete, consent-based C2C workflow available to a voice assistant. Ring adds a concrete hand-off: a device or official simulator supplies presence events that corroborate each person's check-in. Bee adds an education and personal-productivity entry point: an exam-related need captured through a Bee device or Bee software on Apple Watch becomes a prepared request, then waits for the student's approval. These are connected stages of the same product. We enter the supported tracks together and accept the one-track-prize limit. Both mini challenges apply to the same submission. Fire TV is outside our implementation.
+
+## Bee track text
+
+An exam deadline can arrive before a student thinks to search a marketplace. PairUp consumes a need snippet from the student's Bee-recorded context through the CLI, API or an agent holding Bee's Skill/MCP. `add_context` and `get_suggestions` prepare a graphing-calculator request. The student supplies a budget when needed and explicitly accepts before anything is posted. The watch preview offers a compact approval surface. This serves Bee's education and productivity priorities. The final video must show the actual Bee/device-to-useful-action interaction; the synthetic fixture remains rehearsal evidence.
+
 ## Ring track text
 
 **PairUp Point: safe hand-offs with one Ring doorbell and no staff.** Some people would rather not meet a stranger from the internet. On PairUp they pick a PairUp Point for their deal: a small unstaffed spot near the HUB on the UW campus, watched by one Ring doorbell. Each person presses the doorbell on arrival and tells PairUp “I'm here”. PairUp reads the point's Ring Event History through the Ring Partner API, accepts signed Ring webhooks, and confirms each arrival from a doorbell press or a person event within ten minutes. When Ring has confirmed both, the deal card and both voices say “Both here. Go ahead with the hand-off.” The rule is deterministic and privacy-first: PairUp keeps only the type and time of presence events, for 24 hours. Categories: access control and IoT. Code: `src/ring/`, `src/market/points.ts`, `test/points.test.ts`.
@@ -66,19 +94,13 @@ Run the UW pilot, measure task success and points of confusion, then open the ne
 - License: MIT.
 - Contribution: a dependency-free Rust price-settlement library with a small WebAssembly interface, invariant tests, shared JavaScript test vectors and an MCP example. PairUp calls it for every settlement.
 - Why it's useful: any agent host can settle a deal between two private limits with an auditable rule and shared test vectors. The rule is automatic best-offer acceptance; the host enforces identity and one offer below the ask per buyer and listing.
-- Add the contributing GitHub username and the hackathon-period commit or PR URL in the Devpost form.
+- GitHub username: **rairurairu** (verified against the public commit author).
+- Contribution URL: [MCP example, walk-away example and CI](https://github.com/rairurairu/pairing-core/commit/135fe20c444e707e39cb4b8d497be623238be948), October 20, 2026; also [private-minimum settlement change](https://github.com/rairurairu/pairing-core/commit/c07c0b10082c393a7f88f1f5be25a2225cf6122a).
+- This is a separate additional open-source project created/updated during the window and integrated into the primary submission. The [overview](https://amazonappdev2026.devpost.com/#requirements) explicitly allows a new additional project. Optional third-party issue/patch drafts are under [upstream/](upstream/); add their URLs only after Tony publishes them.
 
-## Product feedback notes (Tony: confirm against your own experience)
+## Product feedback, feature requests and friction logs
 
-| Tool | What worked | Feedback | Onboarding and future use |
-|---|---|---|---|
-| MCP TypeScript SDK and MCP Apps | Tool schemas, in-memory transport tests and a portable sandboxed card | Hosts would benefit from a standard timeout path when an embedded view never initializes, and shared conventions for retry keys and discovery | Local setup is documented and tested; we keep building on the same contract |
-| Amazon Bedrock | Embeddings and Converse tool use fit behind one AI interface | A local fallback covers intent and agent calls; embeddings need the service, so quota guidance per model would help | Offline mode lets contributors start without AWS |
-| Strands Agents TypeScript | MCP discovery and before-tool hooks carry the same authorization rules | The stream-event example needed a wrapper-shape update (friction log) | The separate agent stays on Strands |
-| AgentCore Runtime SDK | Runtime entry point and session/stream contract | Local invocation needed headers the README example omits (friction log) | Packaged and tested locally |
-| AWS hosting tools | CloudFormation and SSM release scripts | Git Bash argument rewriting and DLM validation errors (friction log) | Deploys run from one script |
-| Bee | The need-snippet interface and bridge (CLI stream, API poll, replay) | A replay format in the docs would make offline testing easier | The bridge is ready for live Bee data |
-| Ring Partner API and Playground | One-click Playground tokens and the documented JSON:API shapes made the client quick to write; HMAC webhook signing is simple to verify | The Playground simulates live views only, so doorbell presses and person events come from a device, and webhooks need a full app with an HMAC key; a webhook test sender in the Playground would close that gap | PairUp Points read Event History today and add webhooks with an app |
+Use the complete per-tool answer in [PRODUCT_FEEDBACK.md](PRODUCT_FEEDBACK.md), including what each tool was used for, what worked, what needs work, onboarding and whether we would build with it again. Include [FRICTION_LOG.md](FRICTION_LOG.md) as the optional friction answer: every entry has task, steps, expected/actual, severity, workaround and suggestion. Submit [FEATURE_REQUESTS.md](FEATURE_REQUESTS.md) with why each request matters and its priority. [RESOURCE_AUDIT.md](RESOURCE_AUDIT.md) links the official sources and records this audit's evidence. Tony reviews historical first-person observations before pasting.
 
 ## Final submission checks
 
@@ -88,9 +110,9 @@ Run the UW pilot, measure task success and points of confusion, then open the ne
 - [ ] Judge sign-in rehearsed in a fresh browser session.
 - [ ] Public English YouTube or Vimeo demo under three minutes.
 - [ ] Description and per-tool feedback reviewed against your own experience.
-- [ ] Open Source contribution URL, project URL and contributing username supplied.
+- [x] Open Source contribution URL, project URL and contributing username prepared above.
 - [ ] Friction entries included.
 - [ ] Pilot results added if the UW pilot has run ([USER_VALIDATION.md](USER_VALIDATION.md)).
 - [ ] Bee track entered only with live data recorded through a Bee device or an Apple Watch running Bee software (the replay file and the iOS Shortcut path are demo aids).
-- [ ] Ring: the video shows PairUp reading the Ring Playground (or a device) and confirming both arrivals; check in the rules how a second primary track is declared.
+- [ ] Ring: the integrated video shows PairUp reading the Ring Playground (or a device) and confirming both arrivals; declare Ring alongside Alexa+ in Primary Track(s).
 - [ ] Hosted endpoint kept available through judging; submitted before the deadline.

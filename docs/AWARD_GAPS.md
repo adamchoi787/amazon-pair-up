@@ -1,40 +1,29 @@
-# Award readiness
+# Award readiness — PairUp 0.8.0
 
-Updated October 20, 2026. Rules: https://amazonappdev2026.devpost.com/rules
+Updated October 20, 2026 HKT. [Verified rules](HACKATHON_RULES.md) · [submission answers](SUBMISSION.md) · [resource audit](RESOURCE_AUDIT.md).
 
-Judging weighs four criteria equally: technical implementation, design, potential impact and quality of the idea.
+Alexa+ leads the submission. Enter Ring with official simulator/device footage. Bee is implemented and replay-tested, and its track entry needs real Bee-recorded data: Tony currently has no source, and the public-source search found no verified eligible dataset ([options](BEE_DATA_SOURCES.md)). Enter AWS Builder and Open Source together; one track prize and one mini-challenge prize can be awarded per project. Fire TV is outside scope.
 
-## Where we stand
-
-| Criterion / entry | What we have | To finish |
+| Entry / judging criterion | Repo evidence prepared | Remaining external evidence / action |
 |---|---|---|
-| Technical implementation | MCP server with schemas, MCP Apps views, OAuth 2.1, transactions, availability and overlap checks, privacy leak tests, CI | Deploy 0.7.0 and pass `npm run check:release`; record a live Bedrock request |
-| Design | Voice or typed conversation, cards with price, total, time and missing approval, a watch view | Watch two or three new people use it and fix what confuses them |
-| Potential impact | US-first launch on the UW campus in Seattle; items, errands and one-time jobs in one flow; sourced pain points, market size, per-deal savings and a campus model in [research/IMPACT.md](../research/IMPACT.md) | Run the UW pilot ([USER_VALIDATION.md](USER_VALIDATION.md)) and add its numbers to IMPACT.md |
-| Quality of idea | Standing requests, matching from either side, an open-source price rule, learned routines | A focused video that shows one complete exchange first |
-| Alexa+ | MCP server plus a web host that plays the Alexa+ conversation | Public sub-three-minute video and the Devpost form |
-| AWS Builder | Bedrock embeddings and Nova Lite, Strands agent for AgentCore Runtime, CloudFront + EC2 + CloudWatch | Screenshots or logs from the live services |
-| Open Source | pairing-core (MIT, Rust/WASM, test vectors) used for every settlement | Contributor username and contribution URL in the form |
-| Bee | Bridge (CLI stream, API poll, replay) and suggestion flow | Live data recorded through a Bee device or an Apple Watch running Bee software (the replay file and the iOS Shortcut path are demo aids) |
-| Ring | PairUp Points: Ring Partner API client (devices, Event History), HMAC-verified webhook, three MCP tools, card panel, tests | A Ring Playground token and footage of a confirmed hand-off; check the rules on entering a second primary track |
-| Friction bonus | Concrete SDK and deployment entries in [FRICTION_LOG.md](FRICTION_LOG.md) | Review and paste into the form |
+| Technical implementation | Typed MCP tools, 2025-11-25 HTTP checks, OAuth, sessions/recovery, consent, transactions, private views, deterministic pricing, scheduling and CI | Push/deploy submitted commit; live release and model checks |
+| Design | Shared token system, contrast tests, app/cards/dashboard/watch, two-device page, phone/light/dark review, visible arrival guidance | Record the final app in the public English video |
+| Potential impact | Specific UW item/errand/job scenarios, sourced research and explicit pilot plan | Add real pilot results if collected; pilot statistics are optional evidence and stay absent until measured |
+| Quality of idea | Standing two-sided needs, shared product/service contract, open fixed price rule, contextual preparation, Ring arrival and demo Hub alternatives | Explain the coherent evolution and show a complete deal first |
+| Alexa+ | Runtime MCP and Agent Skill, simulated browser voice host and portable MCP Apps card | Show working tools/cards in the integrated video; label the web experience as simulated Alexa+ |
+| Ring | Partner API calls, signed webhook, request-id dedupe, arrival state, watch/card UI and tests | Fresh Playground token or actual device; show an official simulator/device interaction. Local ring:simulate proves local behavior only |
+| Bee | Verified CLI flags, official Skill recipe, bridge and need-to-request consent flow | Real Bee-device / Bee-on-Watch source and useful action in the video; unresolved after online source search |
+| AWS Builder | Bedrock Titan/Nova calls, Strands + AgentCore entrypoint, hosting/metrics definitions, inference-aware evidence collector | Tony deploys and runs evidence; capture AgentCore if claiming it ran in the cloud |
+| Open Source | Separate public MIT pairing-core, verified contributor rairurairu and hackathon-period contribution URLs in SUBMISSION.md | Paste prepared fields; publish optional upstream drafts if desired |
+| Product feedback | Every used integration has use, worked/needs-work, onboarding and future-use answers in PRODUCT_FEEDBACK.md | Tony reviews historical experience and pastes the full answer |
+| Friction bonus / feature requests | Full-field entries plus coverage matrix; concrete feature requests and priorities | Include both optional answers in Devpost |
+| Submission logistics | Correct deadline, integrated 2:55 shot list, source URLs, code history and judge checklist | Public video URL, teammate invitations, eligibility/rights confirmations, Devpost submit; keep judge access through Nov 20 PST |
 
-## What 0.7.0 adds
+## Pre-video order
 
-- Availability checked in both pairing directions, before result limits and before a direct choice is reserved.
-- Exact `starts_at` / `ends_at` with offsets and an IANA time zone on every post, defaulting to Pacific time.
-- One provider's timed bookings never overlap, also under concurrent requests. Simultaneous confirmations keep both yeses.
-- Tentative times need the provider's explicit yes, also on auto-accept offers.
-- Cards show total cost, date and time zone, the provider's hours and the missing approval.
-- A conditional yes ("yes if…") is treated as a new constraint.
-- `/health` and `/build-info.json` identify the running commit and browser build.
+1. Follow [RECORDING_CHECKLIST.md](RECORDING_CHECKLIST.md), deploy the submitted commit and verify a fresh judge sign-in.
+2. Collect the real Ring evidence. Resolve Bee sourcing if entering that track; the local fixture stays labelled demo data.
+3. Run `npm run evidence` against the public release and save the report.
+4. Record the one integrated video in DEMO_SCRIPT.md. Paste SUBMISSION.md, PRODUCT_FEEDBACK.md, FRICTION_LOG.md and FEATURE_REQUESTS.md into the matching form fields.
 
-## Highest-value remaining work
-
-1. Deploy the submitted commit, pass the release check and rehearse a fresh judge sign-in.
-2. Record [DEMO_SCRIPT.md](DEMO_SCRIPT.md).
-3. Run the short UW pilot and add the real results.
-4. Review [SUBMISSION.md](SUBMISSION.md) against the live app; add the product feedback and contribution details.
-5. Keep the endpoint up through judging.
-
-A reliable core flow and a clear video beat extra integrations.
+Local preparation can close code and documentation gaps. Deployment, account access, actual device provenance and the submitted video remain explicit final gates.

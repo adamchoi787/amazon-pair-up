@@ -1,3 +1,19 @@
+# PairUp 0.8.0 — recording preparation
+
+October 20, 2026 HKT. The design branch is merged, the two-device page is ported, superseded worktrees are audited, the Ring/transport/Skill integrations are tested, and the feedback/submission package is prepared. Release checks and their limits are in [VALIDATION.md](VALIDATION.md). Start with [RECORDING_CHECKLIST.md](RECORDING_CHECKLIST.md); the per-item record is in [CODEX_HANDOFF.md](CODEX_HANDOFF.md).
+
+Important recording fixes: the calculator prompt specifies good condition; fresh seeds accept reviewed demo prices; spoken Ring phrases work; card/watch arrivals render; the browser recovers a lost MCP session; Hub delivery is labelled as a demo quote. The runtime evidence collector distinguishes actual Bedrock inference from an offline fallback.
+
+The public endpoint was checked read-only and still reports **0.7.0**, with a different UI fingerprint. Tony deploys the submitted 0.8.0 commit, rehearses judge sign-in and runs the evidence collector. No push, deployment or live AWS inference was performed during preparation.
+
+Tony confirmed no real Bee source. [BEE_DATA_SOURCES.md](BEE_DATA_SOURCES.md) records the open-source search and practical options; no verified eligible public dataset was found. Alexa+ leads, Ring needs official simulator/device footage, and Bee entry stays pending real device data or an organizer-approved alternative. Both mini challenges are prepared.
+
+Upstream issue/patch and dev.to drafts are ready for optional publication by Tony. Existing Claude worktrees remain in place. The vendored price library and negotiation module retain their original contents.
+
+---
+
+## Previous 0.7.0 handoff (historical)
+
 # PairUp 0.7.0 — handoff (October 20, 2026)
 
 **US-first.** The demo market is the University of Washington in Seattle: UW

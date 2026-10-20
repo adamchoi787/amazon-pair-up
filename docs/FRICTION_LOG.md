@@ -66,3 +66,78 @@ confusing than expected. Write it at the time it happens; you won't remember it 
 - **Severity:** minor
 - **Workaround:** `export MSYS_NO_PATHCONV=1` in the script, and pass temp files through `cygpath -w`.
 - **Suggestion:** Add a "Git Bash / MSYS" note to the AWS CLI Windows install and Parameter Store pages, since Parameter Store names are the most common argument that starts with `/`. A CLI warning when a `--name` value looks like an MSYS-rewritten path (`C:/Program Files/Git/...`) would save the debugging.
+
+### ADBT-1 — Builder Tools CLI hides required platform and project context
+- **Who / when:** Codex, October 20, 2026 HKT; observed in this checkout.
+- **Tool / API / SDK:** Amazon Devices Builder Tools MCP 1.0.17.
+- **Task attempted:** Search Ring webhook verification and Alexa+ MCP onboarding documentation.
+- **Steps taken:** Installed the official npm package into `.data/builder-tools`; ran `exec --list`; attempted `exec search_documentation --args` with a query, then with a string platform; connected over MCP to inspect input schemas and retried with `target_platform: {device_os:["vega_os","fire_os"]}`.
+- **Expected:** The listed search command explains its complete arguments and first-call prerequisites.
+- **Actual:** The first two calls failed schema validation. The schema-correct call then returned `PROJECT_CONTEXT_REQUIRED`. After `set_project_context({config:{}})`, both searches returned relevant official Ring and Alexa+ pages. Logs: `codex-builder-search.log` (ignored).
+- **Severity:** minor.
+- **Workaround:** Inspect MCP `tools/list`, set project context explicitly, then search with the platform object.
+- **Suggestion:** Add a complete schema-valid search example to `--help` and report the context prerequisite before argument retries. Support `--schema <tool>` for CLI users.
+
+### MCP-1 — SDK accepts legacy batches on a current-spec endpoint
+- **Who / when:** Codex, October 20, 2026 HKT; SDK source audit and HTTP tests.
+- **Tool / API / SDK:** MCP TypeScript SDK 1.32.1, Streamable HTTP 2025-11-25.
+- **Task attempted:** Enforce one JSON-RPC message per POST for the current transport spec.
+- **Steps taken:** Read the spec and installed transport handler; sent empty, singleton and two-message arrays in `test/transport.test.ts`.
+- **Expected:** A current-spec endpoint rejects batches consistently.
+- **Actual:** The SDK retains older batch handling. PairUp needed an application guard to return 400/-32600; all three array tests now pass.
+- **Severity:** minor.
+- **Workaround:** Reject arrays before passing a request to the transport.
+- **Suggestion:** Offer a negotiated-version strict mode and a current-spec batch-rejection example.
+
+### APPS-1 — Embedded view initialization needs a host failure path
+- **Who / when:** PairUp host implementation, reviewed by Codex October 20, 2026 HKT.
+- **Tool / API / SDK:** MCP Apps / ext-apps 1.7.5.
+- **Task attempted:** Keep a failed embedded view from leaving an indefinite loading skeleton.
+- **Steps taken:** Traced bridge initialization, zero-height frame creation, size reporting, connection errors and text fallback in `src/web/host.ts` and `src/web/main.ts`.
+- **Expected:** The host can bound initialization and offer an accessible recovery action.
+- **Actual:** PairUp supplies an eight-second timer, closes the failed bridge, removes the frame/skeleton and points the user to Deals or spoken status. This is an integration concern found in code review; no SDK outage rate was measured.
+- **Severity:** minor (host integration effort).
+- **Workaround:** A host-owned timeout and cleanup path.
+- **Suggestion:** Document the failure path in the official basic host or expose a configurable initialization helper. Draft: [upstream/mcp-apps-init-timeout.md](upstream/mcp-apps-init-timeout.md).
+
+### RING-1 — Presence demo spans Playground, Event History and webhooks
+- **Who / when:** Ring handoff research, reviewed with starter/API/UX docs by Codex October 20, 2026 HKT.
+- **Tool / API / SDK:** Ring Partner API, Playground, ring-api-helloworld.
+- **Task attempted:** Rehearse two arrivals without a physical doorbell.
+- **Steps taken:** Compared the starter device, event and webhook routes with the API reference; exercised PairUp's signed webhook simulator locally.
+- **Expected:** One simulator workflow demonstrates the same event-to-arrival path used by the application.
+- **Actual:** The starter's event endpoint uses its local webhook store. PairUp reads Ring Event History and accepts HMAC webhooks; its own webhook sender provides a labelled local rehearsal. Fresh Playground/device footage remains to be collected by Tony.
+- **Severity:** minor (multiple demo setup steps).
+- **Workaround:** Keep official Playground/device evidence separate from the local simulated webhook, and label each in the recording.
+- **Suggestion:** Add a documented Playground presence-event/webhook test workflow with the expected Event History payload and signature setup.
+
+### BEE-1 — Reproducible bridge tests and device provenance are separate steps
+- **Who / when:** Codex, October 20, 2026 HKT; current CLI/Skill docs and local replay.
+- **Tool / API / SDK:** Bee CLI, developer API, official Bee Skill/MCP.
+- **Task attempted:** Use an exam-related need to prepare a calculator request.
+- **Steps taken:** Checked `stream --json --types` and all subscribed event names against the CLI README; read the official Skill; replayed the checked-in fixture into a fresh local server.
+- **Expected:** Summary and todo events produce private suggestions; unrelated context creates no request.
+- **Actual:** Calculator and paper snippets produced suggestions. Raw utterances are excluded. Local fixture coverage is reproducible; actual Bee-device or Bee-on-Watch data still needs a capture during recording.
+- **Severity:** minor (rehearsal/provenance documentation effort).
+- **Workaround:** Label replay data; pair the official Bee Skill with PairUp's Skill; use a real Bee data source in the submitted demo.
+- **Suggestion:** Publish a small versioned stream-fixture set and an end-to-end tutorial showing a device event, CLI JSON and a consent-based downstream action.
+
+### Coverage of remaining used tools
+
+These are explicit review records, including successful tasks. **None** means no failure was observed; it is not a claim of bonus-worthy friction. Historical cloud onboarding observations remain attributed to Tony/Claude above. The future-use and onboarding answers for every integration are in [PRODUCT_FEEDBACK.md](PRODUCT_FEEDBACK.md).
+
+| Tool | Task and steps | Expected → actual | Severity | Workaround | Actionable suggestion |
+|---|---|---|---|---|---|
+| Agent Skills format | Parse YAML, inspect names/keys/references and compare current tools | Valid portable skill → spec test passes; corrected stale repository URLs | None | Current repo links and schema tests | Add a discovery/distribution example to the format guide |
+| Bedrock Titan embeddings / Nova Converse | Review runtime calls and run local fallback; prepare evidence collector | Identify a real call → configured mode alone also covers fallback, so added actual `inference` reporting | Minor (application observability) | `npm run evidence` requires a successful real Bedrock result | Expose clear model/fallback provenance in starter examples |
+| Strands SDK | Compile MCP-connected agent and run four scripted conversations | Same consent rules across hosts → all four pass | Minor historical streaming example issue above | Read wrapped stream events | Compile published quick starts against each supported peer version |
+| AgentCore Runtime | Compile runtime package and review invocation contract | Local streaming handler reachable → historical 406/400 entry above; current tests pass | Minor, historical | Send documented headers | Include a complete local invocation command |
+| CloudFormation / DLM | Review deployment and historical stack creation record | Valid snapshot description → punctuation caused rollback in prior run | Minor, historical | DLM-safe description | Validate the property pattern at changeset creation |
+| AWS CLI / SSM / Parameter Store / S3 | Review deploy script and historical Windows deployment | Preserve names and temp-file paths → MSYS rewrote both in prior run | Minor, historical | `MSYS_NO_PATHCONV=1` and Windows file paths | Add a Windows Git Bash recipe for SSM deployment |
+| EC2 Graviton / IAM / ECR | Review role-based ARM64 service/runtime definitions | Builds and least-scope credentials described in deployment code → local package checks pass; live proof remains pending | None observed locally | Use the documented deploy/evidence workflow | Provide one ARM64 MCP + AgentCore deployment reference |
+| CloudFront | Review origin verification and health/build identity | Public release can be identified → read-only checker compares versions, commit and fingerprint | None observed locally | Deploy submitted commit and rerun checker | Include release identity checks in sample hosting guides |
+| CloudWatch / SNS / encrypted EBS snapshots | Inspect metrics, alarms and recovery definitions | Operations hooks in code → definitions present; cloud delivery/recovery not exercised in this audit | None observed locally | Follow deployment and recovery runbook | Show a combined request/tool trace and recovery rehearsal in the sample |
+| Login with Amazon / OAuth | Run auth tests and review client registration/sign-in flow | Caller identity stays scoped → local tests pass; live LWA profile sign-in requires Tony's account | None observed locally | Rehearse a fresh judge sign-in after deployment | Include a hosted MCP + public PKCE-client walkthrough |
+| PGlite / PostgreSQL / pgvector | Run market transactions and privacy/schedule tests | Persistent relational/vector behavior → suite passes locally | None | In-memory DB for tests | Add a small pgvector transaction test fixture |
+| Express / Zod / TypeScript / esbuild / Node.js | Install, typecheck, bundle and run transport tests | Validated HTTP and reproducible browser assets → checks pass locally | None | Current locked dependencies | Keep shared source/bundle consistency checks in templates |
+| pairing-core / Rust / WebAssembly | Exercise price settlement through existing market invariant tests | Fixed cents rule and private views → tests pass | None | Vendored prebuilt module; separate upstream ownership | Retain cross-runtime test vectors with every release |
