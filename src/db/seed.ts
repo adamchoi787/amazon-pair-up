@@ -22,7 +22,9 @@ export async function seedMarketplace(deps: Deps, file = "data/seed-listings.jso
     if (u.home_area) await deps.db.query(`UPDATE users SET home_area=$2 WHERE id=$1`, [u.id, u.home_area]);
   }
   for (const l of seed.listings) {
-    await postOffer(deps, { ...l, user_id: l.seller });
+    // These prices are deliberately chosen and labelled in the reviewed demo
+    // fixture, including damaged items below the usual range.
+    await postOffer(deps, { ...l, user_id: l.seller, confirm_price: true });
   }
   return seed.listings.length;
 }
