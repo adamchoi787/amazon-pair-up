@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PairUp · Two devices</title>
+<meta name="description" content="Two smart displays side by side: a seller and a buyer, paired in one turn.">
+<link rel="icon" href="/addon/icon-64.png">
+<link rel="stylesheet" href="/design/tokens.css">
+<style>
+  /* The stage is dark in both schemes, like a product shot; the devices follow the viewer's scheme. */
+  :root {
+    --stage: #0d1015; --stage-2: #161b22; --fg: #eef0f3; --muted: #98a2ae; --line: #2a313a;
+    --accent: var(--accent-ink); --seller: var(--fg); --buyer: var(--accent-ink); --bezel: #050608; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background: radial-gradient(120% 80% at 50% 0%, var(--stage-2), var(--stage) 70%) fixed, var(--stage);
+    color: var(--fg); font: 15px/1.45 var(--font-body);
+  }
+  button { font: inherit; cursor: pointer; }
+  [hidden] { display: none !important; }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  .top { display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap; max-width: 1760px; margin: 0 auto; padding: 18px 24px 8px; }
+  .title { margin-right: auto; }
+  .title h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
+  .title p { margin: 2px 0 0; color: var(--muted); }
+  .seg { display: inline-flex; padding: 3px; border-radius: 999px; background: rgba(255,255,255,.06); border: 1px solid var(--line); }
+  .seg button { border: 0; background: transparent; color: var(--muted); padding: 8px 16px; border-radius: 999px; font-weight: 600; min-height: 40px; }
+  .seg button[aria-pressed="true"] { background: var(--fg); color: var(--stage); }
+  .ghost { border: 1px solid var(--line); background: rgba(255,255,255,.04); color: var(--fg); border-radius: 999px; padding: 8px 16px; min-height: 40px; }
+
+  /* Both screens fit the window's height: a 16:10 screen is 1.6× as wide as it is tall. */
+  .stage { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; max-width: clamp(900px, calc((100vh - 230px) * 3.2 + 140px), 1760px); margin: 0 auto; padding: 12px 24px 28px; }
+  .device { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+  .label { display: flex; align-items: baseline; gap: 10px; }
+  .role { font-size: 13px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+  .device.seller .role { color: var(--seller); }
+  .device.buyer .role { color: var(--buyer); }
+  .who { color: var(--muted); }
+
+  /* A smart display: a dark bezel around a 16:10 screen, on a short base. */
+  .bezel { background: var(--bezel); border-radius: 26px; padding: 14px; box-shadow: 0 30px 60px -20px rgba(0,0,0,.7), 0 0 0 1px #1d232b inset; position: relative; }
+  .bezel::before { content: ""; position: absolute; top: 5px; left: 50%; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: #1e252e; }
+  .screen { position: relative; width: 100%; aspect-ratio: 16 / 10; min-height: 500px; overflow: hidden; border-radius: 12px; background: #000; }
+  .screen iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
+  .base { width: 34%; height: 14px; margin: -2px auto 0; background: linear-gradient(#1a1f26, #0a0c0f); border-radius: 0 0 14px 14px; }
+
+  .script { display: flex; flex-direction: column; gap: 8px; }
+  .step { display: flex; gap: 10px; align-items: flex-start; text-align: left; width: 100%; border: 1px solid var(--line); background: rgba(255,255,255,.04); color: var(--fg); border-radius: 14px; padding: 10px 14px; min-height: 44px; }
+  button.step:hover { background: rgba(255,255,255,.08); }
+  .step.tap { cursor: default; color: var(--muted); }
+  .step .n { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; background: rgba(255,255,255,.1); }
+  .step .say::before { content: "Say "; color: var(--muted); }
+  .step.done { opacity: .55; }
+
+  body.clean .script, body.clean .top .controls { display: none; }
+
+  /* Phones and narrow windows: one device above the other, each at full width without scaling. */
+  @media (max-width: 900px) {
+    .top { padding: 14px 16px 6px; }
+    .stage { grid-template-columns: 1fr; gap: 24px; padding: 8px 16px 24px; }
+    .bezel { border-radius: 20px; padding: 8px; }
+    .bezel::before { display: none; }
+    .screen { aspect-ratio: auto; height: min(640px, 78vh); }
+  }
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="title">
+    <h1>PairUp</h1>
+    <p>Demo market · two people, two displays, one deal. Reloading screens keeps market data.</p>
+  </div>
+  <div class="controls" style="display:flex;gap:10px;flex-wrap:wrap">
+    <div class="seg" role="group" aria-label="Scenario">
+      <button type="button" data-scenario="calculator" aria-pressed="true">Calculator sale</button>
+      <button type="button" data-scenario="lunch" aria-pressed="false">Lunch run</button>
+    </div>
+    <button class="ghost" type="button" id="restart" title="Reload both devices">Reload screens</button>
+    <button class="ghost" type="button" id="clean" title="Hide the script for recording (press H)">Hide script</button>
+  </div>
+</div>
+
+<main class="stage">
+  <section class="device seller" aria-label="Seller's device">
+    <div class="label"><span class="role" data-role></span><span class="who" data-who></span></div>
+    <div class="bezel"><div class="screen"><iframe title="Seller's device" allow="microphone; autoplay"></iframe></div></div>
+    <div class="base"></div>
+    <div class="script"></div>
+  </section>
+  <section class="device buyer" aria-label="Buyer's device">
+    <div class="label"><span class="role" data-role></span><span class="who" data-who></span></div>
+    <div class="bezel"><div class="screen"><iframe title="Buyer's device" allow="microphone; autoplay"></iframe></div></div>
+    <div class="base"></div>
+    <div class="script"></div>
+  </section>
+</main>
+
+<script type="module">
+  // Each screen is a full copy of the web app (/app/) at its real size, in its own device slot with
+  // its own session. In local development (AUTH_MODE=none) ?as= signs it in under
+  // a name; with OAuth each screen shows its own Sign in button. The script buttons
+  // say a line on a device's behalf; the devices tell each other when the market
+  // changes, so news shows up on the other screen at once.
+  const SCENARIOS = {
+    calculator: {
+      seller: { role: "Seller", name: "Sam" },
+      buyer: { role: "Buyer", name: "Mei" },
+      steps: [
+        ["seller", "say", "Sell my TI-84 for $20, I'll take anything above $15"],
+        ["buyer", "say", "I need a graphing calculator today, maximum $18"],
+        ["buyer", "tap", "Tap Confirm on the deal card"],
+        ["seller", "tap", "The sale shows up here, with a badge, and is read out"],
+      ],
+    },
+    lunch: {
+      seller: { role: "Runner", name: "Sam" },
+      buyer: { role: "Requester", name: "Priya" },
+      steps: [
+        ["seller", "say", "I can do lunch runs around campus for $4 a run, at least $3"],
+        ["buyer", "say", "Find someone to pick up my lunch from the HUB to McCarty Hall by 12:30, $5"],
+        ["buyer", "tap", "Tap Book on the deal card"],
+        ["seller", "tap", "The job shows up here at once: tap Take the job"],
+        ["buyer", "tap", "The booking shows up here and is read out"],
+      ],
+    },
+  };
+  const devices = { seller: document.querySelector(".device.seller"), buyer: document.querySelector(".device.buyer") };
+
+  const params = new URLSearchParams(location.search);
+  let scenario = SCENARIOS[params.get("scenario")] ? params.get("scenario") : "calculator";
+  if (params.has("clean")) document.body.classList.add("clean");
+
+  function load() {
+    const s = SCENARIOS[scenario];
+    for (const b of document.querySelectorAll("[data-scenario]")) b.setAttribute("aria-pressed", String(b.dataset.scenario === scenario));
+    for (const side of ["seller", "buyer"]) {
+      const d = devices[side];
+      const { role, name } = s[side];
+      d.querySelector("[data-role]").textContent = role;
+      d.querySelector("[data-who]").textContent = name;
+      d.setAttribute("aria-label", `${role}'s device`);
+      const frame = d.querySelector("iframe");
+      frame.title = `${role}'s device`;
+      frame.src = `/app/?device=demo-${scenario}-${side}&as=${encodeURIComponent(name)}`;
+      const script = d.querySelector(".script");
+      script.replaceChildren();
+      s.steps.forEach(([who, kind, text], i) => {
+        if (who !== side) return;
+        const step = document.createElement(kind === "say" ? "button" : "div");
+        step.className = `step ${kind}`;
+        const n = document.createElement("span");
+        n.className = "n";
+        n.textContent = String(i + 1);
+        const t = document.createElement("span");
+        t.className = kind;
+        t.textContent = kind === "say" ? `“${text}”` : text;
+        step.append(n, t);
+        if (kind === "say") {
+          step.type = "button";
+          step.onclick = () => {
+            frame.contentWindow?.postMessage({ type: "pairup.say", text }, location.origin);
+            step.classList.add("done");
+          };
+        }
+        script.append(step);
+      });
+    }
+    const url = new URL(location.href);
+    url.searchParams.set("scenario", scenario);
+    history.replaceState(null, "", url);
+  }
+
+
+  for (const b of document.querySelectorAll("[data-scenario]")) b.onclick = () => { scenario = b.dataset.scenario; load(); };
+  document.getElementById("restart").onclick = load;
+  const toggleClean = () => document.body.classList.toggle("clean");
+  document.getElementById("clean").onclick = toggleClean;
+  addEventListener("keydown", (e) => {
+    if ((e.key === "h" || e.key === "H") && !e.ctrlKey && !e.metaKey && !e.altKey) toggleClean();
+  });
+  load();
+</script>
+</body>
+</html>

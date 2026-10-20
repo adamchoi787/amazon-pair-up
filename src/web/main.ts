@@ -30,12 +30,18 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
 const WRITES = new Set(["post_offer", "post_request", "negotiate", "confirm_deal", "decline_deal", "withdraw_post", "choose_handoff", "accept_suggestion", "dismiss_suggestion", "report_user", "rate_deal"]);
 const MAX_STEPS = 6;
 
+const params = new URLSearchParams(location.search);
+const slot = (params.get("device") ?? Auth.slotFromRedirect() ?? "").replace(/[^a-z0-9_-]/gi, "").slice(0, 24);
+const signInAs = (params.get("as") ?? "").trim().slice(0, 40);
+const market = "BroadcastChannel" in window ? new BroadcastChannel("pairup.market") : null;
+
 let auth: Auth;
 let mcp: Mcp;
 const messages: Message[] = [];
 let busy = false;
 let voiceOn = readPref("voice", canSpeak);
 const seenWaiting = new Set<string>();
+const seenConfirmed = new Set<string>();
 let inboxPrimed = false;
 const panels: Partial<Record<"deals" | "posts", ViewHandle>> = {};
 
@@ -56,8 +62,9 @@ hydrateIcons();
 
 async function boot() {
   const config = (await (await fetch("/api/app-config")).json()) as AppConfig;
-  auth = new Auth(config);
+  auth = new Auth(config, slot);
   const error = await auth.completeSignIn().catch(() => "Sign-in failed. Please try again.");
+  if (config.auth === "none" && signInAs && auth.name !== signInAs) auth.signInLocally(signInAs);
   if (!auth.signedIn) return showSignIn(error);
   await start();
 }
@@ -103,10 +110,17 @@ async function start() {
   requestAnimationFrame(moveTabIndicator);
   addEventListener("resize", moveTabIndicator);
   void document.fonts?.ready.then(moveTabIndicator);
-  $("signout").onclick = () => { auth.signOut(); location.replace("/app/"); };
+  $("signout").onclick = () => { auth.signOut(); location.replace(slot ? `/app/?device=${slot}` : "/app/"); };
   updateVoiceToggle();
   $("voice").onclick = () => { voiceOn = !voiceOn; writePref("voice", voiceOn); if (!voiceOn) stopSpeaking(); updateVoiceToggle(); };
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => (document.documentElement.dataset.scheme = themeNow()));
+
+  addEventListener("message", (e) => {
+    if (parent === window || e.source !== parent || e.origin !== location.origin) return;
+    const data = e.data as { type?: string; text?: unknown } | null;
+    if (data?.type === "pairup.say" && typeof data.text === "string") void ask(data.text);
+  });
+  if (market) market.onmessage = () => void refreshInbox();
 
   greet();
   await refreshInbox();
@@ -207,7 +221,7 @@ async function ask(text: string) {
         const uri = mcp.viewFor(use.name);
         if (uri && !r.isError) await addView(turnEl, uri, use.input, r);
         results.push({ toolResult: { toolUseId: use.toolUseId, content: [{ json: resultData(r) }], status: r.isError ? "error" : "success" } });
-        if (WRITES.has(use.name)) void refreshInbox();
+        if (WRITES.has(use.name)) marketChanged();
       }
       messages.push({ role: "user", content: results });
     }
@@ -270,7 +284,12 @@ function onCardAction(name: string, r: CallToolResult) {
   markSeen(r);
   const say = String(resultData(r).say ?? "");
   if (voiceOn && say) speak(say);
-  if (WRITES.has(name)) { void refreshInbox(); void refreshSuggestions(mcp, () => void refreshInbox()); }
+  if (WRITES.has(name)) { marketChanged(); void refreshSuggestions(mcp, () => void refreshInbox()); }
+}
+
+function marketChanged() {
+  market?.postMessage({ changed: true });
+  void refreshInbox();
 }
 
 // ---------- inbox: offers that arrive while you're away ----------
@@ -292,18 +311,22 @@ async function refreshInbox() {
   const fresh = waiting.filter((d) => !seenWaiting.has(d.deal_id));
   for (const d of waiting) seenWaiting.add(d.deal_id);
   if (fresh.length && (inboxPrimed || !messages.length)) announce(fresh, inboxPrimed);
+  const confirmed = deals.filter((d) => d.status === "confirmed");
+  const news = inboxPrimed ? confirmed.filter((d) => !seenConfirmed.has(d.deal_id)) : [];
+  for (const d of confirmed) seenConfirmed.add(d.deal_id);
+  if (news.length) announce(news, true, true);
   inboxPrimed = true;
   if (panels.deals) await panels.deals.update(r);
 }
 
-function announce(fresh: DealLite[], arrivedNow: boolean) {
+function announce(fresh: DealLite[], arrivedNow: boolean, confirmed = false) {
   if (busy) return;
   const d = fresh[0];
   const amount = d.total ?? d.price;
   const price = new Intl.NumberFormat(undefined, { style: "currency", currency: d.currency, maximumFractionDigits: Number.isInteger(amount) ? 0 : 2 }).format(amount);
   const text = fresh.length === 1
-    ? `${arrivedNow ? "New offer" : "Waiting for your yes"}: ${d.title} for ${price}.`
-    : `${fresh.length} offers are waiting for your yes.`;
+    ? `${confirmed ? "Deal agreed" : arrivedNow ? "New offer" : "Waiting for your yes"}: ${d.title} for ${price}.`
+    : confirmed ? `${fresh.length} deals just went through.` : `${fresh.length} offers are waiting for your yes.`;
   clearHero();
   const turnEl = el("div", "turn");
   $("log").append(turnEl);

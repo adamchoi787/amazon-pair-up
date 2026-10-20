@@ -2,6 +2,8 @@
 //   oauth: OAuth 2.1 authorization code + PKCE (S256) as a public client; the
 //          access token is short-lived and the refresh token rotates on use.
 //   none:  local development; the user picks a name, sent as X-User-Id.
+// A device slot (the ?device= query parameter) keeps its own session, so one
+// browser can run several signed-in devices side by side (the demo page).
 
 export type AppConfig =
   | { auth: "oauth"; clientId: string; redirectUri: string; authorizeUrl: string; tokenUrl: string; resource: string }
@@ -9,9 +11,6 @@ export type AppConfig =
 
 interface Tokens { access: string; refresh: string; expiresAt: number }
 interface Session { name: string; tokens?: Tokens; userId?: string }
-
-const KEY = "pairup.session";
-const PENDING = "pairup.pkce";
 
 const store = {
   get<T>(k: string, s: Storage = localStorage): T | null {
@@ -30,10 +29,22 @@ const b64url = (bytes: ArrayBuffer | Uint8Array) =>
 const random = (n = 32) => b64url(crypto.getRandomValues(new Uint8Array(n)));
 
 export class Auth {
-  private session: Session | null = store.get<Session>(KEY);
+  private readonly key: string;
+  private readonly pendingKey: string;
+  private session: Session | null;
   private refreshing: Promise<boolean> | null = null;
 
-  constructor(readonly config: AppConfig) {}
+  constructor(readonly config: AppConfig, readonly slot = "") {
+    this.key = slot ? `pairup.session.${slot}` : "pairup.session";
+    this.pendingKey = slot ? `pairup.pkce.${slot}` : "pairup.pkce";
+    this.session = store.get<Session>(this.key);
+  }
+
+  /** The device slot an OAuth redirect comes back to: it rides in the state parameter. */
+  static slotFromRedirect(): string | null {
+    const state = new URLSearchParams(location.search).get("state");
+    return state?.includes(".") ? state.split(".")[0] : null;
+  }
 
   get signedIn() { return !!this.session && (this.config.auth === "none" ? !!this.session.userId : !!this.session.tokens); }
   get name() { return this.session?.name ?? ""; }
@@ -43,7 +54,7 @@ export class Auth {
     const clean = name.trim().slice(0, 40);
     const userId = `u_${clean.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}`;
     this.session = { name: clean, userId };
-    store.set(KEY, this.session);
+    store.set(this.key, this.session);
   }
 
   /** OAuth: go to the sign-in page. */
@@ -51,8 +62,8 @@ export class Auth {
     if (this.config.auth !== "oauth") return;
     const verifier = random(48);
     const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
-    const state = random(16);
-    store.set(PENDING, { verifier, state }, sessionStorage);
+    const state = this.slot ? `${this.slot}.${random(16)}` : random(16);
+    store.set(this.pendingKey, { verifier, state }, sessionStorage);
     const url = new URL(this.config.authorizeUrl);
     url.search = new URLSearchParams({
       response_type: "code", client_id: this.config.clientId, redirect_uri: this.config.redirectUri,
@@ -67,9 +78,9 @@ export class Auth {
     const params = new URLSearchParams(location.search);
     const code = params.get("code");
     if (!code) return null;
-    history.replaceState(null, "", location.pathname);
-    const pending = store.get<{ verifier: string; state: string }>(PENDING, sessionStorage);
-    store.del(PENDING, sessionStorage);
+    history.replaceState(null, "", this.slot ? `${location.pathname}?device=${encodeURIComponent(this.slot)}` : location.pathname);
+    const pending = store.get<{ verifier: string; state: string }>(this.pendingKey, sessionStorage);
+    store.del(this.pendingKey, sessionStorage);
     if (!pending || params.get("state") !== pending.state) return "Sign-in expired. Please try again.";
     const res = await fetch(this.config.tokenUrl, {
       method: "POST",
@@ -89,14 +100,14 @@ export class Auth {
       name: this.session?.name ?? "",
       tokens: { access: t.access_token, refresh: t.refresh_token, expiresAt: Date.now() + (t.expires_in - 60) * 1000 },
     };
-    store.set(KEY, this.session);
+    store.set(this.key, this.session);
   }
 
   /** Remember the display name the server knows us by (OAuth gives us only tokens). */
   rememberName(name: string) {
     if (!this.session || !name || this.config.auth === "none") return;
     this.session.name = name;
-    store.set(KEY, this.session);
+    store.set(this.key, this.session);
   }
 
   private async refresh(): Promise<boolean> {
@@ -141,6 +152,6 @@ export class Auth {
 
   signOut() {
     this.session = null;
-    store.del(KEY);
+    store.del(this.key);
   }
 }
