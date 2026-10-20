@@ -133,7 +133,7 @@ times require an explicit offset. See [the scheduling contract](docs/TOOL_CONTRA
 
 ## Knows what you need
 
-PairUp learns regular requests from your own history and offers them shortly before they are due. Bee to-dos, need snippets and phone arrival signals can suggest an errand or item. The For you strip lets you say Yes, Not now or Forget. The Devices panel connects a watch, Bee or phone; /watch/ provides a compact voice view. See [Apple Watch](docs/APPLE_WATCH.md) and [Bee](docs/BEE.md). `npm run seed -- --lifestyle` adds three weeks of labelled demo lunch runs (the HUB → McCarty Hall, about $4, around 12:15) for `u_tony`.
+PairUp learns regular requests from your own history and offers them shortly before they are due. Bee to-dos, need snippets and phone arrival signals can suggest an errand or item. The For you dock above the composer shows one suggestion at a time, with Find it (Ask now when the budget is known), Not now or Forget. The Devices panel connects a watch, Bee or phone; /watch/ provides a compact voice view. See [Apple Watch](docs/APPLE_WATCH.md) and [Bee](docs/BEE.md). `npm run seed -- --lifestyle` adds three weeks of labelled demo lunch runs (the HUB → McCarty Hall, about $4, around 12:15) for `u_tony`.
 
 Lifestyle code: src/market/lifestyle.ts and context.ts; device tokens: src/auth/devices.ts and src/http/devices.ts; voice loop: src/agent/runner.ts; browser: src/web/watch.ts and lifestyle-ui.ts; Bee bridge: scripts/bee-bridge.ts.
 
@@ -349,7 +349,7 @@ skills/pairup/     the Agent Skill (SKILL.md)
 agents/agentcore/        Strands Agents voice agent for Amazon Bedrock AgentCore Runtime
 scripts/                 seed, smoke test, latency benchmark (bench.ts), Ring probe and webhook simulator, add-on assets
 research/                impact evidence, papers, plain-language summary
-docs/                    use cases, contract, award plan, Alexa+ setup, deploy, demo script, submission, friction log
+docs/                    use cases, contract, design system, award plan, Alexa+ setup, deploy, demo script, submission, friction log
 vendor/pairing-core/     prebuilt module from https://github.com/rairurairu/pairing-core (refresh: node scripts/sync-pairing-core.mjs)
 Dockerfile, deploy/      container image, AWS CloudFormation + deploy scripts, Lightsail config
 ```

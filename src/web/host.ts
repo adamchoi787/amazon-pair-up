@@ -54,6 +54,9 @@ export async function renderView(
     if (height) {
       frame.style.height = `${Math.ceil(height)}px`;
       container.classList.remove("loading");
+      // The first real size replaces the skeleton, and the card rises in.
+      for (const s of container.querySelectorAll(":scope > .skeleton")) s.remove();
+      frame.classList.add("ready");
     }
     onResize?.();
   };
@@ -72,6 +75,7 @@ export async function renderView(
   } catch (error) {
     void bridge.close().catch(() => undefined);
     frame.remove();
+    for (const s of container.querySelectorAll(":scope > .skeleton")) s.remove();
     throw error;
   } finally { clearTimeout(readyTimer!); }
 

@@ -9,5 +9,5 @@
     "noEmit": true,
     "types": []
   },
-  "include": ["src/web", "src/apps"]
+  "include": ["src/web", "src/apps", "src/design"]
 }

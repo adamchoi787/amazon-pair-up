@@ -5,3 +5,4 @@ public/mcp-apps/*.html -text
 *.sh text eol=lf
 
 public/watch/watch.js -text
+public/design/tokens.css -text

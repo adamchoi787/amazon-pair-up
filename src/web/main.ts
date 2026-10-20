@@ -1,4 +1,5 @@
-import { refreshSuggestions, showDevices } from "./lifestyle-ui.js";
+import { collapseSuggestions, refreshSuggestions, showDevices } from "./lifestyle-ui.js";
+import { icon, mark, type IconName } from "../design/icons.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { Auth, type AppConfig } from "./auth.js";
 import { renderView, themeNow, type ViewHandle } from "./host.js";
@@ -40,6 +41,19 @@ const panels: Partial<Record<"deals" | "posts", ViewHandle>> = {};
 
 // ---------- boot ----------
 
+/** Fill the static markup's icon and mark placeholders. */
+function hydrateIcons(scope: ParentNode = document) {
+  for (const slot of scope.querySelectorAll<HTMLElement>("[data-icon]")) {
+    const svg = icon(slot.dataset.icon as IconName, Number(slot.dataset.size ?? 20));
+    if (slot.classList.contains("tile")) { slot.removeAttribute("data-icon"); slot.append(svg); } else slot.replaceWith(svg);
+  }
+  for (const brand of scope.querySelectorAll<HTMLElement>("[data-mark]")) {
+    brand.prepend(mark(Number(brand.dataset.mark)));
+    brand.removeAttribute("data-mark");
+  }
+}
+hydrateIcons();
+
 async function boot() {
   const config = (await (await fetch("/api/app-config")).json()) as AppConfig;
   auth = new Auth(config);
@@ -77,12 +91,18 @@ async function start() {
   }
   const me = await auth.fetch("/api/me").then((r) => (r.ok ? r.json() : null)).catch(() => null) as { name?: string } | null;
   if (me?.name) auth.rememberName(me.name);
-  $("who").textContent = auth.name;
-  const health = await fetch("/health").then((r) => r.json()).catch(() => ({})) as { agent?: string };
-  $("mode").textContent = health.agent === "bedrock" ? "Amazon Bedrock" : "Offline assistant";
+  $("who").textContent = (auth.name.trim()[0] ?? "").toUpperCase();
+  $("who").title = auth.name;
+  // The assistant mode is a development detail: shown only on local builds without sign-in.
+  const health = await fetch("/health").then((r) => r.json()).catch(() => ({})) as { agent?: string; auth?: string };
+  $("mode").textContent = health.agent === "bedrock" ? "Dev · Bedrock" : "Dev · Offline";
+  $("mode").hidden = health.auth !== "none";
 
   bindComposer();
   bindTabs();
+  requestAnimationFrame(moveTabIndicator);
+  addEventListener("resize", moveTabIndicator);
+  void document.fonts?.ready.then(moveTabIndicator);
   $("signout").onclick = () => { auth.signOut(); location.replace("/app/"); };
   updateVoiceToggle();
   $("voice").onclick = () => { voiceOn = !voiceOn; writePref("voice", voiceOn); if (!voiceOn) stopSpeaking(); updateVoiceToggle(); };
@@ -97,27 +117,41 @@ async function start() {
 
 // ---------- conversation ----------
 
+/** The empty conversation: a greeting and one example per kind of request. Gone once anything is said. */
 function greet() {
   const first = auth.name ? auth.name.split(" ")[0] : "";
-  addBubble("assistant", `Hi${first ? ` ${first}` : ""}! Tell me what you need, what you're selling or what you can do for people, and I'll pair you with someone nearby.`);
-  const chips = $("suggestions");
-  chips.replaceChildren();
-  for (const [label, s] of [
-    ["Sell a calculator", "Sell my TI-84 for $20, I'll take anything above $15"],
-    ["Find a calculator", "I need a graphing calculator today, max $18"],
-    ["Lunch pickup", "Find someone to pick up my lunch from the HUB to McCarty Hall tomorrow by 12:30, $5"],
-    ["Book event help", "Get me a helper for the event on Saturday 2-6pm, budget $10/hr"],
-    ["Check my deals", "Any news on my deals?"],
-  ]) {
-    const b = el("button", "chip", label);
-    b.title = s;
+  const hero = el("div", "hero");
+  hero.id = "hero";
+  hero.append(mark(44), el("h1", "", `Hi${first ? ` ${first}` : ""}. What do you need?`),
+    el("p", "", "Buy or sell something, get an errand run, or find a hand for a job. Say it once and PairUp pairs you with someone nearby."));
+  const examples = el("div", "examples");
+  examples.setAttribute("aria-label", "Try an example");
+  for (const [name, label, s] of [
+    ["sell", "Sell a calculator", "Sell my TI-84 for $20, I'll take anything above $15"],
+    ["item", "Find a calculator", "I need a graphing calculator today, max $18"],
+    ["errand", "Lunch pickup", "Find someone to pick up my lunch from the HUB to McCarty Hall tomorrow by 12:30, $5"],
+    ["job", "Book event help", "Get me a helper for the event on Saturday 2-6pm, budget $10/hr"],
+  ] as const) {
+    const b = el("button", "example");
     b.type = "button";
+    const tile = el("span", "tile");
+    tile.append(icon(name));
+    const text = el("span");
+    text.append(el("strong", "", label), el("span", "", `“${s}”`));
+    b.append(tile, text);
     b.onclick = () => void ask(s);
-    chips.append(b);
+    examples.append(b);
   }
+  hero.append(examples);
+  $("log").replaceChildren(hero);
+}
+
+function clearHero() {
+  document.getElementById("hero")?.remove();
 }
 
 function addBubble(role: "user" | "assistant" | "note", text: string, parent: HTMLElement = $("log")) {
+  clearHero();
   const b = el("div", `bubble ${role}`, text);
   parent.append(b);
   scrollDown();
@@ -139,12 +173,14 @@ async function ask(text: string) {
   busy = true;
   setBusy(true);
   stopSpeaking();
-  $("suggestions").replaceChildren();
+  collapseSuggestions();
   addBubble("user", text);
   const turnEl = el("div", "turn");
   $("log").append(turnEl);
-  const reply = addBubble("assistant", "…", turnEl);
-  reply.classList.add("pending");
+  const reply = addBubble("assistant", "", turnEl);
+  reply.classList.add("pending", "typing");
+  reply.setAttribute("aria-label", "PairUp is thinking");
+  reply.append(el("i"), el("i"), el("i"));
   messages.push({ role: "user", content: [{ text }] });
 
   let finalText = "";
@@ -189,7 +225,8 @@ async function ask(text: string) {
     setBusy(false);
   }
   reply.textContent = finalText;
-  reply.classList.remove("pending");
+  reply.classList.remove("pending", "typing");
+  reply.removeAttribute("aria-label");
   turnEl.prepend(reply);
   if (voiceOn) speak(finalText);
   scrollDown(turnEl);
@@ -209,6 +246,7 @@ function errorResult(say: string): CallToolResult {
 
 async function addView(parent: HTMLElement, uri: string, input: Record<string, unknown>, result: CallToolResult) {
   const box = el("div", "card-slot");
+  box.append(skeleton(1));
   parent.append(box);
   try {
     return await renderView(mcp, box, uri, input, result, onCardAction, () => scrollDown(parent));
@@ -243,6 +281,11 @@ async function refreshInbox() {
   const deals = ((resultData(r).deals as DealLite[] | undefined) ?? []);
   const waiting = deals.filter((d) => d.status === "proposed" && d.waiting_for_you);
   const badge = $("deals-badge");
+  if (waiting.length && badge.textContent !== String(waiting.length)) {
+    badge.classList.remove("bump");
+    void badge.offsetWidth;
+    badge.classList.add("bump");
+  }
   badge.textContent = String(waiting.length);
   badge.hidden = waiting.length === 0;
 
@@ -261,6 +304,7 @@ function announce(fresh: DealLite[], arrivedNow: boolean) {
   const text = fresh.length === 1
     ? `${arrivedNow ? "New offer" : "Waiting for your yes"}: ${d.title} for ${price}.`
     : `${fresh.length} offers are waiting for your yes.`;
+  clearHero();
   const turnEl = el("div", "turn");
   $("log").append(turnEl);
   addBubble("assistant", text, turnEl);
@@ -301,21 +345,43 @@ function bindTabs() {
   }
 }
 
+/** Slides the selected tab's pill under it. */
+function moveTabIndicator() {
+  const selected = document.querySelector<HTMLElement>("[data-tab][aria-selected=true]");
+  const pill = document.querySelector<HTMLElement>(".tab-indicator");
+  if (!selected || !pill) return;
+  pill.style.width = `${selected.offsetWidth}px`;
+  pill.style.transform = `translateX(${selected.offsetLeft}px)`;
+}
+
+const PANEL_HEAD = {
+  deals: ["Deals", "Offers waiting for your yes come first."],
+  posts: ["My posts", "What you're selling, offering and asking for."],
+} as const;
+
 async function openTab(name: "assistant" | "deals" | "posts" | "devices") {
   for (const t of document.querySelectorAll<HTMLButtonElement>("[data-tab]")) {
     t.setAttribute("aria-selected", String(t.dataset.tab === name));
     t.tabIndex = t.dataset.tab === name ? 0 : -1;
   }
+  moveTabIndicator();
   for (const p of ["assistant", "deals", "posts", "devices"]) $(`panel-${p}`).hidden = p !== name;
   if (name === "assistant") return;
   if (name === "devices") return showDevices(auth);
   const tool = name === "deals" ? "get_deal_status" : "list_my_posts";
+  const box = $(`panel-${name}`);
+  if (!box.querySelector(".panel-body")) {
+    const head = el("div", "panel-head");
+    head.append(el("h2", "", PANEL_HEAD[name][0]), el("p", "", PANEL_HEAD[name][1]));
+    const body = el("div", "panel-body");
+    body.append(skeleton(3));
+    box.replaceChildren(head, body);
+  }
   const r = await mcp.call(tool, {});
   if (panels[name]) return panels[name]!.update(r);
   const uri = mcp.viewFor(tool);
-  const box = $(`panel-${name}`);
-  box.replaceChildren();
-  if (uri) panels[name] = await renderView(mcp, box, uri, {}, r, (toolName, res) => {
+  const body = box.querySelector<HTMLElement>(".panel-body")!;
+  if (uri) panels[name] = await renderView(mcp, body, uri, {}, r, (toolName, res) => {
     onCardAction(toolName, res);
     void mcp.call(tool, {}).then((fresh) => panels[name]?.update(fresh));
   });
@@ -331,16 +397,24 @@ function bindComposer() {
     e.preventDefault();
     const text = input.value;
     input.value = "";
+    syncSend();
     void ask(text);
   };
   mic.hidden = !canListen;
+  const PLACEHOLDER = input.placeholder;
+  const send = $<HTMLButtonElement>("send");
+  const syncSend = () => { send.disabled = busy || !input.value.trim(); };
+  input.addEventListener("input", syncSend);
+  syncSend();
   let session: ReturnType<typeof listen> | null = null;
   mic.onclick = async () => {
     if (session) return session.stop();
     if (busy) return;
     stopSpeaking();
     mic.classList.add("listening");
+    form.classList.add("listening");
     mic.setAttribute("aria-label", "Stop listening");
+    input.placeholder = "Listening…";
     session = listen((partial) => (input.value = partial));
     try {
       const heard = await session.done;
@@ -351,7 +425,9 @@ function bindComposer() {
     } finally {
       session = null;
       mic.classList.remove("listening");
+      form.classList.remove("listening");
       mic.setAttribute("aria-label", "Talk");
+      input.placeholder = PLACEHOLDER;
     }
   };
   document.addEventListener("keydown", (e) => {
@@ -359,16 +435,43 @@ function bindComposer() {
   });
 }
 
+/** Placeholder cards in the shape of what is loading: one deal card, or a list. */
+function skeleton(cards: number) {
+  const wrap = el("div", "skeleton");
+  wrap.setAttribute("aria-hidden", "true");
+  const bar = (w: string, h: number) => {
+    const b = el("div", "sk");
+    Object.assign(b.style, { width: w, height: `${h}px` });
+    return b;
+  };
+  for (let i = 0; i < cards; i++) {
+    const card = el("div", "sk-card");
+    const head = el("div", "sk-row");
+    const tile = bar("36px", 36);
+    tile.style.borderRadius = "12px";
+    head.append(tile, bar("38%", 14));
+    card.append(head, bar("64%", 22), bar(cards > 1 ? "22%" : "26%", cards > 1 ? 26 : 36));
+    if (cards === 1) {
+      const actions = el("div", "sk-actions");
+      actions.append(el("div", "sk"), el("div", "sk"));
+      card.append(actions);
+    }
+    wrap.append(card);
+  }
+  return wrap;
+}
+
 function setBusy(on: boolean) {
   $("composer").classList.toggle("busy", on);
-  $<HTMLButtonElement>("send").disabled = on;
+  $<HTMLButtonElement>("send").disabled = on || !$<HTMLInputElement>("text").value.trim();
 }
 
 function updateVoiceToggle() {
   const b = $<HTMLButtonElement>("voice");
   b.hidden = !canSpeak;
   b.setAttribute("aria-pressed", String(voiceOn));
-  b.textContent = voiceOn ? "Voice on" : "Voice off";
+  b.title = voiceOn ? "Reading replies aloud" : "Replies are silent";
+  b.replaceChildren(icon(voiceOn ? "speaker" : "muted"));
 }
 
 function readPref(k: string, d: boolean) {
