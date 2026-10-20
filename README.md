@@ -207,7 +207,8 @@ without a human wiring it up:
 - **Trust and safety:** a prohibited and restricted items and services policy
   checked before every post, reports with a review queue on the dashboard, and
   ratings that feed each person's track record.
-- **Tests:** 97 server tests (unit, end-to-end over MCP, HTTP, OAuth, schemas, privacy,
+- **Speed:** `npm run bench` measures real MCP tool latency and throughput. See the measured local sample below.
+- **Tests:** automated server tests (unit, end-to-end over MCP, HTTP, OAuth, schemas, privacy,
   idempotency) plus the Strands agent against a real server, on every push.
 
 ## Repo map
@@ -230,6 +231,7 @@ src/
   market/learning.ts     learning to pair better: features, model, guarded rollout
   market/policy.ts       what may be posted: keyword rules + embedding match (data/policy.json)
   market/trust.ts        reports, review status and the review queue
+  market/amazon.ts       hand-offs to Amazon: search fallback, Trade-In, Hub meet-up points
   market/service.ts      business operations behind each tool
   market/views.ts        the only place rows become output (privacy redaction)
   market/idempotency.ts  retry-safe writes (idempotency_key)
@@ -243,9 +245,11 @@ public/mcp-apps/         built single-file MCP Apps view
 public/dashboard/        operations dashboard
 data/seed-listings.json  seed market: 162 posts from 22 people, items and services
 data/policy.json         prohibited and restricted items and services
+data/seed-listings.json  seed market: 162 posts from 22 people, items and services; demo Amazon Hub points per area
+data/trade-in-categories.json  categories Amazon Trade-In takes
 skills/amazonpairup/     the Agent Skill (SKILL.md)
 agents/agentcore/        Strands Agents voice agent for Amazon Bedrock AgentCore Runtime
-scripts/                 seed, smoke test, add-on assets
+scripts/                 seed, smoke test, latency benchmark (bench.ts), add-on assets
 docs/                    contract, award plan, Alexa+ setup, deploy, demo script, submission, friction log
 vendor/pairing-core/     prebuilt module from https://github.com/rairurairu/pairing-core (refresh: node scripts/sync-pairing-core.mjs)
 Dockerfile, deploy/      container image, AWS CloudFormation + deploy scripts, Lightsail config
@@ -258,3 +262,5 @@ See [docs/AWARD_GAPS.md](docs/AWARD_GAPS.md) for the award analysis and the day-
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+Local benchmark (2026-10-20, Windows, Node v24.14.1, mock AI, PGlite, real HTTP MCP, 2 workers × 5 rounds, fresh users, 40 calls, zero errors): post_offer p50/p95/p99 49/235/235 ms; post_request 79/134/134 ms; find_matches 32/75/75 ms; confirm_deal 29/41/41 ms. Throughput 26.2 calls/s. This small local sample includes cold calls; measure Bedrock and the deployed network separately with `npm run bench`.

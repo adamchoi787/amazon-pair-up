@@ -70,10 +70,27 @@ result has a `deal`, read it out and ask "Should I confirm it?". When `deal` is
 null the post waits on the market and is paired as soon as a counterpart
 arrives; say so and stop.
 
+## When nobody nearby can help
+
+The market covers what Amazon doesn't (a used item under $20, an errand, an
+hour of help) and hands off to Amazon when it can't help. The post keeps
+waiting either way, so offer these as an option and never as a replacement:
+
+- `post_request` for an item with no deal returns `fallback`: `amazon_url`
+  (an amazon.com search), `new_price` (typical price new, or null) and a `say`
+  ("Nobody nearby has one yet. New on Amazon it's about $110."). Open the link
+  only if the user asks for it.
+- `post_offer` for an item nobody is asking for yet, in a category Amazon
+  Trade-In takes (electronics, books, game consoles), returns `trade_in` with
+  the Amazon Trade-In `url`.
+- When both sides are in the same area, `deal.meetup.place` is that area's
+  Amazon Hub Locker or Counter (`meetup.hub_point`): a public, watched place
+  to hand over the item. Read it as the meet-up.
+
 ## Reading a deal
 
 A deal has `price`, `ask_price` and `saved_vs_ask`, `counterpart`,
-`meetup.place` and `meetup.availability`, `pickup` and `needed_by` for errands,
+`meetup.place` and `meetup.availability` (with `meetup.hub_point` when it is an Amazon Hub point), `pickup` and `needed_by` for errands,
 `on_hold_until`, and `waiting_for` (who still has to say yes; `waiting_for_you`
 is true when it is the user). Hourly work also has `hours` and `total`.
 `price_check` compares the price with the usual range. A deal is closed when

@@ -35,8 +35,10 @@ interface Request {
   request_id: string; kind: Kind; need: string; status: string; price_unit: Unit; your_max_price?: number; currency: string;
   pickup: string | null; location: string | null; schedule: string | null;
 }
+interface Fallback { reason: "no_seller" | "over_budget"; new_price: number | null; currency: string; amazon_url: string; say: string }
+interface TradeIn { category: string; url: string; say: string }
 type Data = Record<string, unknown> & {
-  say?: string; deal?: Deal | null; next_deal?: Deal | null; deals?: Deal[]; offer?: Offer; request?: Request;
+  say?: string; fallback?: Fallback | null; trade_in?: TradeIn | null; deal?: Deal | null; next_deal?: Deal | null; deals?: Deal[]; offer?: Offer; request?: Request;
   request_id?: string; matches?: Offer[]; alternatives?: Offer[]; offers?: Offer[]; requests?: Request[]; waiting_requests?: number;
 };
 
@@ -123,6 +125,17 @@ function errorSay(res: { content?: unknown }) {
     return String((JSON.parse(text ?? "{}") as { say?: string }).say ?? "Something went wrong.");
   } catch {
     return text ?? "Something went wrong.";
+  }
+}
+
+/** Opens an Amazon page in the host's browser (the host may ask the user first). */
+async function openLink(url: string) {
+  try {
+    const res = await app.openLink({ url });
+    if (res.isError) throw new Error("refused");
+  } catch {
+    note = `Open ${url} to see it on Amazon.`;
+    render();
   }
 }
 
@@ -225,6 +238,7 @@ function renderDeal(d: Data) {
       h("div", { class: "price" }, rate(o.ask_price, o.price_unit, o.currency)),
       o.your_min_price != null ? h("p", { class: "muted" }, `Private minimum ${rate(o.your_min_price, o.price_unit, o.currency)} · nobody else sees it`) : null,
       h("p", { class: "muted small" }, service ? "You'll get jobs as people ask." : "You'll be paired with the next buyer who asks."),
+      d.trade_in ? h("div", { class: "actions" }, button("Amazon Trade-In", "secondary", () => void openLink(d.trade_in!.url))) : null,
     ));
   } else if (d.request) {
     const r = d.request;
@@ -237,6 +251,11 @@ function renderDeal(d: Data) {
         ? h("p", { class: "meet" }, [r.pickup && r.location ? `${r.pickup} → ${r.location}` : r.pickup ?? r.location, r.schedule].filter(Boolean).join(" · "))
         : null,
       h("p", { class: "muted small" }, service ? "You'll be paired as soon as someone offers." : "You'll be paired as soon as a seller lists one."),
+      d.fallback ? h("p", { class: "muted small" }, d.fallback.say) : null,
+      d.fallback ? h("div", { class: "actions" }, button(
+        d.fallback.new_price != null ? `New on Amazon · about ${money(d.fallback.new_price, d.fallback.currency)}` : "Look on Amazon",
+        "secondary", () => void openLink(d.fallback!.amazon_url),
+      )) : null,
     ));
   }
   // Alternatives matter while the user is still deciding.

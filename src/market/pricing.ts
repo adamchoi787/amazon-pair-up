@@ -26,6 +26,8 @@ export interface PriceBand {
   source: BandSource;
   /** What the range describes: the reference entry, or how many independent sellers it rests on. */
   basis: string;
+  /** Reference items only: the typical price new on Amazon.com (the Amazon fallback in amazon.ts). */
+  newPrice?: number | null;
 }
 
 /** far_* asks the person to confirm; the others are informational. */
@@ -61,7 +63,7 @@ export function verdict(price: number, band: Pick<PriceBand, "low" | "high">, po
 
 // ---------- 1. reference prices ----------
 
-interface ReferenceEntry { id: string; title: string; kind?: Kind; price_unit?: PriceUnit; low: number; high: number }
+interface ReferenceEntry { id: string; title: string; kind?: Kind; price_unit?: PriceUnit; low: number; high: number; new_price?: number }
 
 const loaded = new WeakMap<Db, Promise<void>>();
 
@@ -86,28 +88,28 @@ async function loadReferences(db: Db, ai: Ai, file: string) {
   for (const e of entries) {
     const kind = e.kind ?? "item";
     const unit = e.price_unit ?? (kind === "item" ? "each" : "job");
-    const hash = createHash("sha1").update(JSON.stringify([e.title, kind, unit, e.low, e.high, ai.mode])).digest("hex");
+    const hash = createHash("sha1").update(JSON.stringify([e.title, kind, unit, e.low, e.high, e.new_price ?? null, ai.mode])).digest("hex");
     if (have.get(e.id) === hash) continue;
     const embedding = await ai.embed(e.title);
     await db.query(
-      `INSERT INTO reference_prices (id, kind, price_unit, title, low, high, hash, embedding)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector)
-       ON CONFLICT (id) DO UPDATE SET kind = $2, price_unit = $3, title = $4, low = $5, high = $6, hash = $7, embedding = $8::vector`,
-      [e.id, kind, unit, e.title, e.low, e.high, hash, toVector(embedding)],
+      `INSERT INTO reference_prices (id, kind, price_unit, title, low, high, new_price, hash, embedding)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::vector)
+       ON CONFLICT (id) DO UPDATE SET kind = $2, price_unit = $3, title = $4, low = $5, high = $6, new_price = $7, hash = $8, embedding = $9::vector`,
+      [e.id, kind, unit, e.title, e.low, e.high, e.new_price ?? null, hash, toVector(embedding)],
     );
   }
 }
 
 async function referenceBand(db: Db, q: BandQuery, policy: PricePolicy): Promise<PriceBand | null> {
-  const { rows } = await db.query<{ title: string; low: string; high: string; sim: number }>(
-    `SELECT title, low, high, (1 - (embedding <=> $1::vector))::float8 AS sim FROM reference_prices
+  const { rows } = await db.query<{ title: string; low: string; high: string; new_price: string | null; sim: number }>(
+    `SELECT title, low, high, new_price, (1 - (embedding <=> $1::vector))::float8 AS sim FROM reference_prices
      WHERE kind = $2 AND price_unit = $3 ORDER BY embedding <=> $1::vector LIMIT 1`,
     [toVector(q.embedding), q.kind, q.unit],
   );
   const r = rows[0];
   if (!r || Number(r.sim) < policy.referenceMatch) return null;
   const f = factor(q.kind, q.condition);
-  return { low: cents(num(r.low)! * f), high: cents(num(r.high)! * f), source: "reference", basis: r.title };
+  return { low: cents(num(r.low)! * f), high: cents(num(r.high)! * f), source: "reference", basis: r.title, newPrice: num(r.new_price) };
 }
 
 // ---------- 2. confirmed trades ----------

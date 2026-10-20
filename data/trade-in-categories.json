@@ -1,0 +1,46 @@
+{
+  "_note": "Candidate device categories for checking eligibility at https://www.amazon.com/tradein. Acceptance depends on model, condition and country. Source: https://www.aboutamazon.com/news/devices/amazon-trade-in-program (checked 2026-10-20).",
+  "categories": [
+    {
+      "id": "electronics",
+      "label": "electronics",
+      "keywords": [
+        "electronics",
+        "phone",
+        "smartphone",
+        "iphone",
+        "galaxy",
+        "pixel",
+        "tablet",
+        "ipad",
+        "kindle",
+        "e-reader",
+        "laptop",
+        "macbook",
+        "chromebook",
+        "smartwatch",
+        "headphones",
+        "earbuds",
+        "airpods",
+        "speaker",
+        "echo",
+        "camera",
+        "router"
+      ]
+    },
+    {
+      "id": "game_consoles",
+      "label": "game consoles",
+      "keywords": [
+        "console",
+        "consoles",
+        "playstation",
+        "ps4",
+        "ps5",
+        "xbox",
+        "nintendo",
+        "gaming"
+      ]
+    }
+  ]
+}
