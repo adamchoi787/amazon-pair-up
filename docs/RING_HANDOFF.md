@@ -22,7 +22,7 @@ PairUp Points are small unstaffed hand-off spots, each watched by one Ring doorb
 ## Left to do
 1. Run `npm run typecheck && npm test`; fix the existing e2e assertion that deep-equals `deal.meetup` (it now has `point: null`).
 2. Merge with main: another session ("Delivery and robotic fulfillment support") is adding Amazon Hub delivery in the same files (views.ts `handoff`/`delivery`, service.ts, server.ts, schemas.ts). When delivery is chosen, `meetup` is empty, so `meetup.point` must be null for delivery deals too.
-3. Scripts: `scripts/ring-probe.ts` (`npm run ring:probe`: list Playground devices + recent history, print the RING_POINT_DEVICES line) and `scripts/ring-simulate.ts` (`npm run ring:simulate`: sign and POST a Ring v1.1 `button_press` to the local webhook, labelled demo).
+3. Done: `npm run ring:probe` (real Playground call: devices + history, prints the RING_POINT_DEVICES line) and `npm run ring:simulate` (signed Ring v1.1 webhook to the local server, labelled demo).
 4. Card UI in `src/apps/view.ts`: "Meet at a PairUp Point" button on proposed/confirmed item deals, the point row with two arrival chips, an "I'm here" button; `npm run build:web` and commit the bundles.
 5. Offline planner (`src/agent/offline.ts`): "I'm here" / "I've arrived" → `check_in_at_point`; "meet at a PairUp Point" / "somewhere safe" → `choose_meetup_point`. Server instructions in server.ts: one sentence about points.
 6. Docs: TOOL_CONTRACT.md (3 tools, webhook, retention), skills/pairup/SKILL.md, README, `public/privacy.html` (Ring: type and time only, 24 h; arrivals 30 days), DEMO_SCRIPT.md Ring beat, SUBMISSION.md Ring track text + Ring product feedback, AWARD_GAPS.md.
