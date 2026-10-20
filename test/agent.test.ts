@@ -235,8 +235,8 @@ test("tools declare the PairUp MCP Apps view, and the view is served", async () 
   const s = await session("u_viewer");
   const withUi = s.tools.filter((t) => (t._meta as { ui?: { resourceUri?: string } } | undefined)?.ui?.resourceUri === "ui://pairup/market.html");
   assert.deepEqual(withUi.map((t) => t.name).sort(), [
-    "accept_suggestion", "check_in_at_point", "choose_handoff", "choose_meetup_point", "confirm_deal", "decline_deal", "find_matches",
-    "get_deal_status", "get_my_routines", "get_suggestions", "list_my_posts", "negotiate", "post_offer", "post_request",
+    "accept_suggestion", "check_in_at_point", "choose_handoff", "choose_meetup_point", "confirm_deal", "decline_deal", "find_matches", "get_deal_status", "get_my_routines", "get_suggestions",
+    "list_my_posts", "negotiate", "post_offer", "post_request",
   ]);
   const client = new Client({ name: "res", version: "0" });
   await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), { requestInit: { headers: { "X-User-Id": "u_viewer" } } }));
