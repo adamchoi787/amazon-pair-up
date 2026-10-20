@@ -77,6 +77,25 @@ const hubPoint = z.object({
   demo: z.boolean().describe("true: a made-up demo location, not a real Amazon Hub point"),
 });
 
+const arrivalState = z.enum(["not_here", "checked_in", "confirmed"])
+  .describe("checked_in = said they are here; confirmed = the point's Ring device saw a doorbell press or a person within 10 minutes");
+
+export const arrivalOut = z.object({
+  status: z.enum(["chosen", "one_here", "both_here"]).describe("both_here = Ring confirmed both arrivals; the hand-off can go ahead"),
+  you: arrivalState,
+  them: arrivalState,
+  both_here_at: z.string().nullable(),
+});
+
+export const pointOut = z.object({
+  point_id: z.string(),
+  name: z.string(),
+  area: z.string(),
+  hours: z.string().nullable(),
+  ring_device: z.boolean().describe("A Ring device is connected and confirms arrivals"),
+  demo: z.literal(true).describe("A planned demo location"),
+}).describe("A PairUp Point: an unstaffed hand-off spot watched by one Ring camera or doorbell");
+
 export const fallbackOut = z.object({
   reason: z.enum(["no_seller", "over_budget"]).describe("no_seller = nothing like it nearby; over_budget = nothing nearby within the budget"),
   new_price: money.nullable().describe("Curated demo estimate for a new item on Amazon.com; null when unknown"),
@@ -126,6 +145,8 @@ export const dealOut = z.object({
     place: z.string().nullable().describe("The suggested hand-off place: the Amazon Hub point when there is one, else the area"),
     availability: z.string().nullable(),
     hub_point: hubPoint.nullable().describe("Items, both sides in the same area: that area's Amazon Hub Locker or Counter, the suggested hand-off place"),
+    point: z.object({ point_id: z.string(), name: z.string(), area: z.string(), demo: z.literal(true) }).merge(arrivalOut).nullable()
+      .describe("The PairUp Point the two chose, with each side's Ring-confirmed arrival"),
   }).describe("Where and when: the meet-up for an item; for a service, where the job is (drop-off for errands) and when"),
   handoff: z.enum(["meetup", "delivery"]).nullable().describe("Items: how it changes hands; the buyer switches it with choose_handoff. null for services"),
   delivery: z.object({
@@ -220,6 +241,19 @@ const marketOutputs = {
   },
   report_user: { report: reportOut, say },
   rate_deal: { rating: ratingOut, say },
+  list_meetup_points: { points: z.array(pointOut), say },
+  choose_meetup_point: { deal_id: z.string(), point: pointOut, say },
+  check_in_at_point: {
+    deal_id: z.string(),
+    point: pointOut,
+    arrival: arrivalOut,
+    ring: z.object({
+      device: z.boolean().describe("The point has a Ring device"),
+      checked: z.boolean().describe("Ring Event History was read for this check-in"),
+      error: z.string().nullable().describe("Why Ring couldn't be read; the signed webhook still confirms arrivals"),
+    }),
+    say,
+  },
   delete_my_data: {
     deleted: z.literal(true),
     posts_taken_down: z.number().int().describe("Live offers and requests withdrawn first"),

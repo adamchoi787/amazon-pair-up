@@ -1,6 +1,7 @@
 import { createAi } from "./ai/index.js";
 import { createApp } from "./app.js";
 import { purgeContext } from "./market/context.js";
+import { purgeRing } from "./market/points.js";
 import { config } from "./config.js";
 import { openDb } from "./db/client.js";
 import { isEmpty, seedMarketplace } from "./db/seed.js";
@@ -29,6 +30,7 @@ const sweeper = setInterval(async () => {
     if (n) log("info", "expired unanswered deals and re-paired their posts", { deals: n });
     await purgeIdempotentCalls(db);
     await purgeContext(db);
+    await purgeRing(db);
   } catch (err) {
     log("error", "hold sweep failed", { err });
   } finally {

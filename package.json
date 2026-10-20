@@ -21,6 +21,8 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.web.json",
     "build:web": "node scripts/build-web.mjs",
     "bee:bridge": "tsx scripts/bee-bridge.ts",
+    "ring:probe": "tsx scripts/ring-probe.ts",
+    "ring:simulate": "tsx scripts/ring-simulate.ts",
     "check:release": "tsx scripts/check-release.ts"
   },
   "dependencies": {

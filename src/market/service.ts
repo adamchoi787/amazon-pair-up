@@ -13,6 +13,7 @@ import {
 } from "./trust.js";
 import { num, type BuyIntentRow, type DealRow, type Kind, type ListingRow, type PriceUnit, type RequestSource, type ServiceUnit } from "./types.js";
 import { tradeInCategory, type Handoff } from "./amazon.js";
+import type { RingSettings } from "./points.js";
 import { checkSchedule, DEFAULT_TIME_ZONE, hasBookingConflict, itemDeadline, providerBookings, resolveServiceTime, validTimeZone } from "./scheduling.js";
 import { dealView, fallbackView, offerView, ratingView, reportView, requestView, tradeInView, type DealView, type DealWithParties } from "./views.js";
 
@@ -36,6 +37,8 @@ export interface MarketSettings {
   policy?: Partial<PolicySettings>;
   /** Different people whose reports put someone under review (src/market/trust.ts). */
   reportThreshold?: number;
+  /** Ring at PairUp Points (src/market/points.ts). */
+  ring?: RingSettings;
 }
 
 export interface Deps {
@@ -819,12 +822,16 @@ const DEAL_WITH_PARTIES = `
                  AND e.kind IN ('deal_half_confirmed', 'deal_confirmed')) AS provider_explicit_yes,
          i.hours, i.pickup, i.needed_by, i.need AS task, l.seller_id, i.buyer_id,
          su.display_name AS seller_name, bu.display_name AS buyer_name,
-         l.location AS offer_location, i.location AS request_location, su.home_area AS seller_home, bu.home_area AS buyer_home
+         l.location AS offer_location, i.location AS request_location, su.home_area AS seller_home, bu.home_area AS buyer_home,
+         mp.point_id AS meetup_point_id, mp.status AS meetup_status, mp.both_here_at AS meetup_both_here_at,
+         (SELECT coalesce(json_agg(json_build_object('user_id', a.user_id, 'checked_in_at', a.checked_in_at, 'verified_at', a.verified_at,
+                 'ring_event_type', a.ring_event_type)), '[]'::json) FROM meetup_arrivals a WHERE a.deal_id = d.id) AS meetup_arrivals
   FROM deals d
   JOIN listings l    ON l.id = d.listing_id
   JOIN buy_intents i ON i.id = d.buy_intent_id
   JOIN users su      ON su.id = l.seller_id
-  JOIN users bu      ON bu.id = i.buyer_id`;
+  JOIN users bu      ON bu.id = i.buyer_id
+  LEFT JOIN meetups mp ON mp.deal_id = d.id`;
 
 function matchView(m: ListingRow & { score: number }, intent: BuyIntentRow, viewerId: string) {
   return {

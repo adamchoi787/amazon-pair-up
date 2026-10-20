@@ -144,6 +144,7 @@ test("both sides on campus: the deal suggests the campus Amazon Hub point", asyn
     place: "Amazon Hub Counter, HUB ground floor, UW campus (demo location)",
     availability: "evenings",
     hub_point: { name: "Amazon Hub Counter, HUB ground floor", type: "counter", area: "UW campus", demo: true },
+    point: null,
   });
   assert.match(req.say, /Meet-up: Amazon Hub Counter, HUB ground floor, UW campus \(demo location\)\./);
   const done = await buyer.call("confirm_deal", { deal_id: req.deal.deal_id });
@@ -163,6 +164,6 @@ test("a buyer's home area counts when the request names none; different areas ke
   const far = await clientAs("amz_far_seller");
   await far.call("post_offer", { title: "Basketball, size 7", category: "sports", ask_price: 10, location: "Northgate" });
   const away = await buyer.call("post_request", { need: "basketball", max_price: 10 });
-  assert.deepEqual(away.deal.meetup, { place: "Northgate", availability: null, hub_point: null });
+  assert.deepEqual(away.deal.meetup, { place: "Northgate", availability: null, hub_point: null, point: null });
   for (const c of [seller, buyer, far]) await c.close();
 });

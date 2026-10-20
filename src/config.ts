@@ -74,6 +74,20 @@ export const config = {
   policy: { meaningMatch: Number(env("POLICY_MEANING_MATCH", "0.8")) },
   reportThreshold: Number(env("REPORT_THRESHOLD", "3")),
 
+  // Ring at PairUp Points (src/market/points.ts). RING_ACCESS_TOKEN: a Ring
+  // Partner API token (a Playground token lasts 30 minutes); check-ins then read
+  // the point device's Event History. RING_HMAC_KEY turns on the signed webhook
+  // at /api/ring/webhook. RING_POINT_DEVICES maps points to devices
+  // ("pt_uw_hub=<device id>"). RING_SANDBOX=true also counts the Playground's
+  // simulated live views as presence.
+  ring: {
+    accessToken: env("RING_ACCESS_TOKEN"),
+    apiBase: env("RING_API_BASE"),
+    hmacKey: env("RING_HMAC_KEY"),
+    pointDevices: env("RING_POINT_DEVICES"),
+    sandbox: env("RING_SANDBOX") === "true",
+  },
+
   // /api/dashboard shows every post and deal. Open in AUTH_MODE=none (local);
   // otherwise it needs this token, and stays off when the token is unset.
   dashboardToken: env("DASHBOARD_TOKEN"),

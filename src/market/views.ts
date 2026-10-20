@@ -2,6 +2,7 @@ import { AMAZON_TRADE_IN_URL, amazonSearchUrl, deliveryQuote, hubPointFor, type 
 import { verdict, type BandSource } from "./pricing.js";
 import { num, type BuyIntentRow, type DealRow, type Kind, type ListingRow, type PriceUnit } from "./types.js";
 import { checkSchedule } from "./scheduling.js";
+import { arrivalView, pointById, type ArrivalRow } from "./points.js";
 
 // The ONLY place rows become tool output. Private limits are included solely
 // for their owner. Every tool response goes through these functions, and
@@ -94,6 +95,11 @@ export interface DealWithParties extends DealRow {
   request_location: string | null;
   seller_home: string | null;
   buyer_home: string | null;
+  /** The PairUp Point the two chose, if any (src/market/points.ts). */
+  meetup_point_id?: string | null;
+  meetup_status?: string | null;
+  meetup_both_here_at?: string | Date | null;
+  meetup_arrivals?: ArrivalRow[] | string | null;
 }
 
 export type Role = "buyer" | "seller" | "observer";
@@ -119,11 +125,13 @@ export function dealView(d: DealWithParties, viewerId: string) {
   const sellerConfirmed = d.seller_confirmed && (d.status !== "proposed" || d.kind === "item" || scheduling?.status === "verified" || d.provider_explicit_yes);
   // Items change hands; two people in the same area meet at its Amazon Hub point.
   // Or Amazon carries it between a Hub point in each area, when the buyer asks for delivery.
+  // A PairUp Point the two chose replaces the Hub point.
   const sellerArea = d.offer_location ?? d.seller_home;
   const buyerArea = d.request_location ?? d.buyer_home;
   const quote = d.kind === "item" ? deliveryQuote(sellerArea, buyerArea) : null;
   const delivering = d.kind === "item" && d.handoff === "delivery" && quote != null;
-  const hub = d.kind === "item" && !delivering ? hubPointFor(sellerArea, buyerArea) : null;
+  const point = delivering ? null : pointById(d.meetup_point_id);
+  const hub = d.kind === "item" && !delivering && !point ? hubPointFor(sellerArea, buyerArea) : null;
   const itemTotal = dealTotal(price, d.price_unit, hours);
   const waitingFor =
     d.status !== "proposed" ? [] : [
@@ -154,8 +162,16 @@ export function dealView(d: DealWithParties, viewerId: string) {
     waiting_for: waitingFor,
     waiting_for_you: role !== "observer" && waitingFor.includes(role),
     meetup: delivering
-      ? { place: null, availability: null, hub_point: null }
-      : { place: hub ? hubPlace(hub) : d.meetup, availability: d.availability, hub_point: hub && { ...hub, demo: true } },
+      ? { place: null, availability: null, hub_point: null, point: null }
+      : {
+          place: point ? `${point.name} (demo location)` : hub ? hubPlace(hub) : d.meetup,
+          availability: d.availability,
+          hub_point: hub && { ...hub, demo: true },
+          point: point && {
+            point_id: point.id, name: point.name, area: point.area, demo: true as const,
+            ...arrivalView(d.meetup_status ?? "chosen", d.meetup_both_here_at ?? null, arrivals(d.meetup_arrivals), viewerId),
+          },
+        },
     handoff: d.kind === "item" ? (delivering ? ("delivery" as const) : ("meetup" as const)) : null,
     delivery: d.kind === "item" && quote ? deliveryView(quote, delivering, delivering ? d.delivery_ref : null) : null,
     pickup: d.kind === "service" ? d.pickup : null,
@@ -166,6 +182,9 @@ export function dealView(d: DealWithParties, viewerId: string) {
     updated_at: iso(d.updated_at)!,
   };
 }
+
+/** Arrivals as JSON from the deal query (a string on drivers that leave json unparsed). */
+const arrivals = (v: ArrivalRow[] | string | null | undefined): ArrivalRow[] => (typeof v === "string" ? JSON.parse(v) : v ?? []);
 
 /** How the agreed price compares with the typical range for the offer. */
 function priceCheck(d: DealWithParties, price: number) {

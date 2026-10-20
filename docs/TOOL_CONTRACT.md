@@ -249,6 +249,40 @@ can't wait, it's about $110 new on Amazon." The Hub points in
 `data/seed-listings.json` (`areas`) are made-up demo data and come back with
 `demo: true`; replace them with verified meeting points before using real locations.
 
+## PairUp Points (Ring)
+
+A PairUp Point is a small unstaffed hand-off spot watched by one Ring doorbell
+or camera ([points.ts](../src/market/points.ts), points in
+`data/pairup-points.json`, demo locations returned with `demo: true`).
+
+| Tool | Does |
+|---|---|
+| `list_meetup_points` (read) | `{ area? }` → `points[]`: `point_id`, `name`, `area`, `hours`, `ring_device` (a Ring device confirms arrivals), `demo` |
+| `choose_meetup_point` (write, MCP Apps view) | `{ deal_id?, point_id? }` on a proposed or confirmed deal; without `point_id`, the point in both people's area, else in either. Sets `deal.meetup.place` and starts the arrivals over. Error codes `no_open_deal`, `unknown_point`, `no_point_nearby` |
+| `check_in_at_point` (write, MCP Apps view) | `{ deal_id? }` on a confirmed deal at a point ("I'm here"). Records the arrival, reads the point device's Ring Event History, returns `arrival` and `ring` (`device`, `checked`, `error`). Error codes `no_meetup`, `deal_not_confirmed` |
+
+An arrival is `confirmed` when the point's Ring device recorded a presence event
+within ten minutes of the check-in: a doorbell press (`button_press`, history
+`ding`) or a person (`motion_detected` with `sub_type` `human` or `motion`,
+history `motion`). Vehicles and packages never count. With `RING_SANDBOX=true`
+the Ring Playground's simulated live views (`on_demand`) count too. When both
+arrivals are confirmed, `deal.meetup.point.status` is `both_here` and both
+people hear it through `deals://me`.
+
+`deal.meetup.point`: `point_id`, `name`, `area`, `demo`, `status`
+(`chosen` | `one_here` | `both_here`), `you` and `them` (`not_here` |
+`checked_in` | `confirmed`), `both_here_at`.
+
+PairUp reaches Ring from the server in two ways: `GET /v1/devices` and
+`GET /v1/history/devices/{id}/events` on `https://api.amazonvision.com` with
+`RING_ACCESS_TOKEN` (a Playground token lasts 30 minutes), and Ring webhooks at
+`POST /api/ring/webhook` (on when `RING_HMAC_KEY` is set; `X-Signature:
+sha256=<HMAC-SHA256 of the raw body>` is checked before the body is used).
+`RING_POINT_DEVICES=pt_uw_hub=<device id>` links points to devices;
+`npm run ring:probe` lists them. PairUp stores only the event id, type and time
+of presence events from point devices, for 24 hours, and check-ins for 30 days.
+It requests no video, snapshots or audio.
+
 ## Learning to pair better
 
 Every deal the engine proposes records its features

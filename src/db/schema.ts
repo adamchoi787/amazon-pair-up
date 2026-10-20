@@ -313,4 +313,41 @@ CREATE TABLE IF NOT EXISTS device_tokens (
   last_used_at  TIMESTAMPTZ,
   revoked       BOOLEAN NOT NULL DEFAULT FALSE
 );
+
+-- PairUp Points (src/market/points.ts): unstaffed hand-off spots watched by one
+-- Ring device. meetups: the point a deal's two people chose. meetup_arrivals:
+-- each side's "I'm here", confirmed by a Ring doorbell press or person event at
+-- the point within ten minutes (kept 30 days). ring_events: only the type and
+-- time of presence events from point devices, never media (kept 24 hours).
+CREATE TABLE IF NOT EXISTS meetups (
+  deal_id       TEXT PRIMARY KEY REFERENCES deals(id),
+  point_id      TEXT NOT NULL,
+  chosen_by     TEXT NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'chosen',   -- chosen | one_here | both_here
+  both_here_at  TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS meetup_arrivals (
+  deal_id          TEXT NOT NULL REFERENCES deals(id),
+  user_id          TEXT NOT NULL REFERENCES users(id),
+  checked_in_at    TIMESTAMPTZ NOT NULL,
+  ring_event_id    TEXT,
+  ring_event_at    TIMESTAMPTZ,
+  ring_event_type  TEXT,
+  verified_at      TIMESTAMPTZ,
+  PRIMARY KEY (deal_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS ring_events (
+  id           TEXT PRIMARY KEY,                -- Ring's event id
+  device_id    TEXT NOT NULL,
+  point_id     TEXT NOT NULL,
+  event_type   TEXT NOT NULL,                   -- button_press | motion_detected | ding | motion | on_demand
+  sub_type     TEXT,
+  occurred_at  TIMESTAMPTZ NOT NULL,
+  source       TEXT NOT NULL,                   -- webhook | history
+  request_id   TEXT,
+  received_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ring_events_point_idx ON ring_events (point_id, occurred_at);
 `;

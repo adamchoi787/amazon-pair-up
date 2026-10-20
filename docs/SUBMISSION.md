@@ -46,6 +46,10 @@ The test suite covers matching, pricing, privacy, scheduling, OAuth, MCP transpo
 ### What's next
 Run the UW pilot, measure task success and points of confusion, then open the next Seattle campuses and neighborhoods. Connect the Amazon Hub locator and live retail prices in place of the demo lists.
 
+## Ring track text
+
+**PairUp Point: safe hand-offs with one Ring doorbell and no staff.** Some people would rather not meet a stranger from the internet. On PairUp they pick a PairUp Point for their deal: a small unstaffed spot near the HUB on the UW campus, watched by one Ring doorbell. Each person presses the doorbell on arrival and tells PairUp “I'm here”. PairUp reads the point's Ring Event History through the Ring Partner API, accepts signed Ring webhooks, and confirms each arrival from a doorbell press or a person event within ten minutes. When Ring has confirmed both, the deal card and both voices say “Both here. Go ahead with the hand-off.” The rule is deterministic and privacy-first: PairUp keeps only the type and time of presence events, for 24 hours. Categories: access control and IoT. Code: `src/ring/`, `src/market/points.ts`, `test/points.test.ts`.
+
 ## AWS Builder answer
 
 - **Bedrock Titan Text Embeddings V2:** offer, request and reference-price embeddings for semantic retrieval with pgvector.
@@ -74,6 +78,7 @@ Run the UW pilot, measure task success and points of confusion, then open the ne
 | AgentCore Runtime SDK | Runtime entry point and session/stream contract | Local invocation needed headers the README example omits (friction log) | Packaged and tested locally |
 | AWS hosting tools | CloudFormation and SSM release scripts | Git Bash argument rewriting and DLM validation errors (friction log) | Deploys run from one script |
 | Bee | The need-snippet interface and bridge (CLI stream, API poll, replay) | A replay format in the docs would make offline testing easier | The bridge is ready for live Bee data |
+| Ring Partner API and Playground | One-click Playground tokens and the documented JSON:API shapes made the client quick to write; HMAC webhook signing is simple to verify | The Playground simulates live views only, so doorbell presses and person events come from a device, and webhooks need a full app with an HMAC key; a webhook test sender in the Playground would close that gap | PairUp Points read Event History today and add webhooks with an app |
 
 ## Final submission checks
 
@@ -86,5 +91,6 @@ Run the UW pilot, measure task success and points of confusion, then open the ne
 - [ ] Open Source contribution URL, project URL and contributing username supplied.
 - [ ] Friction entries included.
 - [ ] Pilot results added if the UW pilot has run ([USER_VALIDATION.md](USER_VALIDATION.md)).
-- [ ] Bee track entered only with real Bee-recorded data.
+- [ ] Bee track entered only with live data recorded through a Bee device or an Apple Watch running Bee software (the replay file and the iOS Shortcut path are demo aids).
+- [ ] Ring: the video shows PairUp reading the Ring Playground (or a device) and confirming both arrivals; check in the rules how a second primary track is declared.
 - [ ] Hosted endpoint kept available through judging; submitted before the deadline.

@@ -69,7 +69,7 @@ test("a buyer switches a deal to Amazon Hub delivery; the seller confirms again"
   assert.equal(ship.deal.delivery.selected, true);
   assert.equal(ship.deal.price, 12, "the settled price stays");
   assert.equal(ship.deal.total, 17.99, "price plus the delivery fee");
-  assert.deepEqual(ship.deal.meetup, { place: null, availability: null, hub_point: null });
+  assert.deepEqual(ship.deal.meetup, { place: null, availability: null, hub_point: null, point: null });
   assert.equal(ship.deal.seller_confirmed, false, "a drop-off needs the seller's yes again");
   assert.equal(ship.say,
     "Switched to Amazon Hub delivery. Amazon Hub delivery: drop-off at Amazon Hub Counter, Northgate Station level 2, " +

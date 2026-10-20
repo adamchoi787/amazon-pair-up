@@ -149,7 +149,7 @@ npm run reset        # create tables + load seed listings
 npm start            # web app on http://127.0.0.1:3000/, MCP server at /mcp, operations dashboard at /dashboard/
 npm run smoke        # (second terminal) plays the TI-84 demo over real MCP
 npm run check:release # read-only comparison of the running release and this checkout
-npm test             # 150 unit + end-to-end tests (in-memory Postgres + pgvector)
+npm test             # 155 unit + end-to-end tests (in-memory Postgres + pgvector)
 npm run simulate     # the learning loop on a simulated market, day by day
 cd agents/agentcore && npm install && npm test   # the Strands agent against a real server
 ```
