@@ -217,7 +217,8 @@ Resources:
   DailySnapshots:
     Type: AWS::DLM::LifecyclePolicy
     Properties:
-      Description: AmazonPairUp daily EBS snapshots, kept for 7 days
+      # DLM allows only letters, digits, spaces, "_" and "-" here
+      Description: AmazonPairUp daily EBS snapshots kept for 7 days
       State: ENABLED
       ExecutionRoleArn: !GetAtt SnapshotRole.Arn
       PolicyDetails:
