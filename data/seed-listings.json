@@ -1,5 +1,5 @@
 {
-  "_note": "Owner: C. Grow to ~200 realistic listings. min_price is the seller's PRIVATE reserve. Keep the demo's TI-84 OUT of here — the seller creates it live in the video.",
+  "_note": "Offers for the seed market: items for sale and services on offer (kind: service, price_unit: job or hour). min_price is the PRIVATE minimum. Keep the demo posts out of here (the TI-84 and the campus lunch runs): they are created live in the video and by npm run smoke.",
   "users": [
     { "id": "u_mei", "display_name": "Mei", "home_area": "HKUST campus" },
     { "id": "u_jason", "display_name": "Jason", "home_area": "Hang Hau station" },
@@ -34,6 +34,12 @@
     { "seller": "u_tom", "title": "Portable phone power bank 10000mAh", "description": "USB-C and USB-A output.", "category": "charger", "condition": "good", "ask_price": 11, "min_price": 8, "location": "Sai Kung" },
     { "seller": "u_mei", "title": "Lab coat, size M", "description": "Worn for one semester of chem lab.", "category": "clothing", "condition": "good", "ask_price": 6, "min_price": 4, "location": "HKUST campus" },
     { "seller": "u_jason", "title": "Safety goggles", "description": "Anti-fog, for lab use.", "category": "lab", "condition": "like_new", "ask_price": 3, "min_price": 2, "location": "Hang Hau station" },
-    { "seller": "u_priya", "title": "HDMI cable 2m", "description": "4K capable.", "category": "charger", "condition": "good", "ask_price": 3, "min_price": 2, "location": "HKUST campus" }
+    { "seller": "u_priya", "title": "HDMI cable 2m", "description": "4K capable.", "category": "charger", "condition": "good", "ask_price": 3, "min_price": 2, "location": "HKUST campus" },
+    { "seller": "u_ken", "kind": "service", "price_unit": "job", "title": "Dinner runs to the halls", "description": "I'll pick up dinner from any campus restaurant and bring it to your hall.", "category": "delivery", "ask_price": 5, "min_price": 4, "location": "HKUST campus", "availability": "weekdays 6-9pm" },
+    { "seller": "u_mei", "kind": "service", "price_unit": "job", "title": "Parcel pickup from the campus mailroom", "description": "I collect your parcel and drop it at your hall or office.", "category": "delivery", "ask_price": 3, "min_price": 2, "location": "HKUST campus", "availability": "weekdays 12-2pm" },
+    { "seller": "u_ana", "kind": "service", "price_unit": "job", "title": "Grocery runs from Hang Hau", "description": "Send me your list; I shop at Hang Hau and deliver to Tseung Kwan O or campus.", "category": "delivery", "ask_price": 6, "min_price": 5, "location": "Tseung Kwan O", "availability": "evenings" },
+    { "seller": "u_priya", "kind": "service", "price_unit": "hour", "title": "Event helper: setup, registration, ushering", "description": "Experienced with club events and conferences. Can bring a friend.", "category": "event", "ask_price": 11, "min_price": 9, "location": "HKUST campus", "availability": "weekends" },
+    { "seller": "u_tom", "kind": "service", "price_unit": "hour", "title": "Moving help with a trolley", "description": "Boxes, furniture, moving between halls or flats.", "category": "moving", "ask_price": 12, "min_price": 10, "location": "Sai Kung", "availability": "weekends" },
+    { "seller": "u_jason", "kind": "service", "price_unit": "hour", "title": "Calculus and physics tutoring", "description": "Year 1 and 2 courses, homework help, exam prep.", "category": "tutoring", "ask_price": 15, "min_price": 12, "location": "Hang Hau station", "availability": "weeknights" }
   ]
 }

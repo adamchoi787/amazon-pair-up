@@ -276,8 +276,8 @@ function signInPage(params: Record<string, string>, purpose: OAuthClient["purpos
     .map((k) => `<input type="hidden" name="${k}" value="${esc(params[k])}">`)
     .join("");
   const [title, intro, button] = purpose === "alexa"
-    ? ["Link AmazonPairUp to Alexa", "Sign in so Alexa can buy and sell for you.", "Link account"]
-    : ["Sign in to AmazonPairUp", "Sign in to buy and sell with people nearby, by voice.", "Sign in"];
+    ? ["Link AmazonPairUp to Alexa", "Sign in so Alexa can buy, sell and find help for you.", "Link account"]
+    : ["Sign in to AmazonPairUp", "Sign in to buy, sell and get help from people nearby, by voice.", "Sign in"];
   return page(
     title,
     `<p>${intro} Your private price limits are never shown to other people.</p>

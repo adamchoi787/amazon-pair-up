@@ -6,7 +6,7 @@ import { createMockAi, mockEmbed } from "../src/ai/mock.js";
 import { createApp } from "../src/app.js";
 import { config, type Config } from "../src/config.js";
 import { openDb, type Db } from "../src/db/client.js";
-import { createBuyIntent, createListing, MarketError, type Deps } from "../src/market/service.js";
+import { postRequest, postOffer, MarketError, type Deps } from "../src/market/service.js";
 
 // Production policy: HTTP rate limits, dashboard access, posting limits, and
 // untrusted model output.
@@ -70,15 +70,15 @@ test("behind a CDN, only requests with the origin secret reach the app", async (
 
 test("posting limits stop floods and budget probing", async () => {
   const deps: Deps = { db, ai: createMockAi(DIM), cfg: { matchThreshold: 0.35, postsPerHour: 3, maxOpenRequests: 2 } };
-  await createBuyIntent(deps, { user_id: "prober", need: "rice cooker", max_price: 10 });
-  await createBuyIntent(deps, { user_id: "prober", need: "rice cooker", max_price: 11 });
-  await assert.rejects(createBuyIntent(deps, { user_id: "prober", need: "rice cooker", max_price: 12 }), (e: Error) =>
+  await postRequest(deps, { user_id: "prober", need: "rice cooker", max_price: 10 });
+  await postRequest(deps, { user_id: "prober", need: "rice cooker", max_price: 11 });
+  await assert.rejects(postRequest(deps, { user_id: "prober", need: "rice cooker", max_price: 12 }), (e: Error) =>
     e instanceof MarketError && /open requests/.test(e.message));
 
-  await createListing(deps, { user_id: "flooder", title: "Thing one", ask_price: 5 });
-  await createListing(deps, { user_id: "flooder", title: "Thing two", ask_price: 5 });
-  await createListing(deps, { user_id: "flooder", title: "Thing three", ask_price: 5 });
-  await assert.rejects(createListing(deps, { user_id: "flooder", title: "Thing four", ask_price: 5 }), (e: Error) =>
+  await postOffer(deps, { user_id: "flooder", title: "Thing one", ask_price: 5 });
+  await postOffer(deps, { user_id: "flooder", title: "Thing two", ask_price: 5 });
+  await postOffer(deps, { user_id: "flooder", title: "Thing three", ask_price: 5 });
+  await assert.rejects(postOffer(deps, { user_id: "flooder", title: "Thing four", ask_price: 5 }), (e: Error) =>
     e instanceof MarketError && /posted a lot/.test(e.message));
 });
 

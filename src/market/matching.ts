@@ -3,7 +3,8 @@ import type { BuyIntentRow, ListingRow } from "./types.js";
 
 // Hybrid retrieval in one SQL query, run in both directions (request → listings
 // and listing → waiting requests) with the same constraints and the same score:
-//   1. hard constraints  — available, not your own, enough quantity, condition >= wanted,
+//   1. hard constraints  — available, not your own, same kind (item or service)
+//                          and price unit, enough quantity, condition >= wanted (items),
 //                          a deal is possible (seller min <= buyer max; evaluated
 //                          server-side, never exposed), request not expired, and
 //                          the pair was not declined or left to expire before
@@ -45,7 +46,7 @@ const toScores = <T extends Scores>(r: T): T => ({
   score: Number(r.score),
 });
 
-/** Listings that could serve this buy request, best first. Uses the request's stored embedding. */
+/** Offers that could serve this request, best first. Uses the request's stored embedding. */
 export async function findMatchesForIntent(
   db: Db,
   intent: BuyIntentRow,
@@ -70,9 +71,10 @@ export async function findMatchesForIntent(
       FROM listings l, q
       WHERE l.status = 'active'
         AND l.seller_id <> $3
+        AND l.kind = $9 AND l.price_unit = $10
         AND l.quantity >= $4
         AND l.min_price <= $2
-        AND ${rank("l.condition")} >= ${rank("$6")}
+        AND (l.kind = 'service' OR ${rank("l.condition")} >= ${rank("$6")})
         AND l.embedding IS NOT NULL
         AND NOT EXISTS (SELECT 1 FROM deals d
                         WHERE d.listing_id = l.id AND d.buy_intent_id = $1 AND d.status IN ('declined', 'expired'))
@@ -83,12 +85,15 @@ export async function findMatchesForIntent(
     ORDER BY score DESC, created_at ASC
     LIMIT $7
     `,
-    [intent.id, intent.max_price, intent.buyer_id, intent.quantity, intent.location, intent.min_condition, opts.limit, opts.threshold],
+    [
+      intent.id, intent.max_price, intent.buyer_id, intent.quantity, intent.location, intent.min_condition,
+      opts.limit, opts.threshold, intent.kind, intent.price_unit,
+    ],
   );
   return rows.map(toScores);
 }
 
-/** Waiting buy requests this (stored) listing satisfies, best first. */
+/** Waiting requests this (stored) offer satisfies, best first. */
 export async function findIntentsForListing(
   db: Db,
   listingId: string,
@@ -113,9 +118,10 @@ export async function findIntentsForListing(
       WHERE l.id = $1
         AND i.status = 'open'
         AND i.buyer_id <> l.seller_id
+        AND l.kind = i.kind AND l.price_unit = i.price_unit
         AND l.quantity >= i.quantity
         AND l.min_price <= i.max_price
-        AND ${rank("l.condition")} >= ${rank("i.min_condition")}
+        AND (l.kind = 'service' OR ${rank("l.condition")} >= ${rank("i.min_condition")})
         AND l.embedding IS NOT NULL
         AND i.embedding IS NOT NULL
         AND (i.needed_by IS NULL OR i.needed_by > now())

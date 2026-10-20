@@ -94,6 +94,11 @@ text, images and video alone, so the video and description carry most of the wei
 - Seller gets told when a buyer is paired; status and recall work by voice.
 
 **Potential Impact**
+- One market for things and services (Oct 20): errands and delivery ("find
+  someone to pick up my lunch", fee to the person who walks) and one-time jobs
+  ("a helper for Saturday 2-6pm, $10 an hour") run on the same pairing,
+  private-limit negotiation and two-sided yes. This widens the market from
+  occasional resale to daily needs, which is the strongest growth story.
 - A specific first audience (HKUST campus), why voice removes the friction, and
   how it grows (neighbourhoods, then any Alexa+ household).
 - Real evidence: a short classmate poll or interviews. Use only real numbers.

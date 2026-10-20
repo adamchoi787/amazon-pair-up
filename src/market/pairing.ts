@@ -4,7 +4,8 @@ import { findIntentsForListing, findMatchesForIntent } from "./matching.js";
 import { negotiate } from "./negotiation.js";
 import { num, type BuyIntentRow, type DealRow, type ListingRow } from "./types.js";
 
-// The pairing engine. Listings and buy requests are both standing posts: when
+// The pairing engine. Offers (listings) and requests (buy intents) are both
+// standing posts, for an item or a service: when
 // either side posts, the engine pairs it with the best counterpart a deal is
 // possible with, negotiates inside both private limits, and opens a proposed
 // deal. A post with no counterpart waits and is paired when one arrives.
@@ -12,8 +13,9 @@ import { num, type BuyIntentRow, type DealRow, type ListingRow } from "./types.j
 // Invariants:
 //   - a listing is in at most one proposed deal (status 'pending' while held)
 //   - a buy request is in at most one proposed deal (status 'matched' while held)
-//   - a hold lasts `holdHours`; an unanswered deal then expires and both posts
-//     are re-paired
+//   - a hold lasts `holdHours`, or until the request's deadline when that comes
+//     first (a lunch run can't wait a day); an unanswered deal then expires and
+//     both posts are re-paired
 //   - a declined or expired listing/request pair is never proposed again
 //   - expired requests (needed_by in the past) are not paired
 
@@ -89,10 +91,13 @@ export async function propose(
      hold_listing AS (UPDATE listings SET status = 'pending' WHERE id = $2 AND EXISTS (SELECT 1 FROM ok) RETURNING id),
      hold_intent  AS (UPDATE buy_intents SET status = 'matched' WHERE id = $3 AND EXISTS (SELECT 1 FROM ok) RETURNING id)
      INSERT INTO deals (id, listing_id, buy_intent_id, price, currency, seller_confirmed, meetup, expires_at)
-     SELECT $1, $2, $3, $4, $5, $6, $7, now() + make_interval(secs => $8)
+     SELECT $1, $2, $3, $4, $5, $6, $7, LEAST(now() + make_interval(secs => $8), $9::timestamptz)
      WHERE EXISTS (SELECT 1 FROM hold_listing) AND EXISTS (SELECT 1 FROM hold_intent)
      RETURNING *`,
-    [shortId("deal"), listing.id, intent.id, result.price, listing.currency, listing.auto_accept, listing.location, s.holdHours * 3600],
+    [
+      shortId("deal"), listing.id, intent.id, result.price, listing.currency, listing.auto_accept,
+      meetingPlace(listing, intent), s.holdHours * 3600, intent.needed_by,
+    ],
   );
   const deal = rows[0];
   if (!deal) return null;
@@ -102,6 +107,10 @@ export async function propose(
   });
   return deal;
 }
+
+/** Items change hands where the seller is; a service happens where the requester needs it. */
+const meetingPlace = (listing: ListingRow, intent: BuyIntentRow) =>
+  listing.kind === "service" ? intent.location ?? listing.location : listing.location;
 
 /**
  * End a proposed deal without closing it. By default both posts go back on the

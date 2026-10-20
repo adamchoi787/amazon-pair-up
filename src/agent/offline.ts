@@ -6,9 +6,10 @@ import {
 
 // Deterministic assistant for running without AWS. Same contract as the Bedrock
 // step: look at the conversation, then either request MCP tool calls or reply.
-// It understands the core voice flows: selling, buying, yes/no on an offer,
-// more options, news, listing and withdrawing posts, and short follow-ups when
-// a price or budget was missing.
+// It understands the core voice flows: selling an item, offering a service,
+// asking for an item or for help, yes/no on an offer, more options, news,
+// listing and withdrawing posts, and short follow-ups when a price or budget
+// was missing.
 
 type Json = Record<string, unknown>;
 type Step = { content: Block[]; stop: "tool_use" | "end_turn" };
@@ -20,14 +21,19 @@ const call = (name: string, input: Json, text?: string): Step => ({
 });
 
 const HELP =
-  "You can say things like: sell my TI-84 for 20 dollars, I'll take anything above 15. Or: I need a graphing calculator, maximum 18 dollars.";
+  "You can say things like: sell my TI-84 for 20 dollars, I'll take anything above 15. Or: I need a graphing calculator, maximum 18 dollars. " +
+  "Or: find someone to pick up my lunch from LG7 to Hall 5 by 12:30, 5 dollars. Or: I can do lunch runs on campus for 4 dollars a run.";
 
 const MONEY = String.raw`(?:hk)?\$?\s*(\d+(?:\.\d{1,2})?)`;
+const MIN = String.raw`\b(?:above|over|at least|down to|as low as|minimum(?: of)?|min|no less than|lowest(?: is)?)\s+(?:of\s+)?${MONEY}`;
+const HOURLY = /\/\s*h(?:ou)?r\b|\bper hour\b|\ban hour\b|\bhourly\b/i;
+const PLACE = /\b(?:on|at|near|around)\s+((?:[A-Z][\w-]*\s)?campus|[\w-]+(?:\s[\w-]+)?\s(?:campus|station|library|hall))\b/i;
 const amount = (re: RegExp, text: string) => {
   const m = text.match(re);
   return m ? Number(m[1]) : undefined;
 };
 const anyAmount = (text: string) => amount(new RegExp(MONEY, "i"), text);
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 const CONDITIONS: [RegExp, string][] = [
   [/\bbrand[- ]new\b|\bsealed\b|\bunopened\b/i, "new"],
@@ -62,12 +68,14 @@ function afterTools(messages: AgentMessage[], results: ToolResultBlock[]): Step 
 // ---------- on the user's words ----------
 
 const DECLINE = /^\s*(no|nope|nah|decline|pass|not (that|this)( one)?|cancel (it|that|the deal))\b/i;
-export const WITHDRAW = /\b(take down|remove|withdraw|delete|cancel)\b.*\b(listing|request|post|my|the)\b/i;
-const MY_POSTS = /\b(what am i (selling|looking for)|my (listings|posts|requests|items)|what (have|did) i (list|post)(ed)?)\b/i;
-const STATUS = /\b(news|status|my deals?|any (offers|deals|buyers|sellers|updates)|anyone|anybody|meet-?up|did (anyone|someone|anybody)|who (bought|is buying)|inbox|what'?s new)\b/i;
+export const WITHDRAW = /\b(take down|remove|withdraw|delete|cancel)\b.*\b(listing|offer|request|post|my|the)\b/i;
+const MY_POSTS = /\b(what am i (selling|offering|looking for)|my (listings|offers|posts|requests|items)|what (have|did) i (list|post|offer)(ed)?)\b/i;
+const STATUS = /\b(news|status|my (deals?|jobs?)|any (offers|deals|buyers|sellers|jobs|updates)|meet-?up|did (anyone|someone|anybody)|has (anyone|anybody)|who (bought|is buying)|inbox|what'?s new)\b/i;
 const MORE = /\b((more|other) (options|ones|choices)|what else|anything else|show me (more|others|alternatives)|alternatives)\b/i;
 const SELL = /\b(sell|selling|list my|get rid of)\b/i;
-const BUY = /\b(need|want|looking for|buy|find( me)?|get me|is anyone selling|does anyone have)\b/i;
+// "I can do lunch runs on campus", "I'm free on Saturday to help at events"
+const OFFER = /\b(?:i can|i could|i'?m (?:available|free|happy)\b.*?\bto|i offer|offering)\s+\S/i;
+const BUY = /\b(need|want|looking for|buy|find( me)?|get me|hire|book|is anyone selling|does anyone have)\b/i;
 
 function onUtterance(messages: AgentMessage[], text: string): Step {
   if (!text) return reply(HELP);
@@ -76,9 +84,11 @@ function onUtterance(messages: AgentMessage[], text: string): Step {
   const asked = previousAssistantText(messages);
   const askedPrice = asked.match(/How much do you want for "(.+)"\?/);
   if (askedPrice && anyAmount(text) !== undefined) return sell(`sell my ${askedPrice[1]} for $${anyAmount(text)}. ${text}`);
+  const askedRate = asked.match(/How much do you charge for "(.+)"\?/);
+  if (askedRate && anyAmount(text) !== undefined) return offerService(`I can do ${askedRate[1]} for $${anyAmount(text)}. ${text}`);
   const budgetFor = pendingBudgetRequest(messages);
   if (budgetFor && anyAmount(text) !== undefined && !SELL.test(text)) {
-    return call("create_buy_intent", { raw_request: budgetFor, max_price: anyAmount(text) });
+    return call("post_request", { raw_request: budgetFor, max_price: anyAmount(text) });
   }
 
   if (DECLINE.test(text)) {
@@ -92,11 +102,12 @@ function onUtterance(messages: AgentMessage[], text: string): Step {
   if (WITHDRAW.test(text) || MY_POSTS.test(text)) return call("list_my_posts", {});
   if (STATUS.test(text)) return call("get_deal_status", {});
   if (MORE.test(text)) {
-    const intent = latestIntent(messages);
-    return intent ? call("find_matches", { intent_id: intent, limit: 4 }) : reply("What are you looking for?");
+    const request = latestRequest(messages);
+    return request ? call("find_matches", { request_id: request, limit: 4 }) : reply("What are you looking for?");
   }
   if (SELL.test(text)) return sell(text);
-  if (BUY.test(text)) return call("create_buy_intent", { raw_request: text });
+  if (OFFER.test(text)) return offerService(text);
+  if (BUY.test(text)) return call("post_request", { raw_request: text });
   return reply(HELP);
 }
 
@@ -107,15 +118,35 @@ function sell(text: string): Step {
   if (!title) return reply("What would you like to sell?");
   const ask = amount(new RegExp(String.raw`\bfor\s+${MONEY}`, "i"), text);
   if (ask === undefined) return reply(`How much do you want for "${title}"?`);
-  const min = amount(new RegExp(String.raw`\b(?:above|over|at least|down to|as low as|minimum(?: of)?|min|no less than|lowest(?: is)?)\s+(?:of\s+)?${MONEY}`, "i"), text);
-  const location = text.match(/\b(?:on|at|near|around)\s+((?:[A-Z][\w-]*\s)?campus|[\w-]+(?:\s[\w-]+)?\s(?:campus|station|library|hall))\b/i)?.[1];
+  const min = amount(new RegExp(MIN, "i"), text);
+  const location = text.match(PLACE)?.[1];
   const condition = CONDITIONS.find(([re]) => re.test(text))?.[1];
-  return call("create_listing", {
-    title: title.charAt(0).toUpperCase() + title.slice(1),
+  return call("post_offer", {
+    title: capitalize(title),
     ask_price: ask,
     ...(min !== undefined && min <= ask ? { min_price: min } : {}),
     ...(location ? { location } : {}),
     ...(condition ? { condition } : {}),
+  });
+}
+
+/** "I can do lunch runs around campus for $4 a run, at least $3." */
+function offerService(text: string): Step {
+  const task = text
+    .match(new RegExp(String.raw`\b(?:i can|i could|i'?m (?:available|free|happy)\b.*?\bto|i offer|offering(?: to)?)\s+(?:do\s+)?(.+?)(?=\s+for\s+${MONEY}|\s*[,.;!?]|\s+(?:at least|minimum|min)\b|$)`, "i"))?.[1]
+    ?.trim();
+  if (!task) return reply("What can you do for people?");
+  const ask = amount(new RegExp(String.raw`\bfor\s+${MONEY}`, "i"), text) ?? anyAmount(text);
+  if (ask === undefined) return reply(`How much do you charge for "${task}"?`);
+  const min = amount(new RegExp(MIN, "i"), text);
+  const location = text.match(PLACE)?.[1];
+  return call("post_offer", {
+    kind: "service",
+    title: capitalize(task),
+    price_unit: HOURLY.test(text) ? "hour" : "job",
+    ask_price: ask,
+    ...(min !== undefined && min <= ask ? { min_price: min } : {}),
+    ...(location ? { location } : {}),
   });
 }
 
@@ -156,11 +187,11 @@ function* resultsNewestFirst(messages: AgentMessage[]) {
   }
 }
 
-/** If the last thing that happened was a buy request rejected for lack of a budget, its words. */
+/** If the last thing that happened was a request rejected for lack of a budget, its words. */
 function pendingBudgetRequest(messages: AgentMessage[]) {
   for (const r of resultsNewestFirst(messages)) {
-    if (r.tool === "create_buy_intent" && r.status === "error" && /most you'd pay/.test(String(r.data.say))) {
-      for (const m of messages) for (const b of m.content) if (isToolUse(b) && b.toolUse.name === "create_buy_intent") {
+    if (r.tool === "post_request" && r.status === "error" && /most you'd pay/.test(String(r.data.say))) {
+      for (const m of messages) for (const b of m.content) if (isToolUse(b) && b.toolUse.name === "post_request") {
         const raw = b.toolUse.input.raw_request;
         if (typeof raw === "string") return raw;
       }
@@ -182,9 +213,10 @@ function latestOpenDeal(messages: AgentMessage[], mustAwaitUser: boolean) {
   return undefined;
 }
 
-function latestIntent(messages: AgentMessage[]) {
+function latestRequest(messages: AgentMessage[]) {
   for (const r of resultsNewestFirst(messages)) {
-    const id = (r.data as { intent?: { intent_id?: string }; intent_id?: string }).intent?.intent_id ?? (r.data as { intent_id?: string }).intent_id;
+    const d = r.data as { request?: { request_id?: string }; request_id?: string };
+    const id = d.request?.request_id ?? d.request_id;
     if (id) return id;
   }
   return undefined;
@@ -195,10 +227,10 @@ const words = (s: string) => new Set(s.toLowerCase().match(/[a-z0-9]+/g) ?? []);
 function pickPost(text: string, data: Json) {
   const said = words(text);
   const live = [
-    ...((data.listings as { listing_id: string; title: string; status: string }[] | undefined) ?? [])
-      .filter((l) => l.status === "active" || l.status === "pending").map((l) => ({ id: l.listing_id, label: l.title })),
-    ...((data.requests as { intent_id: string; need: string; status: string }[] | undefined) ?? [])
-      .filter((i) => i.status === "open" || i.status === "matched").map((i) => ({ id: i.intent_id, label: i.need })),
+    ...((data.offers as { offer_id: string; title: string; status: string }[] | undefined) ?? [])
+      .filter((o) => o.status === "active" || o.status === "pending").map((o) => ({ id: o.offer_id, label: o.title })),
+    ...((data.requests as { request_id: string; need: string; status: string }[] | undefined) ?? [])
+      .filter((r) => r.status === "open" || r.status === "matched").map((r) => ({ id: r.request_id, label: r.need })),
   ];
   const scored = live
     .map((p) => ({ ...p, score: [...words(p.label)].filter((w) => w.length > 1 && said.has(w)).length }))

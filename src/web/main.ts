@@ -25,7 +25,7 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
   return e;
 };
 
-const WRITES = new Set(["create_listing", "create_buy_intent", "negotiate", "confirm_deal", "decline_deal", "withdraw_post"]);
+const WRITES = new Set(["post_offer", "post_request", "negotiate", "confirm_deal", "decline_deal", "withdraw_post"]);
 const MAX_STEPS = 6;
 
 let auth: Auth;
@@ -97,10 +97,16 @@ async function start() {
 
 function greet() {
   const first = auth.name ? auth.name.split(" ")[0] : "";
-  addBubble("assistant", `Hi${first ? ` ${first}` : ""}! Tell me what you want to sell or what you need, and I'll pair you with someone nearby.`);
+  addBubble("assistant", `Hi${first ? ` ${first}` : ""}! Tell me what you need, what you're selling or what you can do for people, and I'll pair you with someone nearby.`);
   const chips = $("suggestions");
   chips.replaceChildren();
-  for (const s of ["Sell my TI-84 for $20, I'll take anything above $15", "I need a graphing calculator today, max $18", "Any news on my deals?", "What am I selling?"]) {
+  for (const s of [
+    "Sell my TI-84 for $20, I'll take anything above $15",
+    "I need a graphing calculator today, max $18",
+    "Find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5",
+    "Get me a helper for the event on Saturday 2-6pm, budget $10/hr",
+    "Any news on my deals?",
+  ]) {
     const b = el("button", "chip", s);
     b.type = "button";
     b.onclick = () => void ask(s);

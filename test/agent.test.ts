@@ -25,7 +25,7 @@ const toolUse = (step: ReturnType<typeof planOffline>) => {
 test("understands selling, with a private minimum, place and condition", () => {
   const use = toolUse(planOffline([user("Sell my TI-84 graphing calculator for $20 on HKUST campus, like new. I'll take anything above $15.")]));
   assert.deepEqual(use && { name: use.name, input: use.input }, {
-    name: "create_listing",
+    name: "post_offer",
     input: { title: "TI-84 graphing calculator", ask_price: 20, min_price: 15, location: "HKUST campus", condition: "like_new" },
   });
 });
@@ -36,28 +36,47 @@ test("asks for a missing price and uses the answer", () => {
   const question = (ask.content[0] as { text: string }).text;
   assert.equal(question, 'How much do you want for "desk lamp"?');
   const use = toolUse(planOffline([user("I want to sell my desk lamp"), { role: "assistant", content: [{ text: question }] }, user("8 dollars")]));
-  assert.equal(use?.name, "create_listing");
+  assert.equal(use?.name, "post_offer");
   assert.deepEqual(use?.input, { title: "Desk lamp", ask_price: 8 });
 });
 
 test("passes buy requests through in the user's own words", () => {
   const use = toolUse(planOffline([user("I need a graphing calculator today, maximum $18")]));
-  assert.deepEqual(use && { name: use.name, input: use.input }, { name: "create_buy_intent", input: { raw_request: "I need a graphing calculator today, maximum $18" } });
+  assert.deepEqual(use && { name: use.name, input: use.input }, { name: "post_request", input: { raw_request: "I need a graphing calculator today, maximum $18" } });
+});
+
+test("understands offering a service, per job or per hour", () => {
+  const runs = toolUse(planOffline([user("I can do lunch runs around campus for $4 a run, at least $3")]));
+  assert.deepEqual(runs && { name: runs.name, input: runs.input }, {
+    name: "post_offer",
+    input: { kind: "service", title: "Lunch runs around campus", price_unit: "job", ask_price: 4, min_price: 3, location: "campus" },
+  });
+  const help = toolUse(planOffline([user("I'm free on Saturday to help at events, $11 an hour, at least $9")]));
+  assert.deepEqual(help?.input, { kind: "service", title: "Help at events", price_unit: "hour", ask_price: 11, min_price: 9 });
+  const ask = planOffline([user("I can walk dogs in Sai Kung")]);
+  assert.equal((ask.content[0] as { text: string }).text, 'How much do you charge for "walk dogs in Sai Kung"?');
+});
+
+test("passes requests for help through in the user's own words", () => {
+  for (const said of ["Find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5", "Get me a guy to help with the upcoming events, budget $10/hr"]) {
+    const use = toolUse(planOffline([user(said)]));
+    assert.deepEqual(use && { name: use.name, input: use.input }, { name: "post_request", input: { raw_request: said } });
+  }
 });
 
 test("yes confirms the offer waiting for the user; no declines it", () => {
   const history: AgentMessage[] = [
     user("I need a lamp, max $10"),
-    { role: "assistant", content: [{ toolUse: { toolUseId: "t1", name: "create_buy_intent", input: { raw_request: "I need a lamp, max $10" } } }] },
+    { role: "assistant", content: [{ toolUse: { toolUseId: "t1", name: "post_request", input: { raw_request: "I need a lamp, max $10" } } }] },
     { role: "user", content: [{ toolResult: { toolUseId: "t1", status: "success", content: [{ json: {
-      intent: { intent_id: "int_1" }, deal: { deal_id: "deal_9", status: "proposed", waiting_for_you: true }, say: "Found it…",
+      request: { request_id: "req_1" }, deal: { deal_id: "deal_9", status: "proposed", waiting_for_you: true }, say: "Found it…",
     } }] } }] },
     { role: "assistant", content: [{ text: "Found it…" }] },
   ];
   assert.deepEqual(toolUse(planOffline([...history, user("Yes, confirm it")]))?.input, { deal_id: "deal_9" });
   assert.equal(toolUse(planOffline([...history, user("Yes, confirm it")]))?.name, "confirm_deal");
   assert.equal(toolUse(planOffline([...history, user("No thanks")]))?.name, "decline_deal");
-  assert.deepEqual(toolUse(planOffline([...history, user("Show me other options")]))?.input, { intent_id: "int_1", limit: 4 });
+  assert.deepEqual(toolUse(planOffline([...history, user("Show me other options")]))?.input, { request_id: "req_1", limit: 4 });
   assert.equal(toolUse(planOffline([user("yes")]))?.name, "get_deal_status", "a yes with nothing pending checks the inbox");
 });
 
@@ -77,11 +96,11 @@ test("take it down: lists the user's posts, then withdraws the one they named", 
     user("Take down my umbrella listing"),
     { role: "assistant", content: first.content },
     { role: "user", content: [{ toolResult: { toolUseId: toolUse(first)!.toolUseId, content: [{ json: {
-      listings: [{ listing_id: "lst_a", title: "Compact travel umbrella", status: "active" }, { listing_id: "lst_b", title: "Desk lamp", status: "active" }],
+      offers: [{ offer_id: "ofr_a", title: "Compact travel umbrella", status: "active" }, { offer_id: "ofr_b", title: "Desk lamp", status: "active" }],
       requests: [], say: "You have two items for sale.",
     } }] } }] },
   ]);
-  assert.deepEqual(toolUse(next)?.input, { post_id: "lst_a" });
+  assert.deepEqual(toolUse(next)?.input, { post_id: "ofr_a" });
 });
 
 test("a deal is never confirmed without the user's explicit yes", () => {
@@ -162,12 +181,27 @@ test("a spoken sale and purchase, end to end through the web app's loop", async 
   assert.equal(card.view, "ui://amazonpairup/market.html", "the result names its MCP Apps view");
   assert.equal((card.data.deal as { price: number }).price, 17);
 
-  assert.equal(await buyer.say("what does it cost?"), "Say things like: sell my TI-84 for 20 dollars, I'll take anything above 15. Or: I need a graphing calculator, maximum 18 dollars.".replace("Say", "You can say"));
+  assert.match(await buyer.say("what does it cost?"), /^You can say things like: sell my TI-84 for 20 dollars/);
   const done = await buyer.say("Yes, confirm it");
   assert.match(done, /^Done! TI-84 graphing calculator for \$17 with u_mei\. Meet-up: HKUST campus\.$/);
   assert.match(await seller.say("Any news on my deals?"), /confirmed with u_ken/);
 
   for (const s of [seller, buyer]) await s.close();
+});
+
+test("a spoken lunch run, end to end: the requester and the runner each say yes", async () => {
+  const runner = await session("u_runner");
+  const hungry = await session("u_hungry");
+
+  assert.match(await runner.say("I can do lunch runs around campus for $4 a run, at least $3"), /^You're on the market: Lunch runs around campus, \$4 a job\./);
+  const offer = await hungry.say("Find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5");
+  assert.equal(offer, "Found someone: u_runner can do it for $3.50, $0.50 below their rate. From LG7 canteen to Hall 5, by 12:30. Should I confirm? u_runner gives the final yes.");
+  assert.equal((hungry.cards.at(-1)!.data.deal as { kind: string }).kind, "service");
+  assert.equal(await hungry.say("Yes"), "Confirmed on your side. I'll let you know when u_runner says yes.");
+
+  assert.match(await runner.say("Any jobs for me?"), /^One deal is waiting for your yes\. Pick up my lunch for u_hungry, \$3\.50/);
+  assert.equal(await runner.say("Yes, I'll take it"), "Booked! Lunch runs around campus with u_hungry, $3.50. From LG7 canteen to Hall 5, by 12:30.");
+  for (const s of [runner, hungry]) await s.close();
 });
 
 test("a buyer who forgets the budget is asked, and the answer completes the request", async () => {
@@ -180,7 +214,7 @@ test("a buyer who forgets the budget is asked, and the answer completes the requ
 test("tools declare the AmazonPairUp MCP Apps view, and the view is served", async () => {
   const s = await session("u_viewer");
   const withUi = s.tools.filter((t) => (t._meta as { ui?: { resourceUri?: string } } | undefined)?.ui?.resourceUri === "ui://amazonpairup/market.html");
-  assert.deepEqual(withUi.map((t) => t.name).sort(), ["confirm_deal", "create_buy_intent", "create_listing", "decline_deal", "find_matches", "get_deal_status", "list_my_posts", "negotiate"]);
+  assert.deepEqual(withUi.map((t) => t.name).sort(), ["confirm_deal", "decline_deal", "find_matches", "get_deal_status", "list_my_posts", "negotiate", "post_offer", "post_request"]);
   const client = new Client({ name: "res", version: "0" });
   await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), { requestInit: { headers: { "X-User-Id": "u_viewer" } } }));
   const { resources } = await client.listResources();
@@ -217,7 +251,7 @@ test("tool results that carry a spoken sentence become the reply directly", asyn
   const { sayFromResults } = await import("../src/agent/index.js");
   const said: AgentMessage[] = [
     user("I need a lamp, max $10"),
-    { role: "assistant", content: [{ toolUse: { toolUseId: "a", name: "create_buy_intent", input: {} } }] },
+    { role: "assistant", content: [{ toolUse: { toolUseId: "a", name: "post_request", input: {} } }] },
     { role: "user", content: [{ toolResult: { toolUseId: "a", content: [{ json: { say: "Found it: Desk lamp for $8." } }] } }] },
   ];
   assert.equal(sayFromResults(said), "Found it: Desk lamp for $8.");

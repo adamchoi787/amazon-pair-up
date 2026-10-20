@@ -29,8 +29,8 @@
 </header>
 <main>
   <section><h2>Deals</h2><ul id="deals"></ul></section>
-  <section><h2>Buy requests</h2><ul id="intents"></ul></section>
-  <section><h2>Listings</h2><ul id="listings"></ul></section>
+  <section><h2>Requests</h2><ul id="intents"></ul></section>
+  <section><h2>Offers</h2><ul id="listings"></ul></section>
   <section><h2>Agent activity</h2><ul id="events"></ul></section>
 </main>
 <script>
@@ -38,17 +38,19 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
 const money = (v, c) => (c === "USD" ? "$" : c + " ") + Number(v).toFixed(Number(v) % 1 ? 2 : 0);
 const time = (t) => new Date(t).toLocaleTimeString();
+const unit = (u) => (u === "hour" ? "/hr" : u === "job" ? " per job" : "");
+const kindTag = (k) => (k === "service" ? `<span class="tag">service</span> ` : "");
 async function refresh() {
   try {
     // Deployed dashboards need DASHBOARD_TOKEN: open the page as /#token=<token>.
     const token = new URLSearchParams(location.hash.slice(1)).get("token");
     const d = await (await fetch("/api/dashboard", { headers: token ? { Authorization: `Bearer ${token}` } : {} })).json();
-    $("deals").innerHTML = d.deals.map((x) => `<li><span class="price">${money(x.price, x.currency)}</span> ${esc(x.title)}
-      <span class="tag ${x.status}">${esc(x.status)}</span><div class="muted">buyer ${esc(x.buyer_id)} · seller ${esc(x.seller_id)} · ${esc(x.meetup ?? "")}</div></li>`).join("") || "<li class=muted>No deals yet</li>";
-    $("intents").innerHTML = d.intents.map((x) => `<li>${esc(x.need)} <span class="tag">${esc(x.source)}</span> <span class="tag">${esc(x.status)}</span>
+    $("deals").innerHTML = d.deals.map((x) => `<li><span class="price">${money(x.price, x.currency)}${unit(x.price_unit)}</span> ${kindTag(x.kind)}${esc(x.title)}
+      <span class="tag ${x.status}">${esc(x.status)}</span><div class="muted">buyer ${esc(x.buyer_id)} · seller ${esc(x.seller_id)} · ${esc([x.pickup, x.meetup].filter(Boolean).join(" → "))}</div></li>`).join("") || "<li class=muted>No deals yet</li>";
+    $("intents").innerHTML = d.intents.map((x) => `<li>${kindTag(x.kind)}${esc(x.need)} <span class="tag">${esc(x.source)}</span> <span class="tag">${esc(x.status)}</span>
       <div class="muted">${esc(x.buyer_id)} · budget <span class="lock">🔒</span> · ${time(x.created_at)}</div></li>`).join("") || "<li class=muted>None</li>";
-    $("listings").innerHTML = d.listings.map((x) => `<li>${esc(x.title)} <span class="price">${money(x.ask_price, x.currency)}</span> <span class="tag">${esc(x.status)}</span>
-      <div class="muted">${esc(x.seller_id)} · ${esc(x.condition)} · ${esc(x.location ?? "")} · reserve <span class="lock">🔒</span></div></li>`).join("");
+    $("listings").innerHTML = d.listings.map((x) => `<li>${kindTag(x.kind)}${esc(x.title)} <span class="price">${money(x.ask_price, x.currency)}${unit(x.price_unit)}</span> <span class="tag">${esc(x.status)}</span>
+      <div class="muted">${esc(x.seller_id)} · ${esc(x.kind === "service" ? "" : x.condition)} · ${esc(x.location ?? "")} · reserve <span class="lock">🔒</span></div></li>`).join("");
     $("events").innerHTML = d.events.map((x) => `<li>${esc(x.kind.replaceAll("_", " "))}<div class="muted">${esc(x.actor_id)} · ${time(x.created_at)} · ${esc(JSON.stringify(x.detail))}</div></li>`).join("");
   } catch (e) { console.error(e); }
 }

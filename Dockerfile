@@ -18,7 +18,8 @@ COPY public ./public
 ENV HOST=0.0.0.0 \
     PORT=3000 \
     PGLITE_DIR=/data/pglite \
-    SEED_ON_START=true
+    SEED_ON_START=true \
+    TZ=Asia/Hong_Kong
 
 RUN mkdir -p /data && chown node:node /data
 USER node

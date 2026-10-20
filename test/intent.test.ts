@@ -19,3 +19,37 @@ test("mock embeddings: related items closer than unrelated", () => {
   const mat = mockEmbed("Yoga mat purple", 512);
   assert.ok(cos(q, ti) > cos(q, mat) + 0.2);
 });
+
+test("reads a request for help: errand route, fee, deadline", () => {
+  const now = new Date(2026, 9, 20, 10, 0); // Tue 20 Oct, 10:00 local
+  const i = mockExtractIntent("find some one to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5", now);
+  assert.equal(i.kind, "service");
+  assert.equal(i.price_unit, "job");
+  assert.equal(i.need, "pick up my lunch");
+  assert.equal(i.category, "delivery");
+  assert.equal(i.max_price, 5);
+  assert.equal(i.pickup, "LG7 canteen");
+  assert.equal(i.location, "Hall 5");
+  assert.equal(i.schedule, "by 12:30");
+  assert.equal(new Date(i.needed_by!).getTime(), new Date(2026, 9, 20, 12, 30).getTime());
+});
+
+test("reads hourly work: rate, day, time window and hours", () => {
+  const now = new Date(2026, 9, 20, 10, 0);
+  const i = mockExtractIntent("get me a guy to help with the event on Saturday 2-6pm, budget $10/hr", now);
+  assert.equal(i.kind, "service");
+  assert.equal(i.price_unit, "hour");
+  assert.equal(i.need, "help with the event");
+  assert.equal(i.max_price, 10);
+  assert.equal(i.hours, 4);
+  assert.equal(i.schedule, "Saturday 2-6pm");
+  assert.equal(new Date(i.needed_by!).getTime(), new Date(2026, 9, 24, 14, 0).getTime());
+  assert.equal(mockExtractIntent("tutor me in calculus tomorrow, $15 an hour for 2 hours", now).hours, 2);
+});
+
+test("items stay items", () => {
+  const i = mockExtractIntent("looking for 3 packs of tissues on campus, under 5 dollars");
+  assert.equal(i.kind, undefined);
+  assert.equal(i.quantity, 3);
+  assert.equal(i.pickup, undefined);
+});

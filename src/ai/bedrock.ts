@@ -11,18 +11,25 @@ import { mockExtractIntent } from "./mock.js";
 // Amazon Bedrock implementation. Credentials come from the standard AWS chain
 // (env vars, ~/.aws, or the IAM role of the host — AgentCore / Lambda / App Runner).
 
-const INTENT_SYSTEM = `You turn a shopper's request (or ambient context about their day) into JSON for a person-to-person marketplace that pairs buyers with sellers.
+const INTENT_SYSTEM = `You turn a person's request (or ambient context about their day) into JSON for a person-to-person marketplace. People ask for things (an item to buy) or for help (someone to do a task: pick up lunch, run an errand, deliver something, help at an event, tutor, help move).
 Return ONLY a JSON object. Include a key only when the request states it; every other key is left out:
-- need: short search phrase for the item, e.g. "graphing calculator" (always include)
-- category: the item's kind as one lowercase word, the most specific common noun, e.g. "calculator", "textbook", "umbrella"
-- max_price: number, the most they will pay
-- min_condition: one of ${CONDITIONS.join(", ")}, only if they mention condition ("like new", "in good condition", "works")
-- quantity: integer, only if they ask for more than one
-- needed_by: ISO 8601 datetime, only if they mention a time ("today" means 23:59 local time today), resolved against the current time given
-- location: a named place they want to meet or pick up, only if they name one
+- need: short search phrase; for an item the item ("graphing calculator"), for help the task ("pick up my lunch") (always include)
+- kind: "service" when they want a person to do a task; leave out for items
+- category: one lowercase word, the most specific common noun; for items e.g. "calculator", "textbook", "umbrella"; for services one of "delivery", "event", "tutoring", "moving", or another single word
+- max_price: number, the most they will pay (per hour when they give an hourly rate)
+- price_unit: services only: "hour" for an hourly rate, "job" for a flat fee for the whole task
+- hours: services only: how many hours the job lasts, when stated or clear from a time range ("2-6pm" is 4)
+- pickup: errands only: where to collect something from
+- location: where to meet, deliver to, or do the job, only if they name a place
+- schedule: services only: when the job happens, short, as said ("today by 12:30", "Saturday 2-6pm")
+- min_condition: items only: one of ${CONDITIONS.join(", ")}, only if they mention condition ("like new", "in good condition", "works")
+- quantity: items only: integer, only if they ask for more than one
+- needed_by: ISO 8601 datetime, only if they mention a time: the deadline for an item ("today" means 23:59 local time today), the start time for a service; resolved against the current time given
 Examples:
 "I need a graphing calculator today, maximum $18" → {"need":"graphing calculator","category":"calculator","max_price":18,"needed_by":"<today 23:59>"}
-"looking for 3 packs of tissues on campus, under 5 dollars" → {"need":"tissues","category":"tissue","max_price":5,"quantity":3,"location":"campus"}`;
+"looking for 3 packs of tissues on campus, under 5 dollars" → {"need":"tissues","category":"tissue","max_price":5,"quantity":3,"location":"campus"}
+"find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5" → {"need":"pick up my lunch","kind":"service","category":"delivery","max_price":5,"price_unit":"job","pickup":"LG7 canteen","location":"Hall 5","schedule":"today by 12:30","needed_by":"<today 12:30>"}
+"get me a guy to help with the event on Saturday 2-6pm, budget $10/hr" → {"need":"help with the event","kind":"service","category":"event","max_price":10,"price_unit":"hour","hours":4,"schedule":"Saturday 2-6pm","needed_by":"<Saturday 14:00>"}`;
 
 // Model output is untrusted: keep each field only if it is valid on its own.
 const FIELDS = {
@@ -33,6 +40,11 @@ const FIELDS = {
   quantity: z.coerce.number().int().positive().max(1000),
   needed_by: z.string().refine((v) => !Number.isNaN(new Date(v).getTime())).transform((v) => new Date(v).toISOString()),
   location: z.string().trim().min(1).max(120),
+  kind: z.enum(["item", "service"]),
+  price_unit: z.enum(["job", "hour"]),
+  hours: z.coerce.number().positive().max(24 * 14),
+  pickup: z.string().trim().min(1).max(120),
+  schedule: z.string().trim().min(1).max(80),
 };
 
 export function sanitizeIntent(raw: unknown, text: string): ExtractedIntent {

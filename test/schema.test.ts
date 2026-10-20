@@ -58,20 +58,20 @@ test("all tool results conform to their declared schemas", async () => {
   const seller = await clientAs("s");
   const buyer = await clientAs("b");
 
-  await seller.call("create_listing", { title: "Scientific calculator", category: "calculator", ask_price: 12, min_price: 9 });
-  const posted = await seller.call("create_listing", {
+  await seller.call("post_offer", { title: "Scientific calculator", category: "calculator", ask_price: 12, min_price: 9 });
+  const posted = await seller.call("post_offer", {
     title: "TI-84 Plus graphing calculator", category: "calculator", condition: "good",
     ask_price: 20, min_price: 15, location: "HKUST campus", availability: "weekdays after 5pm",
   });
-  const req = await buyer.call("create_buy_intent", { raw_request: "I need a graphing calculator tomorrow, maximum $18" });
+  const req = await buyer.call("post_request", { raw_request: "I need a graphing calculator tomorrow, maximum $18" });
   assert.ok(req.deal, "paired");
-  assert.equal(req.deal.listing_id, posted.listing.listing_id);
+  assert.equal(req.deal.offer_id, posted.offer.offer_id);
   assert.equal(req.deal.meetup.availability, "weekdays after 5pm");
 
-  const more = await buyer.call("find_matches", { intent_id: req.intent.intent_id });
+  const more = await buyer.call("find_matches", { request_id: req.request.request_id });
   const pick = more.matches[0];
   assert.ok(pick, "an alternative exists");
-  const switched = await buyer.call("negotiate", { intent_id: req.intent.intent_id, listing_id: pick.listing_id });
+  const switched = await buyer.call("negotiate", { request_id: req.request.request_id, offer_id: pick.offer_id });
   assert.ok(switched.deal);
   const no = await buyer.call("decline_deal", { deal_id: switched.deal.deal_id });
   assert.ok(no.next_deal, "the TI-84 comes back as the next offer");
@@ -81,4 +81,30 @@ test("all tool results conform to their declared schemas", async () => {
   assert.ok(status.deals.length >= 1);
 
   for (const c of [seller, buyer]) await c.close();
+});
+
+test("service results conform too: errands, hourly work, posts", async () => {
+  const runner = await clientAs("schema_runner");
+  const helper = await clientAs("schema_helper");
+  const client = await clientAs("schema_client");
+
+  await runner.call("post_offer", {
+    kind: "service", title: "Lunch runs around campus", category: "delivery", ask_price: 4, min_price: 3, location: "HKUST campus",
+  });
+  await helper.call("post_offer", {
+    kind: "service", price_unit: "hour", title: "Event helper: setup and registration", category: "event", ask_price: 11, min_price: 9,
+  });
+  const lunch = await client.call("post_request", { raw_request: "find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5" });
+  assert.equal(lunch.deal?.kind, "service");
+  const event = await client.call("post_request", { raw_request: "get me a guy to help with the event on Saturday 2-6pm, budget $10/hr" });
+  assert.equal(event.deal?.price_unit, "hour");
+  await client.call("confirm_deal", { deal_id: lunch.deal.deal_id });
+  await runner.call("get_deal_status", {});
+  await runner.call("confirm_deal", { deal_id: lunch.deal.deal_id });
+  await helper.call("decline_deal", { deal_id: event.deal.deal_id });
+  await runner.call("list_my_posts", {});
+  const mine = await client.call("list_my_posts", {});
+  await client.call("withdraw_post", { post_id: mine.requests[0].request_id });
+
+  for (const c of [runner, helper, client]) await c.close();
 });

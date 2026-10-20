@@ -19,20 +19,28 @@ Deadline **Oct 23, 12:00pm PDT (Oct 24, 3:00am HKT)**. Submit by Fri 21:00 HKT.
 ## Description draft
 
 **AmazonPairUp** is an agentic C2C marketplace for Alexa+ that pairs buyers and
-sellers directly. Both sides just talk: "Sell my TI-84 for $20, I'll take
-anything above $15" or "I need a graphing calculator today, max $18". Our
-self-hosted MCP server (spec 2025-11-25, Streamable HTTP) turns speech into
-structured listings and buy intents with Amazon Bedrock. It pairs each buyer
-with the best-fitting seller using hybrid search: pgvector semantic similarity,
-Postgres full-text search, and hard constraints on condition, quantity and
-price feasibility. It then negotiates a price inside limits each side set
-privately. Alexa+ presents the deal and each person confirms with one word.
-Private limits never leave the server.
+sellers directly, for things and for services. People just talk: "Sell my TI-84
+for $20, I'll take anything above $15", "Find someone to pick up my lunch from
+LG7 canteen to Hall 5 by 12:30, $5", or "Get me a helper for the event on
+Saturday 2-6pm, budget $10 an hour".
 
-Because posting, pairing and negotiating take a single sentence, anything
-people have and others need becomes worth trading, from used textbooks to a $2
-pack of tissues.
+Our self-hosted MCP server (spec 2025-11-25, Streamable HTTP) turns speech into
+structured offers and requests with Amazon Bedrock: the item or the task, the
+budget, a flat fee or an hourly rate, the pickup and drop-off, the time window
+and the hours. One pairing engine serves both kinds. It pairs each request with
+the best-fitting offer using hybrid search (pgvector semantic similarity and
+Postgres full-text search) under hard constraints on kind, price unit,
+condition, quantity, deadline and price feasibility, then negotiates a price
+inside limits each side set privately. Alexa+ presents the deal with an MCP Apps
+card and each person confirms with one word. Private limits never leave the
+server.
+
+Because posting, pairing and negotiating take a single sentence, small things
+become worth doing: a $2 pack of tissues, a $3.50 lunch run by a student already
+walking past the canteen, four hours of help at a club event. The fee goes to
+the person who does the work, and a runner's offer stays open to take the next
+job.
 
 With Bee connected, real-world context such as "exam tomorrow,
-calculator broke" becomes a proactive buy intent, so Alexa can suggest a deal
+calculator broke" becomes a proactive request, so Alexa can suggest a deal
 before the user asks.

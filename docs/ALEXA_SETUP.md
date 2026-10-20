@@ -150,26 +150,30 @@ development stage is enough for the demo.
 **Name** (30 max): `AmazonPairUp`
 
 **Short description** (123 max):
-> Buy and sell with people nearby, by voice. Alexa pairs buyers with sellers and negotiates inside your private limits.
+> Buy, sell and get help from people nearby, by voice. Alexa pairs you up and negotiates inside your private limits.
 
 **Full description** (4000 max):
-> AmazonPairUp pairs people who want to buy something with people who want to sell it, and you use it just by talking.
+> AmazonPairUp pairs people who need something with people who have it or can do it: a used calculator, someone to pick up your lunch, a helper for your event. You use it just by talking.
 >
 > Selling: tell Alexa what you have, your asking price and, if you like, the lowest price you'd accept. Your minimum is never shown to buyers.
 >
 > Buying: tell Alexa what you need and the most you'd pay. AmazonPairUp finds the best seller by meaning and keywords, checks condition, quantity and price, and negotiates a fair price inside both people's limits in the same moment. If nobody has it yet, your request waits and Alexa pairs you as soon as someone lists one.
 >
+> Getting help: ask for someone to pick up your lunch, run an errand or help at your event, with a fee per job or an hourly rate. Alexa finds a person nearby who offers that kind of help, agrees the fee inside both limits, and tells you where and when.
+>
+> Offering help: say what you can do and your rate, like lunch runs around campus for $4. Alexa brings you jobs as people ask, and you say yes to each one.
+>
 > Each side says yes before a deal closes, and both get the meet-up details right away.
 >
-> Because it takes a single sentence, even small everyday items, like a $2 pack of tissues, are worth trading.
+> Because it takes a single sentence, small things become worth doing: a $2 pack of tissues, a $4 lunch run.
 >
 > AmazonPairUp is a prototype built for the Amazon Developer Hackathon 2026. Payment happens in person at the meet-up.
 
 **Example phrases** (3–4, 200 max each):
 1. `Alexa, sell my TI-84 calculator for 20 dollars, I'll take anything above 15`
 2. `Alexa, I need a graphing calculator today for under 18 dollars`
-3. `Alexa, find me a pack of tissues on campus`
-4. `Alexa, what's the status of my marketplace deals?`
+3. `Alexa, find someone to pick up my lunch from the canteen by 12:30, 5 dollars`
+4. `Alexa, any jobs or deals for me?`
 
 **Privacy policy URL:** `https://<host>/privacy.html`
 **Terms of use URL:** `https://<host>/terms.html`

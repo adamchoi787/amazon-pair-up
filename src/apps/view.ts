@@ -3,30 +3,40 @@ import { App, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 // The AmazonPairUp MCP Apps view. One view for every tool; the layout follows
 // the shape of the tool result:
 //   deal     an offer (or a new post), with Confirm / Decline when it waits for this user
-//   options  other listings for a request, with "Get this one"
+//   options  other offers for a request, with "Get this one"
 //   deals    the user's deals, those waiting for their yes first
-//   posts    the user's items and requests, with "Take down"
+//   posts    the user's offers and requests, with "Take down"
+// Items and services share every layout; a service card shows the rate, the
+// total for hourly work, the route for errands and when the job is.
 // Rendered by any MCP Apps host. Data comes from the tool result's
 // structuredContent; actions call the server's tools through the host.
 
 type View = "deal" | "options" | "deals" | "posts";
-const viewFor = (d: Data): View => (d.matches ? "options" : d.deals ? "deals" : d.listings || d.requests ? "posts" : "deal");
+const viewFor = (d: Data): View => (d.matches ? "options" : d.deals ? "deals" : d.offers || d.requests ? "posts" : "deal");
+
+type Kind = "item" | "service";
+type Unit = "each" | "job" | "hour";
 
 interface Deal {
-  deal_id: string; listing_id: string; title: string; condition: string; your_role: "buyer" | "seller" | "observer";
-  counterpart: string | null; price: number; ask_price: number; saved_vs_ask: number; currency: string;
+  deal_id: string; offer_id: string; kind: Kind; title: string; task: string | null; condition: string | null;
+  your_role: "buyer" | "seller" | "observer"; counterpart: string | null;
+  price: number; price_unit: Unit; hours: number | null; total: number | null; ask_price: number; saved_vs_ask: number; currency: string;
   status: "proposed" | "confirmed" | "declined" | "replaced" | "expired" | "withdrawn";
   waiting_for: ("buyer" | "seller")[]; waiting_for_you: boolean;
-  meetup: { place: string | null; availability: string | null }; on_hold_until: string | null;
+  meetup: { place: string | null; availability: string | null }; pickup: string | null; needed_by: string | null;
+  on_hold_until: string | null;
 }
-interface Listing {
-  listing_id: string; title: string; condition: string; ask_price: number; currency: string; location: string | null;
-  status: string; within_budget_at_ask?: boolean; your_min_price?: number;
+interface Offer {
+  offer_id: string; kind: Kind; title: string; condition: string | null; ask_price: number; price_unit: Unit; currency: string;
+  location: string | null; status: string; within_budget_at_ask?: boolean; your_min_price?: number;
 }
-interface Intent { intent_id: string; need: string; status: string; your_max_price?: number; currency: string }
+interface Request {
+  request_id: string; kind: Kind; need: string; status: string; price_unit: Unit; your_max_price?: number; currency: string;
+  pickup: string | null; location: string | null; schedule: string | null;
+}
 type Data = Record<string, unknown> & {
-  say?: string; deal?: Deal | null; next_deal?: Deal | null; deals?: Deal[]; listing?: Listing; intent?: Intent;
-  intent_id?: string; matches?: Listing[]; alternatives?: Listing[]; listings?: Listing[]; requests?: Intent[]; waiting_buyers?: number;
+  say?: string; deal?: Deal | null; next_deal?: Deal | null; deals?: Deal[]; offer?: Offer; request?: Request;
+  request_id?: string; matches?: Offer[]; alternatives?: Offer[]; offers?: Offer[]; requests?: Request[]; waiting_requests?: number;
 };
 
 const app = new App({ name: "AmazonPairUp", version: "1.0.0" }, {}, { autoResize: true });
@@ -46,11 +56,17 @@ function h<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<Record<
 
 const money = (n: number, currency = "USD") =>
   new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: Number.isInteger(n) ? 0 : 2 }).format(n);
+/** "$9/hr", "$4 per job", "$17". */
+const rate = (n: number, unit: Unit, currency = "USD") => money(n, currency) + (unit === "hour" ? "/hr" : unit === "job" ? " per job" : "");
 const when = (iso: string) => new Date(iso).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 const pretty = (s: string) => s.replace(/_/g, " ");
-const POST_STATUS: Record<string, string> = {
-  active: "For sale", pending: "Offer pending", sold: "Sold", withdrawn: "Taken down",
-  open: "Looking", matched: "Offer pending", fulfilled: "Bought", cancelled: "Cancelled",
+const OFFER_STATUS: Record<string, Record<Kind, string>> = {
+  active: { item: "For sale", service: "Available" }, pending: { item: "Offer pending", service: "Job pending" },
+  sold: { item: "Sold", service: "Booked" }, withdrawn: { item: "Taken down", service: "Taken down" },
+};
+const REQUEST_STATUS: Record<string, Record<Kind, string>> = {
+  open: { item: "Looking", service: "Asking" }, matched: { item: "Offer pending", service: "Helper found" },
+  fulfilled: { item: "Bought", service: "Booked" }, cancelled: { item: "Cancelled", service: "Cancelled" },
 };
 /** Inline views stay short (Alexa+ design guide: 3–5 items); the rest live in the app's lists. */
 const INLINE_MAX = 5;
@@ -60,8 +76,13 @@ function chip(text: string, tone: "accent" | "good" | "muted" | "warn" = "muted"
 }
 
 function statusChip(d: Deal) {
-  if (d.status === "proposed") return d.waiting_for_you ? chip("Waiting for your yes", "accent") : chip(`Waiting for the ${d.waiting_for.join(" and ")}`, "muted");
-  if (d.status === "confirmed") return chip("Confirmed", "good");
+  const service = d.kind === "service";
+  if (d.status === "proposed") {
+    if (d.waiting_for_you) return chip(service && d.your_role === "seller" ? "New job for you" : "Waiting for your yes", "accent");
+    const who = d.waiting_for.map((p) => (service ? (p === "seller" ? d.counterpart ?? "helper" : d.counterpart ?? "requester") : `the ${p}`));
+    return chip(`Waiting for ${who.join(" and ")}`, "muted");
+  }
+  if (d.status === "confirmed") return chip(service ? "Booked" : "Confirmed", "good");
   if (d.status === "expired") return chip("Expired", "warn");
   if (d.status === "replaced") return chip("Replaced", "muted");
   if (d.status === "withdrawn") return chip("Taken down", "warn");
@@ -106,25 +127,51 @@ function errorSay(res: { content?: unknown }) {
 
 // ---------- views ----------
 
+function savingsLine(d: Deal) {
+  const buyer = d.your_role === "buyer";
+  const ask = rate(d.ask_price, d.price_unit, d.currency);
+  if (d.saved_vs_ask <= 0) return d.kind === "item" ? "At the asking price" : "At their rate";
+  if (!buyer) return `Asked ${ask}, agreed inside your limit`;
+  return `You save ${money(d.saved_vs_ask, d.currency)}${d.price_unit === "hour" ? "/hr" : ""} on the ${ask} ask`;
+}
+
+/** Where and when: a meet-up for an item; for a service, the route or place and the time. */
+function placeRows(d: Deal) {
+  const time = d.meetup.availability ?? (d.needed_by ? when(d.needed_by) : null);
+  if (d.kind === "item") {
+    const meet = [d.meetup.place, d.meetup.availability].filter(Boolean).join(" · ");
+    return meet ? [h("p", { class: "meet" }, h("span", { class: "label" }, "Meet-up"), meet)] : [];
+  }
+  return [
+    d.pickup ? h("p", { class: "meet" }, h("span", { class: "label" }, "Pick up"), d.pickup) : null,
+    d.meetup.place ? h("p", { class: "meet" }, h("span", { class: "label" }, d.pickup ? "Drop off" : "Where"), d.meetup.place) : null,
+    time ? h("p", { class: "meet" }, h("span", { class: "label" }, "When"), time) : null,
+  ];
+}
+
 function dealCard(d: Deal, compact = false) {
   const buyer = d.your_role === "buyer";
-  const savings = buyer && d.saved_vs_ask > 0 ? `You save ${money(d.saved_vs_ask, d.currency)} on the ${money(d.ask_price, d.currency)} ask` :
-    !buyer && d.saved_vs_ask > 0 ? `Asked ${money(d.ask_price, d.currency)}, agreed inside your limit` : `At the asking price`;
-  const meet = [d.meetup.place, d.meetup.availability].filter(Boolean).join(" · ");
+  const service = d.kind === "service";
+  const confirmLabel = service && !buyer ? "Take the job" : service ? `Book for ${rate(d.price, d.price_unit, d.currency)}` : `Confirm ${money(d.price, d.currency)}`;
   const actions = d.status === "proposed" && d.waiting_for_you
     ? h("div", { class: "actions" },
-        button(`Confirm ${money(d.price, d.currency)}`, "primary", () => act("confirm_deal", { deal_id: d.deal_id }, (r) => { if (r.deal) replaceDeal(r.deal); })),
-        button("Decline", "secondary", () => act("decline_deal", { deal_id: d.deal_id }, (r) => {
+        button(confirmLabel, "primary", () => act("confirm_deal", { deal_id: d.deal_id }, (r) => { if (r.deal) replaceDeal(r.deal); })),
+        button(service && !buyer ? "Pass" : "Decline", "secondary", () => act("decline_deal", { deal_id: d.deal_id }, (r) => {
           replaceDeal({ ...d, status: "declined", waiting_for: [], waiting_for_you: false });
           if (r.next_deal && data) data = { ...data, deal: r.next_deal, next_deal: null };
         })))
     : null;
+  const title = service && !buyer && d.task ? d.task : d.title;
   return h("article", { class: compact ? "card compact" : "card" },
-    h("div", { class: "row" }, statusChip(d), d.counterpart ? h("span", { class: "muted" }, `${buyer ? "From" : "To"} ${d.counterpart}`) : null),
-    h("h2", {}, d.title),
-    h("div", { class: "price" }, money(d.price, d.currency)),
-    h("p", { class: "muted" }, savings),
-    meet ? h("p", { class: "meet" }, h("span", { class: "label" }, "Meet-up"), meet) : null,
+    h("div", { class: "row" }, statusChip(d), d.counterpart ? h("span", { class: "muted" }, `${buyer ? (service ? "By" : "From") : "For"} ${d.counterpart}`) : null),
+    h("h2", {}, title),
+    service && !buyer ? h("p", { class: "muted small" }, d.title) : null,
+    h("div", { class: "price" }, rate(d.price, d.price_unit, d.currency)),
+    d.price_unit === "hour" && d.total != null && d.hours != null
+      ? h("p", { class: "muted" }, `${money(d.total, d.currency)} for ${d.hours} hour${d.hours === 1 ? "" : "s"}`)
+      : null,
+    h("p", { class: "muted" }, savingsLine(d)),
+    ...placeRows(d),
     d.status === "proposed" && d.on_hold_until ? h("p", { class: "muted small" }, `On hold until ${when(d.on_hold_until)}`) : null,
     actions,
   );
@@ -136,14 +183,14 @@ function replaceDeal(next: Deal) {
   if (data.deals) data = { ...data, deals: data.deals.map((x) => (x.deal_id === next.deal_id ? next : x)) };
 }
 
-function listingCard(l: Listing, intentId?: string) {
+function offerCard(o: Offer, requestId?: string) {
   return h("article", { class: "card option" },
-    h("div", { class: "row" }, chip(pretty(l.condition)), l.within_budget_at_ask ? chip("In budget", "good") : null),
-    h("h3", {}, l.title),
-    h("div", { class: "price small-price" }, money(l.ask_price, l.currency)),
-    l.location ? h("p", { class: "muted small" }, l.location) : null,
-    intentId ? button("Get this one", "secondary", () => act("negotiate", { intent_id: intentId, listing_id: l.listing_id }, (r) => {
-      if (data) data = { ...data, deal: r.deal ?? null, matches: data.matches?.filter((m) => m.listing_id !== l.listing_id) };
+    h("div", { class: "row" }, chip(o.condition ? pretty(o.condition) : o.price_unit === "hour" ? "hourly" : "per job"), o.within_budget_at_ask ? chip("In budget", "good") : null),
+    h("h3", {}, o.title),
+    h("div", { class: "price small-price" }, rate(o.ask_price, o.price_unit, o.currency)),
+    o.location ? h("p", { class: "muted small" }, o.location) : null,
+    requestId ? button(o.kind === "service" ? "Book this one" : "Get this one", "secondary", () => act("negotiate", { request_id: requestId, offer_id: o.offer_id }, (r) => {
+      if (data) data = { ...data, deal: r.deal ?? null, matches: data.matches?.filter((m) => m.offer_id !== o.offer_id) };
     })) : null,
   );
 }
@@ -152,36 +199,45 @@ function renderDeal(d: Data) {
   const deal = d.deal ?? d.next_deal ?? null;
   const parts: (Node | null)[] = [];
   if (deal) parts.push(dealCard(deal));
-  else if (d.listing) {
+  else if (d.offer) {
+    const o = d.offer;
+    const service = o.kind === "service";
+    const waiting = d.waiting_requests ?? 0;
     parts.push(h("article", { class: "card" },
-      h("div", { class: "row" }, chip("Listed", "accent"), d.waiting_buyers ? h("span", { class: "muted" }, `${d.waiting_buyers} buyer${d.waiting_buyers > 1 ? "s" : ""} looking`) : null),
-      h("h2", {}, d.listing.title),
-      h("div", { class: "price" }, money(d.listing.ask_price, d.listing.currency)),
-      d.listing.your_min_price != null ? h("p", { class: "muted" }, `Private minimum ${money(d.listing.your_min_price, d.listing.currency)} · buyers never see it`) : null,
-      h("p", { class: "muted small" }, "You'll be paired with the next buyer who asks."),
+      h("div", { class: "row" }, chip(service ? "Available" : "Listed", "accent"),
+        waiting ? h("span", { class: "muted" }, `${waiting} ${waiting > 1 ? "people" : "person"} looking`) : null),
+      h("h2", {}, o.title),
+      h("div", { class: "price" }, rate(o.ask_price, o.price_unit, o.currency)),
+      o.your_min_price != null ? h("p", { class: "muted" }, `Private minimum ${rate(o.your_min_price, o.price_unit, o.currency)} · nobody else sees it`) : null,
+      h("p", { class: "muted small" }, service ? "You'll get jobs as people ask." : "You'll be paired with the next buyer who asks."),
     ));
-  } else if (d.intent) {
+  } else if (d.request) {
+    const r = d.request;
+    const service = r.kind === "service";
     parts.push(h("article", { class: "card" },
-      h("div", { class: "row" }, chip("Looking", "accent")),
-      h("h2", {}, d.intent.need),
-      d.intent.your_max_price != null ? h("p", { class: "muted" }, `Up to ${money(d.intent.your_max_price, d.intent.currency)} · sellers never see it`) : null,
-      h("p", { class: "muted small" }, "You'll be paired as soon as a seller lists one."),
+      h("div", { class: "row" }, chip(service ? "Asking" : "Looking", "accent")),
+      h("h2", {}, r.need),
+      r.your_max_price != null ? h("p", { class: "muted" }, `Up to ${rate(r.your_max_price, r.price_unit, r.currency)} · ${service ? "helpers" : "sellers"} never see it`) : null,
+      service && (r.pickup || r.location || r.schedule)
+        ? h("p", { class: "meet" }, [r.pickup && r.location ? `${r.pickup} → ${r.location}` : r.pickup ?? r.location, r.schedule].filter(Boolean).join(" · "))
+        : null,
+      h("p", { class: "muted small" }, service ? "You'll be paired as soon as someone offers." : "You'll be paired as soon as a seller lists one."),
     ));
   }
   // Alternatives matter while the user is still deciding.
   const alts = !deal || deal.status === "proposed" ? d.alternatives ?? [] : [];
-  if (alts.length && d.intent) {
+  if (alts.length && d.request) {
     parts.push(h("h4", {}, deal ? "Other options" : "Close matches"));
-    parts.push(h("div", { class: "carousel" }, ...alts.map((l) => listingCard(l, d.intent!.intent_id))));
+    parts.push(h("div", { class: "carousel" }, ...alts.map((o) => offerCard(o, d.request!.request_id))));
   }
   return parts;
 }
 
 function renderOptions(d: Data) {
   const matches = d.matches ?? [];
-  if (d.deal) return [dealCard(d.deal), ...(matches.length ? [h("h4", {}, "Other options"), h("div", { class: "carousel" }, ...matches.map((l) => listingCard(l, d.intent_id)))] : [])];
+  if (d.deal) return [dealCard(d.deal), ...(matches.length ? [h("h4", {}, "Other options"), h("div", { class: "carousel" }, ...matches.map((o) => offerCard(o, d.request_id)))] : [])];
   if (!matches.length) return [h("p", { class: "muted" }, "No other options right now.")];
-  return [h("div", { class: "carousel" }, ...matches.map((l) => listingCard(l, d.intent_id)))];
+  return [h("div", { class: "carousel" }, ...matches.map((o) => offerCard(o, d.request_id)))];
 }
 
 function renderDeals(d: Data) {
@@ -195,10 +251,10 @@ const confirming = new Set<string>();
 function renderPosts(d: Data) {
   const live = (s: string) => ["active", "pending", "open", "matched"].includes(s);
   const order = (s: string) => (live(s) ? 0 : 1);
-  const row = (id: string, label: string, sub: string, status: string) => {
+  const row = (id: string, label: string, sub: string, status: string, statusText: string) => {
     const armed = confirming.has(id);
     return h("article", { class: "card compact" },
-      h("div", { class: "row" }, chip(POST_STATUS[status] ?? pretty(status), live(status) ? "accent" : "muted")),
+      h("div", { class: "row" }, chip(statusText, live(status) ? "accent" : "muted")),
       h("h3", {}, label),
       h("p", { class: "muted small" }, sub),
       live(status) ? h("div", { class: "actions" }, button(armed ? "Tap again to take it down" : "Take down", armed ? "danger" : "secondary", () => {
@@ -209,20 +265,22 @@ function renderPosts(d: Data) {
           const status = String(r.status);
           data = {
             ...data,
-            listings: data.listings?.map((l) => (l.listing_id === id ? { ...l, status } : l)),
-            requests: data.requests?.map((i) => (i.intent_id === id ? { ...i, status } : i)),
+            offers: data.offers?.map((o) => (o.offer_id === id ? { ...o, status } : o)),
+            requests: data.requests?.map((q) => (q.request_id === id ? { ...q, status } : q)),
           };
         });
       })) : null,
     );
   };
   const items = [
-    ...[...(d.listings ?? [])].sort((a, b) => order(a.status) - order(b.status))
-      .map((l) => row(l.listing_id, l.title, `Selling · ${money(l.ask_price, l.currency)}`, l.status)),
+    ...[...(d.offers ?? [])].sort((a, b) => order(a.status) - order(b.status))
+      .map((o) => row(o.offer_id, o.title, `${o.kind === "service" ? "Offering" : "Selling"} · ${rate(o.ask_price, o.price_unit, o.currency)}`, o.status,
+        OFFER_STATUS[o.status]?.[o.kind] ?? pretty(o.status))),
     ...[...(d.requests ?? [])].sort((a, b) => order(a.status) - order(b.status))
-      .map((i) => row(i.intent_id, i.need, `Buying${i.your_max_price != null ? ` · up to ${money(i.your_max_price, i.currency)}` : ""}`, i.status)),
+      .map((q) => row(q.request_id, q.need, `${q.kind === "service" ? "Asking for help" : "Buying"}${q.your_max_price != null ? ` · up to ${rate(q.your_max_price, q.price_unit, q.currency)}` : ""}`, q.status,
+        REQUEST_STATUS[q.status]?.[q.kind] ?? pretty(q.status))),
   ];
-  if (!items.length) return [h("p", { class: "muted" }, "Nothing listed or requested yet.")];
+  if (!items.length) return [h("p", { class: "muted" }, "No offers or requests yet.")];
   return items.length > INLINE_MAX ? [...items.slice(0, INLINE_MAX), h("p", { class: "more" }, `And ${items.length - INLINE_MAX} more`)] : items;
 }
 

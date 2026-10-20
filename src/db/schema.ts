@@ -1,4 +1,5 @@
-// Schema is applied idempotently on startup.
+// Schema is applied idempotently on startup. `listings` hold offers and
+// `buy_intents` hold requests; either can be an item or a service.
 // Private limits (min_price / max_price) live here and must never be returned
 // to the counterparty — see src/market/views.ts.
 
@@ -76,6 +77,18 @@ CREATE INDEX IF NOT EXISTS listings_seller_idx ON listings (seller_id, created_a
 CREATE INDEX IF NOT EXISTS listings_status_idx ON listings (status);
 CREATE INDEX IF NOT EXISTS intents_buyer_idx ON buy_intents (buyer_id, created_at);
 CREATE INDEX IF NOT EXISTS intents_status_idx ON buy_intents (status);
+
+-- Services. A post is an item or a service. Items are priced each, services per
+-- job (a lunch run) or per hour (event help), and only posts of the same kind
+-- and unit are paired. A service request can add the expected hours (hourly
+-- work), where to pick something up (errands) and when the job happens.
+ALTER TABLE listings    ADD COLUMN IF NOT EXISTS kind       TEXT NOT NULL DEFAULT 'item';
+ALTER TABLE listings    ADD COLUMN IF NOT EXISTS price_unit TEXT NOT NULL DEFAULT 'each';
+ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS kind       TEXT NOT NULL DEFAULT 'item';
+ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS price_unit TEXT NOT NULL DEFAULT 'each';
+ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS hours      NUMERIC(5,2);
+ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS pickup     TEXT;
+ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS schedule   TEXT;
 
 -- Append-only audit trail; powers the dashboard.
 CREATE TABLE IF NOT EXISTS events (

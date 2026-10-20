@@ -1,29 +1,33 @@
 # AmazonPairUp — a voice-first C2C marketplace for Alexa+
 
-> People who have something and people who need something just say so.
-> Alexa+ pairs each buyer with a seller, negotiates inside limits each side set
-> privately, and asks both for a final "yes".
+> People who have something, people who can do something, and people who need
+> either just say so. Alexa+ pairs each buyer with a seller, negotiates inside
+> limits each side set privately, and asks both for a final "yes".
 
 **Track:** Alexa+ (self-hosted MCP server, spec 2025-11-25, Streamable HTTP)
 **Mini challenge:** AWS Builder (Amazon Bedrock embeddings + intent extraction, AWS hosting)
-**Bee:** "Proactive Context Mode" turns real-world context into buy intents
+**Bee:** "Proactive Context Mode" turns real-world context into requests
 
 ## The idea in one minute
 
-Trading directly with another person today means photos, forms, haggling in
-chat and arranging a meet-up. That effort decides what gets traded: a spare
-calculator or an unopened pack of tissues rarely finds the neighbour who needs it.
+Getting something from another person today means photos, forms, haggling in
+chat and arranging a meet-up. Getting a small job done means a platform that
+adds its own fees on top. That effort and cost decide what happens: a spare
+calculator rarely finds the neighbour who needs it, and nobody pays a delivery
+app to carry a $5 lunch two buildings over.
 
-AmazonPairUp pairs buyers and sellers directly and does the work in between.
-Both sides post what they have or what they need, new or used:
+AmazonPairUp pairs buyers and sellers directly and does the work in between,
+for things and for services. Both sides post what they have, what they can do,
+or what they need:
 
-- **Seller:** "Alexa, sell my TI-84 for $20. I'll take anything above $15."
-- **Buyer:** "Alexa, I need a graphing calculator today, max $18."
-- **Alexa:** "Found it: TI-84 Plus graphing calculator for $17, $3 below asking. Meet-up: HKUST campus. Should I confirm it?" — "Yes." — Done.
+- **Things:** "Alexa, sell my TI-84 for $20. I'll take anything above $15." · "Alexa, I need a graphing calculator today, max $18." → "Found it: TI-84 Plus graphing calculator for $17, $3 below asking. Meet-up: HKUST campus. Should I confirm it?"
+- **Errands and delivery:** "Alexa, find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5." → a student already doing lunch runs on campus takes it for $3.50, and the fee goes to the person who walks.
+- **One-time jobs:** "Alexa, get me a helper for the event on Saturday 2-6pm, budget $10 an hour." → "Found someone: Priya can do it for $9.50 an hour, $38 for 4 hours."
 
 Neither side ever sees the other's limit. Our MCP server understands both
-requests, pairs the buyer with the best-fitting seller, negotiates and records
-the deal; Alexa+ is the voice and the agent; each person just says yes or no.
+requests, pairs each request with the best-fitting offer of the same kind,
+negotiates and records the deal; Alexa+ is the voice and the agent; each
+person just says yes or no.
 
 ## Run it (2 minutes, no database or AWS needed)
 
@@ -68,7 +72,7 @@ typing works everywhere.
 
 ```mermaid
 flowchart TB
-  U[Buyer / Seller] -- voice --> A[Alexa+<br/>interface + agent]
+  U[People who need, have or can do something] -- voice --> A[Alexa+<br/>interface + agent]
   A -- "MCP tools (Streamable HTTP)" --> S
   subgraph S["AmazonPairUp MCP server"]
     I[Intent extraction<br/>Bedrock LLM] --> P[Pairing engine<br/>runs on every post, both sides]
@@ -76,7 +80,7 @@ flowchart TB
     P --> N[Settlement: pairing-core<br/>Rust → WebAssembly, private limits]
     N --> D[Proposed deal<br/>both sides confirm]
   end
-  S --> DB[(Postgres + pgvector<br/>users · listings · requests · deals · events)]
+  S --> DB[(Postgres + pgvector<br/>users · offers · requests · deals · events)]
   B[Bee context] -. intent enrichment .-> I
 ```
 
@@ -90,15 +94,15 @@ flowchart TB
 
 | Tool | What it does |
 |---|---|
-| `create_listing` | Sell: item, public ask, **private minimum**, meet-up area. Pairs with a waiting buyer in the same call |
-| `create_buy_intent` | Buy: need + **private budget**. Pairs with the best seller and negotiates in the same call; returns alternatives |
+| `post_offer` | Offer an item to sell or a service you can do (per job or per hour): public price, **private minimum**, area. Pairs with a waiting request in the same call |
+| `post_request` | Ask for an item or for help (pickup, drop-off, time, hours) + **private budget**. Pairs with the best offer and negotiates in the same call; returns alternatives |
 | `find_matches` | More options for a request |
-| `negotiate` | Take a different option instead; replaces the current offer |
+| `negotiate` | Take a different option instead; replaces the current deal |
 | `confirm_deal` / `decline_deal` | Each side's yes or no; a no re-pairs both posts |
-| `get_deal_status` | Deals waiting for your yes first, with counterpart and meet-up details |
-| `list_my_posts` / `withdraw_post` | Your items and requests; take one down, releasing any deal it held |
+| `get_deal_status` | Deals and jobs waiting for your yes first, with counterpart, place and time |
+| `list_my_posts` / `withdraw_post` | Your offers and requests; take one down, releasing any deal it held |
 
-Every tool declares an output schema and annotations. Offers nobody answers expire
+Every tool declares an output schema and annotations. Deals nobody answers expire (by the request's deadline at the latest)
 and both posts are paired again; per-user posting limits and per-caller rate limits
 protect the market. Pairing rules, schemas, limits and privacy rules:
 [docs/TOOL_CONTRACT.md](docs/TOOL_CONTRACT.md).
@@ -126,7 +130,7 @@ src/apps/                the MCP Apps view (deal card, options, deals, posts)
 public/app/              web app shell + built bundle (npm run build:web)
 public/mcp-apps/         built single-file MCP Apps view
 public/dashboard/        operations dashboard
-data/seed-listings.json  seed marketplace
+data/seed-listings.json  seed market: items for sale and services on offer
 scripts/                 seed, smoke test, add-on assets
 docs/                    contract, award plan, Alexa+ setup, deploy, demo script, submission, friction log
 vendor/pairing-core/     prebuilt pairing-core module (refresh: node scripts/sync-pairing-core.mjs)

@@ -142,11 +142,11 @@ test("linked users act as themselves; user_id arguments cannot impersonate", asy
 
   const client = await mcpAs(tokens.access_token);
   const res = await client.callTool({
-    name: "create_listing",
+    name: "post_offer",
     arguments: { user_id: "u_someone_else", title: "Desk fan", ask_price: 10, min_price: 7 },
   });
-  const { listing } = JSON.parse((res.content as { text: string }[])[0].text);
-  const { rows } = await db.query<{ seller_id: string }>(`SELECT seller_id FROM listings WHERE id = $1`, [listing.listing_id]);
+  const { offer: listing } = JSON.parse((res.content as { text: string }[])[0].text);
+  const { rows } = await db.query<{ seller_id: string }>(`SELECT seller_id FROM listings WHERE id = $1`, [listing.offer_id]);
   assert.equal(rows[0].seller_id, "u_mei");
   await client.close();
 });
