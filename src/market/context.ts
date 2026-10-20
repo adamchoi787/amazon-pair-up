@@ -80,6 +80,18 @@ export interface Suggestion {
 
 export const looksLikeNeed = (text: string) => NEED_CUES.test(text) && !NOT_NOW.test(text);
 
+/**
+ * The part of a summary that names the need: "Realized my calculator broke;
+ * need a graphing calculator before the exam." → "need a graphing calculator
+ * before the exam". Extraction then reads the item, not the story around it.
+ */
+export function needClause(text: string) {
+  const clauses = text.split(/(?<=[.;!?])\s+|;\s*/).map((c) => c.trim().replace(/[.;!?]+$/, "")).filter(Boolean);
+  const needs = clauses.filter(looksLikeNeed);
+  // Prefer the clause that says what is wanted over the one that says what broke.
+  return needs.find((c) => /\b(need|buy|get|looking for|someone to|replace|borrow|hire|book)\b/i.test(c)) ?? needs[0] ?? text;
+}
+
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 const parseDate = (s?: string) => {
   const d = s ? new Date(s) : new Date();
@@ -116,7 +128,7 @@ export async function addContext(deps: Deps, userId: string, input: SignalInput)
   const need = input.kind !== "location" && text && looksLikeNeed(text);
   let suggestion: Suggestion | null = null;
   if (need) {
-    const extracted = await ai.extractIntent(text, observedAt);
+    const extracted = await ai.extractIntent(needClause(text), observedAt);
     suggestion = await fromSignal(deps, userId, id, input.source, text, extracted, observedAt);
   }
   await db.query(

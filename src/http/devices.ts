@@ -81,12 +81,13 @@ export function deviceRouter(deps: Deps, cfg: Config, userCaller: UserCaller): R
         results.push(await addContext(deps, caller.userId, { ...s, source }));
       }
       const fresh = results.filter((x) => x.suggestion && !x.duplicate);
-      // A location alone can make a routine due: answer with what is worth saying now.
-      const now = fresh.length ? null : await getSuggestions(deps, caller.userId);
+      // Arriving somewhere can make a routine due: then answer with what is worth saying now.
+      const arrived = !fresh.length && items.some((s) => s.kind === "location");
+      const now = arrived ? (await getSuggestions(deps, caller.userId)).suggestions : [];
       res.set("Cache-Control", "no-store").json({
         results,
-        suggestions: fresh.length ? fresh.map((x) => x.suggestion) : now!.suggestions,
-        say: fresh[0]?.suggestion?.say ?? (now!.suggestions.length ? now!.say : ""),
+        suggestions: fresh.length ? fresh.map((x) => x.suggestion) : now,
+        say: fresh[0]?.suggestion?.say ?? now[0]?.say ?? "",
       });
     } catch (err) {
       if (err instanceof MarketError) return fail(res, 400, err.message);
