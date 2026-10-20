@@ -102,7 +102,9 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
         "send a fresh one per action and the same one on a retry, so nothing is posted or confirmed twice. " +
         "With a session, subscribe to deals://me and posts://me (resources/subscribe) to hear when a deal is proposed, " +
         "confirmed, declined or expires instead of polling. Hosts that support elicitation are asked directly to check a " +
-        "price and to confirm a deal. delete_my_data erases the user's data after their explicit yes." +
+        "price and to confirm a deal. delete_my_data erases the user's data after their explicit yes. " +
+        "When a user wants a safe place to meet, offer list_meetup_points and choose_meetup_point (an unstaffed " +
+        "PairUp Point watched by a Ring doorbell); when they say \"I'm here\", call check_in_at_point. " +
         "When nobody " +
         "nearby can help, results point to Amazon: post_request's 'fallback' (an amazon.com search link and a labelled demo price estimate) and " +
         "post_offer's 'trade_in' (Amazon Trade-In). Offer them as an option; the post keeps waiting either way.",

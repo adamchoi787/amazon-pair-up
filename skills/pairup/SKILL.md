@@ -64,6 +64,8 @@ Confirmation records agreement, not payment, handover or completed work.
 | "I need a graphing calculator today, max $18" | `post_request` with `raw_request` = their words (add fields you clearly heard) |
 | "Pick up my lunch from the HUB to McCarty Hall by 12:30, $5" | `post_request` with `raw_request`; the server reads kind, pickup and time |
 | "Yes" / "Confirm it" (right after you read a deal) | `confirm_deal` with that `deal_id` |
+| "Where can we meet safely?" / "Meet at a PairUp Point" | `list_meetup_points`, then `choose_meetup_point` with the `deal_id` (and the `point_id` they picked) |
+| "I'm here" (at the point, confirmed deal) | `check_in_at_point` with that `deal_id` |
 | "Can they send it?" / "Deliver it to me" (item deal) | `choose_handoff` with `method: "delivery"`, then read the fee and the pickup locker; `"meetup"` switches back |
 | "No" / "Not that one" | `decline_deal`; the result includes the next best offer when there is one |
 | "Show me other options" | `find_matches` with the `request_id` |
@@ -96,10 +98,29 @@ waiting either way, so offer these as an option and never as a replacement:
   Amazon Hub Locker or Counter (`meetup.hub_point`): a public, watched place
   to hand over the item. Read it as the meet-up.
 
+## PairUp Points (Ring)
+
+A PairUp Point is an unstaffed hand-off spot watched by one Ring doorbell.
+Offer one when the user wants a safe place to meet a stranger.
+
+- `list_meetup_points` lists the points (optionally by `area`); read the
+  name and hours. Points marked `demo: true` are demo locations.
+- `choose_meetup_point` sets the point for a proposed or confirmed deal.
+  Without `point_id` it picks the point in both people's area. The point
+  becomes `deal.meetup.place`.
+- `check_in_at_point` is the "I'm here" step on a confirmed deal. Ask the
+  user to press the doorbell first. Ring confirms the arrival when the
+  device recorded a press or a person within ten minutes.
+- `deal.meetup.point.status` reads `chosen`, `one_here` or `both_here`;
+  `you` and `them` read `not_here`, `checked_in` or `confirmed`. Read
+  "You're both here" when it is `both_here`.
+
+PairUp keeps only the Ring event type and time, for 24 hours, and never video.
+
 ## Reading a deal
 
 A deal has `price`, `ask_price` and `saved_vs_ask`, `counterpart`,
-`meetup.place` and `meetup.availability` (with `meetup.hub_point` when it is an Amazon Hub point), `pickup` and `needed_by` for errands,
+`meetup.place` and `meetup.availability` (with `meetup.hub_point` when it is an Amazon Hub point and `meetup.point` when it is a PairUp Point), `pickup` and `needed_by` for errands,
 `on_hold_until`, and `waiting_for` (who still has to say yes; `waiting_for_you`
 is true when it is the user). Hourly work also has `hours` and `total`.
 `price_check` compares the price with the usual range. A deal is closed when

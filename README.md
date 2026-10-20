@@ -137,6 +137,33 @@ PairUp learns regular requests from your own history and offers them shortly bef
 
 Lifestyle code: src/market/lifestyle.ts and context.ts; device tokens: src/auth/devices.ts and src/http/devices.ts; voice loop: src/agent/runner.ts; browser: src/web/watch.ts and lifestyle-ui.ts; Bee bridge: scripts/bee-bridge.ts.
 
+## PairUp Points with Ring
+
+A PairUp Point is an unstaffed hand-off spot watched by one Ring doorbell. The
+two people in a deal pick a point (`list_meetup_points`, `choose_meetup_point`),
+then each presses the doorbell and says "I'm here" (`check_in_at_point`).
+PairUp reads the point device's Event History through the Ring Partner API
+(`api.amazonvision.com`) and accepts HMAC-signed Ring webhooks at
+`POST /api/ring/webhook`. When Ring has confirmed both arrivals, the deal card
+shows "both here". PairUp keeps only the event type and time, for 24 hours, and
+never requests video. The points in `data/pairup-points.json` are demo data.
+
+| Variable | Use |
+|---|---|
+| `RING_ACCESS_TOKEN` | Partner API bearer token (a Playground token lasts 30 minutes) |
+| `RING_API_BASE` | API base URL, default `https://api.amazonvision.com` |
+| `RING_HMAC_KEY` | Webhook signing key; turns on `/api/ring/webhook` |
+| `RING_POINT_DEVICES` | Points to devices, e.g. `pt_uw_hub=<device id>` |
+| `RING_SANDBOX` | `true` counts Playground live-view simulations as arrivals |
+
+```bash
+npm run ring:probe     # lists your Ring devices and recent events, prints the RING_POINT_DEVICES line
+npm run ring:simulate  # sends a signed demo Ring webhook to the local server
+```
+
+Code: src/ring/ (client, webhook), src/market/points.ts. Details:
+[docs/TOOL_CONTRACT.md](docs/TOOL_CONTRACT.md#pairup-points-ring).
+
 ## Run it (2 minutes, no database or AWS needed)
 
 ```bash
@@ -219,6 +246,7 @@ flowchart TB
 | `report_user` | Report the other side of a deal or the owner of an offer; the two are never paired again, and enough reports put someone under review |
 | `get_suggestions` / `accept_suggestion` / `dismiss_suggestion` | Private suggestions; accept after yes, skip for now or forget a routine |
 | `add_context` / `get_my_routines` | Bring a need snippet from Bee or a device; explain what was learned from your own history |
+| `list_meetup_points` / `choose_meetup_point` / `check_in_at_point` | PairUp Points: pick a Ring-watched hand-off spot, then "I'm here" with Ring confirming each arrival |
 | `delete_my_data` | Erase data after explicit confirmation, releasing holds and anonymizing retained counterpart deal records |
 
 Weapons, drugs, alcohol and tobacco, prescription medicine, recalled and
@@ -271,7 +299,8 @@ without a human wiring it up:
   Historical 0.6.0 benchmark before the scheduling changes (2026-10-20, Windows, Node v24.14.1, mock AI, PGlite, real HTTP MCP, 2 workers × 5 rounds, fresh users, 40 calls, zero errors): post_offer p50/p95/p99 42/331/331 ms; post_request 84/126/126 ms; find_matches 20/68/68 ms; confirm_deal 27/36/36 ms. Throughput 25.7 calls/s. This small local sample includes cold calls; measure Bedrock and the deployed network separately with `npm run bench`.
 - **Tests:** unit and integration checks over MCP/HTTP, OAuth, schemas, privacy,
   idempotency, schedule compatibility, overlapping bookings and concurrent approvals;
-  plus scripted Strands conversations against a real server. CI runs on every push.
+  PairUp Points with Ring (client, presence rule, webhook signature, two-person check-in);
+  154 tests in `npm test`, plus scripted Strands conversations against a real server. CI runs on every push.
 
 ## Repo map
 
@@ -295,10 +324,12 @@ src/
   market/policy.ts       what may be posted: keyword rules + embedding match (data/policy.json)
   market/trust.ts        reports, review status and the review queue
   market/amazon.ts       hand-offs to Amazon: search fallback, Trade-In, Hub meet-up points
+  market/points.ts       PairUp Points: registry, check-ins, Ring arrival matching, purge
   market/service.ts      business operations behind each tool
   market/views.ts        the only place rows become output (privacy redaction)
   market/idempotency.ts  retry-safe writes (idempotency_key)
   http/log.ts            JSON logs, CloudWatch Embedded Metric Format, request ids
+  ring/                  Ring Partner API client (devices, Event History) and webhook signature check
   ai/                    mock + Bedrock embeddings and intent extraction
   db/                    PGlite / Postgres client, schema, seeding
 src/web/                 the web app: OAuth PKCE sign-in, MCP client, MCP Apps host, voice
@@ -309,9 +340,10 @@ public/dashboard/        operations dashboard
 data/policy.json         prohibited and restricted items and services
 data/seed-listings.json  seed market: 162 posts from 22 people, items and services; demo Amazon Hub points per area
 data/trade-in-categories.json  categories Amazon Trade-In takes
+data/pairup-points.json  demo PairUp Points (Ring hand-off spots)
 skills/pairup/     the Agent Skill (SKILL.md)
 agents/agentcore/        Strands Agents voice agent for Amazon Bedrock AgentCore Runtime
-scripts/                 seed, smoke test, latency benchmark (bench.ts), add-on assets
+scripts/                 seed, smoke test, latency benchmark (bench.ts), Ring probe and webhook simulator, add-on assets
 research/                impact evidence, papers, plain-language summary
 docs/                    use cases, contract, award plan, Alexa+ setup, deploy, demo script, submission, friction log
 vendor/pairing-core/     prebuilt module from https://github.com/rairurairu/pairing-core (refresh: node scripts/sync-pairing-core.mjs)
