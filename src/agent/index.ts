@@ -27,14 +27,17 @@ export async function handleAgentTurn(deps: Deps, cfg: Config, body: unknown): P
   const { messages } = parsed.data;
 
   const mode = agentMode(cfg);
+  let inference: "bedrock" | "offline" | "tool_result" = "offline";
   let step: { content: Block[]; stop: "tool_use" | "end_turn" };
   const spoken = mode === "bedrock" ? sayFromResults(messages) : null;
   if (spoken) {
+    inference = "tool_result";
     // The tool already phrased the outcome for speech: say it, skip a model round trip.
     step = { content: [{ text: spoken }], stop: "end_turn" };
   } else if (mode === "bedrock") {
     try {
       step = await bedrockTurn(cfg, messages, await toolSpecs(deps));
+      inference = "bedrock";
     } catch (err) {
       // Throttling or an outage: the offline planner keeps the app usable.
       log("warn", "Bedrock agent step failed; using the offline planner", { error: (err as Error).message });
@@ -44,7 +47,7 @@ export async function handleAgentTurn(deps: Deps, cfg: Config, body: unknown): P
     step = planOffline(messages);
   }
   const content = requireExplicitYes(step.content, lastUserText(messages));
-  return { message: { role: "assistant", content }, stop: content.some(isToolUse) ? step.stop : "end_turn", mode };
+  return { message: { role: "assistant", content }, stop: content.some(isToolUse) ? step.stop : "end_turn", mode, inference };
 }
 
 /**

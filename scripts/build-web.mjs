@@ -63,7 +63,7 @@ writeFileSync(
 
 const size = (f) => `${(readFileSync(f).length / 1024).toFixed(0)} KB`;
 const fingerprint = createHash("sha256");
-for (const path of ["public/design/tokens.css", "public/app/index.html", "public/app/app.js", "public/mcp-apps/market.html", "public/watch/index.html", "public/watch/watch.js"]) {
+for (const path of ["public/design/tokens.css", "public/app/index.html", "public/app/demo.html", "public/app/app.js", "public/mcp-apps/market.html", "public/watch/index.html", "public/watch/watch.js", "public/dashboard/index.html"]) {
   fingerprint.update(path).update("\0").update(readFileSync(path, "utf8").replace(/\r\n/g, "\n")).update("\0");
 }
 writeFileSync("public/build-info.json", JSON.stringify({ version: JSON.parse(readFileSync("package.json", "utf8")).version, fingerprint: fingerprint.digest("hex") }, null, 2) + "\n");

@@ -1,6 +1,6 @@
 {
   "name": "pairup-agentcore",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "PairUp voice agent built with Strands Agents, hosted on Amazon Bedrock AgentCore Runtime, using the PairUp MCP server as its tools.",
   "license": "MIT",
   "type": "module",

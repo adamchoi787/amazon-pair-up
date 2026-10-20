@@ -3,7 +3,7 @@ name: pairup
 description: Buy, sell or get small jobs done between people through the PairUp MCP server. Use when the user wants to sell an item, offer a service (errands, deliveries, event help, tutoring), find an item, get someone to do a task, or check on their deals and meet-ups, rate a deal or report someone. Covers posting, reading a proposed deal, confirming only on an explicit yes, private price limits, price checks, what can't be posted, ratings, reports and retries.
 license: MIT
 metadata:
-  version: "0.7.0"
+  version: "0.8.0"
   mcp-endpoint: https://d3cxpkmhl89rw9.cloudfront.net/mcp
   server-card: https://d3cxpkmhl89rw9.cloudfront.net/.well-known/mcp/server-card.json
 ---
@@ -18,7 +18,7 @@ into one tool call, read back the result, and ask for a yes.
 
 ## Connect
 
-- MCP endpoint: `https://d3cxpkmhl89rw9.cloudfront.net/mcp`, Streamable HTTP, protocol `2025-11-25`, stateless.
+- MCP endpoint: `https://d3cxpkmhl89rw9.cloudfront.net/mcp`, Streamable HTTP, protocol `2025-11-25`. Calls can be stateless; initialize for subscriptions.
 - Sign-in: OAuth 2.1 with PKCE. Discovery at `/.well-known/oauth-protected-resource`.
   No pre-registration: use a Client ID Metadata Document (your `client_id` is the
   https URL of your client metadata JSON) or register at `/oauth/register`
@@ -171,7 +171,7 @@ Server ← { say: "Done! TI-84 Plus graphing calculator for $18 with Mei. Meet-u
 Agent: Done! TI-84 Plus graphing calculator for $18 with Mei. Meet-up: UW campus, weekdays after 5pm.
 ```
 
-Full contract, schemas and privacy rules: [TOOL_CONTRACT.md](https://github.com/adamchoi787/voice-market-mcp/blob/main/docs/TOOL_CONTRACT.md).
+Full contract, schemas and privacy rules: [TOOL_CONTRACT.md](https://github.com/rairurairu/amazon-pair-up/blob/main/docs/TOOL_CONTRACT.md).
 
 ## Live resources, confirmations and deletion
 
@@ -186,7 +186,7 @@ Clients declaring form elicitation receive elicitation/create for unusual
 prices and deal confirmation. Declining or cancelling leaves the action
 unconfirmed. Clients without elicitation use the tool's spoken confirmation flow.
 
-delete_my_data asks for confirmation; pass confirm: true only after the user's
+`delete_my_data` asks for confirmation; pass confirm: true only after the user's
 explicit yes. It withdraws live posts, releases holds, erases the account, tokens,
 history and learning rows, and anonymizes past deals needed by the counterpart.
 
@@ -194,11 +194,11 @@ history and learning rows, and anonymizes past deals needed by the counterpart.
 
 | Tool | Use and result |
 |---|---|
-| get_suggestions | On sign-in, on arrival, or when asked what the user needs. Returns private suggestions from their own history or context. |
-| accept_suggestion | After explicit yes; pass suggestion_id and max_price if a budget is missing. Returns a posted request and any proposed deal. |
-| dismiss_suggestion | Not now skips this occurrence. forget: true stops the routine; device snippets are removed on dismissal. |
-| add_context | source bee/watch/phone, kind todo/conversation/journal/fact/location/note, need text or place, optional stable external_id, observed_at and time_zone. Returns a suggestion when relevant. |
-| get_my_routines | Explain the learned need, usual budget, time, route and contributing devices. |
+| `get_suggestions` | On sign-in, on arrival, or when asked what the user needs. Returns private suggestions from their own history or context. |
+| `accept_suggestion` | After explicit yes; pass suggestion_id and max_price if a budget is missing. Returns a posted request and any proposed deal. |
+| `dismiss_suggestion` | Not now skips this occurrence. forget: true stops the routine; device snippets are removed on dismissal. |
+| `add_context` | source bee/watch/phone, kind todo/conversation/journal/fact/location/note, need text or place, optional stable external_id, observed_at and time_zone. Returns a suggestion when relevant. |
+| `get_my_routines` | Explain the learned need, usual budget, time, route and contributing devices. |
 
 Request source can be voice, bee_context, device_context or routine. Suggestions
 are private to their owner and need explicit acceptance before posting. Repeated
@@ -216,6 +216,16 @@ Voice history lasts ten minutes; context need snippets expire after thirty days.
 For an agent holding Bee MCP data: read the user's todos or daily summary, call
 add_context for a need clause with source bee and a stable external_id, then
 get_suggestions. Ask for a budget if needed and wait for yes before accepting.
-See [Bee guide](https://github.com/adamchoi787/voice-market-mcp/blob/main/docs/BEE.md) and [Apple Watch guide](https://github.com/adamchoi787/voice-market-mcp/blob/main/docs/APPLE_WATCH.md).
+See [Bee guide](https://github.com/rairurairu/amazon-pair-up/blob/main/docs/BEE.md) and [Apple Watch guide](https://github.com/rairurairu/amazon-pair-up/blob/main/docs/APPLE_WATCH.md).
 
 Retail reference amounts are hand-set demo estimates and are labelled in spoken results and cards. Amazon search links let the user check current prices. Trade-In links ask the user to check eligibility for their model and country.
+
+## Use with Bee
+
+Pair this skill with the official [Bee Skill](https://github.com/bee-computer/bee-skill)
+or Bee MCP (`bee mcp`). Discover the installed Bee tools, read the user's own
+to-dos or daily context, and forward only a relevant need clause through
+`add_context` with `source: "bee"` and a stable `external_id`. Then call
+`get_suggestions`. A TI-84 needed before an exam is an education workflow:
+read the prepared request, ask for a budget when needed, and wait for yes before
+`accept_suggestion`. Raw conversations and other people's utterances stay in Bee.

@@ -1,6 +1,6 @@
 {
   "name": "pairup",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Voice-first C2C marketplace for Alexa+: an MCP server that pairs buyers and sellers of things and services from natural-language requests and negotiates the deal.",
   "license": "MIT",
   "type": "module",
@@ -23,7 +23,8 @@
     "bee:bridge": "tsx scripts/bee-bridge.ts",
     "ring:probe": "tsx scripts/ring-probe.ts",
     "ring:simulate": "tsx scripts/ring-simulate.ts",
-    "check:release": "tsx scripts/check-release.ts"
+    "check:release": "tsx scripts/check-release.ts",
+    "evidence": "tsx scripts/evidence.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1152.0",
@@ -44,6 +45,7 @@
     "@types/node": "^22.10.0",
     "@types/pg": "^8.23.1",
     "esbuild": "^0.25.10",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "yaml": "^2.9.1"
   }
 }

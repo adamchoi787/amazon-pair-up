@@ -97,4 +97,3 @@ the connection in the Ring app if it stays pending. Tokens and raw device IDs
 stay outside customer-facing cards. The actions have keyboard focus and large
 targets; shared tokens have light/dark contrast tests and reduced-motion rules.
 Presence corroborates a check-in; this prototype performs no identity verification.
-

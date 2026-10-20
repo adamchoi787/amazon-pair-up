@@ -94,12 +94,12 @@ const FORGET = /\b(forget (it|that|this)|don'?t (suggest|ask) (that|this|it) aga
 const DELIVER = /\b(deliver (it|that)|have it delivered|ship (it|that)|can (they|you|he|she|the seller) (ship|send|deliver)\b|send it to (me|my locker)|to my locker|locker delivery)\b/i;
 const MEET = /\b(i'?ll meet( (them|up|in person))?|meet (up )?instead|let'?s meet( up)?|meet in person)\b/i;
 // PairUp Points: "meet at a PairUp Point", "somewhere safe"; then "I'm here" at the point.
-const MEET_POINT = /(pairup point|meet(?:-?up)? point|somewhere safe|safe (?:place|spot)|ring (?:doorbell|point))/i;
-const ARRIVED = /(i'?m here|i am here|i'?ve arrived|i have arrived|i'?m at the (?:point|pairup point|hub))/i;
+const MEET_POINT = /\b(pairup point|meet(?:-?up)? point|somewhere safe|safe (?:place|spot)|ring (?:doorbell|point))\b/i;
+const ARRIVED = /\b(i['’]?m here|i am here|i['’]?ve arrived|i have arrived|i['’]?m at the (?:point|pairup point|hub))\b/i;
 const MORE = /\b((more|other) (options|ones|choices)|what else|anything else|show me (more|others|alternatives)|alternatives)\b/i;
 const SELL = /\b(sell|selling|list my|get rid of)\b/i;
 // "I can do lunch runs on campus", "I'm free on Saturday to help at events"
-const OFFER = /\b(?:i can|i could|i'?m (?:available|free|happy)\b.*?\bto|i offer|offering)\s+\S/i;
+const OFFER = /\b(?:i can|i could|i['’]?m (?:available|free|happy)\b.*?\bto|i offer|offering)\s+\S/i;
 const BUY = /\b(need|want|looking for|buy|find( me)?|get me|hire|book|is anyone selling|does anyone have)\b/i;
 
 function onUtterance(messages: AgentMessage[], text: string): Step {
@@ -197,7 +197,7 @@ function sell(text: string): Step {
 /** "I can do lunch runs around campus for $4 a run, at least $3." */
 function offerService(text: string): Step {
   const task = text
-    .match(new RegExp(String.raw`\b(?:i can|i could|i'?m (?:available|free|happy)\b.*?\bto|i offer|offering(?: to)?)\s+(?:do\s+)?(.+?)(?=\s+for\s+${MONEY}|\s*[,.;!?]|\s+(?:at least|minimum|min)\b|$)`, "i"))?.[1]
+    .match(new RegExp(String.raw`\b(?:i can|i could|i['’]?m (?:available|free|happy)\b.*?\bto|i offer|offering(?: to)?)\s+(?:do\s+)?(.+?)(?=\s+for\s+${MONEY}|\s*[,.;!?]|\s+(?:at least|minimum|min)\b|$)`, "i"))?.[1]
     ?.trim();
   if (!task) return reply("What can you do for people?");
   const ask = amount(new RegExp(String.raw`\bfor\s+${MONEY}`, "i"), text)

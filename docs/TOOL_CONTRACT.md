@@ -537,3 +537,21 @@ fingerprint of the browser surfaces. `npm run check:release` reads these plus
 readiness and the app shell, and returns a failing exit code for stale assets,
 version or an explicitly expected revision. It is read-only: no sign-in and no
 market writes.
+## 0.8.0 interoperability notes
+
+The HTTP transport enforces one JSON-RPC message per POST; legacy arrays receive
+400/-32600. Session loss returns 404 and the browser reinitializes once while
+preserving the original idempotency key. Fully parsed requests (`need`, `kind`,
+`max_price`) use local extraction for remaining hints and skip a second model
+extraction call. Explicit structured fields keep precedence.
+
+Ring arrival evidence is HMAC-verified and deduplicated by event id and
+`meta.request_id`. PairUp's local policy ignores webhook event timestamps older
+than 30 minutes or more than one minute in the future; arrivals correlate to
+presence within ten minutes. This corroborates a user's check-in. It performs
+no identity verification. The client follows same-origin pagination, reports
+long rate-limit waits and retries one short 429/5xx after its backoff.
+
+`POST /api/agent` additionally returns `inference: bedrock | offline | tool_result`.
+`mode` describes configuration; `inference` identifies the path actually used
+for that response. The evidence collector requires `inference: bedrock`.
