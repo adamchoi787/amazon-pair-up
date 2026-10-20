@@ -1,0 +1,12 @@
+diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -65,4 +65,6 @@
+       for await (const event of agent.stream(request.prompt)) {
+-        if (event.type === 'modelContentBlockDeltaEvent' && event.delta?.type === 'textDelta') {
+-          yield { event: 'message', data: { text: event.delta.text } }
++        if (event.type === 'modelStreamUpdateEvent' &&
++            event.event.type === 'modelContentBlockDeltaEvent' &&
++            event.event.delta.type === 'textDelta') {
++          yield { event: 'message', data: { text: event.event.delta.text } }
+         }

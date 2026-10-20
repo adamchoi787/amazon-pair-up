@@ -1,5 +1,7 @@
 # Ring track handoff: PairUp Point (branch `ring-pairup-point`)
 
+> October 20 Codex follow-up: the Ring work is merged locally into main for 0.8.0. Phone/light/dark app cards, arrival states and the watch preview were checked; the rules audit is complete. See [VALIDATION.md](VALIDATION.md) and [RECORDING_CHECKLIST.md](RECORDING_CHECKLIST.md). Deployment, official Ring simulator/device footage and qualifying Bee data remain external gates. The notes below preserve the original handoff.
+
 Written October 20, 2026 by the Ring session before a usage limit. Continue from here.
 
 ## The idea

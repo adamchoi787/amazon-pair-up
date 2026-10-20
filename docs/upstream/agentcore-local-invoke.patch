@@ -1,0 +1,18 @@
+diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -76,4 +76,14 @@
+ app.run()
+ ```
+ 
++Call the streaming handler locally (requires model access):
++
++```bash
++curl -N http://localhost:8080/invocations \
++  -H 'Content-Type: application/json' \
++  -H 'Accept: text/event-stream' \
++  -H 'X-Amzn-Bedrock-AgentCore-Runtime-Session-Id: local-session-0000000000000000000000' \
++  -d '{"prompt":"hello"}'
++```
++
+ Use `requestSchema` to validate agent entrypoint input. Keep user prompts typed as strings and pass only prompt text
