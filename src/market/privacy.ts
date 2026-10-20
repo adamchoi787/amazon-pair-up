@@ -93,6 +93,7 @@ export async function deleteMyData(deps: Deps, userId: string) {
   await db.query(`DELETE FROM oauth_codes WHERE user_id = $1`, [userId]);
   await db.query(`DELETE FROM user_passcodes WHERE user_id = $1`, [userId]);
   await db.query(`DELETE FROM context_signals WHERE user_id = $1`, [userId]);
+  await db.query(`DELETE FROM meetup_arrivals WHERE user_id = $1`, [userId]);
   await db.query(`DELETE FROM routine_feedback WHERE user_id = $1`, [userId]);
   const devices = await ids(db, `SELECT id FROM device_tokens WHERE user_id = $1`, [userId]);
   const tokens = (await count(db, `DELETE FROM oauth_tokens WHERE user_id = $1`, [userId])) +

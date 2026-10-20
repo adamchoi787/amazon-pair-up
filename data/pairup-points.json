@@ -1,0 +1,26 @@
+{
+  "_note": "DEMO DATA. PairUp Points are small unstaffed hand-off spots, each watched by one Ring camera or doorbell. These are planned demo locations for the UW Seattle market; no devices are installed there. ring_device_id links a point to a Ring device: set it here, or with RING_POINT_DEVICES=pt_uw_hub=<device id> (npm run ring:probe lists your device ids).",
+  "points": [
+    {
+      "id": "pt_uw_hub",
+      "name": "PairUp Point, HUB north entrance",
+      "area": "UW campus",
+      "hours": "daily 7am-11pm",
+      "ring_device_id": null
+    },
+    {
+      "id": "pt_uw_suzzallo",
+      "name": "PairUp Point, Suzzallo Library east steps",
+      "area": "UW campus",
+      "hours": "daily 7am-10pm",
+      "ring_device_id": null
+    },
+    {
+      "id": "pt_udistrict_station",
+      "name": "PairUp Point, U District station plaza",
+      "area": "U District station",
+      "hours": "daily 6am-midnight",
+      "ring_device_id": null
+    }
+  ]
+}

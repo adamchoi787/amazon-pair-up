@@ -16,6 +16,7 @@ import { REPORT_REASONS } from "../market/trust.js";
 import { KINDS, REQUEST_SOURCES, SERVICE_UNITS } from "../market/types.js";
 import { DEFAULT_TIME_ZONE, validTimeZone } from "../market/scheduling.js";
 import * as suggestions from "../market/context.js";
+import * as points from "../market/points.js";
 import { registerViews, VIEWS, type ViewName } from "./apps.js";
 import { registerPrompts } from "./prompts.js";
 import { outputs } from "./schemas.js";
@@ -399,6 +400,61 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       annotations: { ...writes, destructiveHint: true, idempotentHint: true },
     },
     (args) => write("withdraw_post", args, (userId) => market.withdrawPost(deps, userId, args.post_id)),
+  );
+
+  server.registerTool(
+    "list_meetup_points",
+    {
+      title: "PairUp Points nearby",
+      description:
+        "List PairUp Points: small unstaffed hand-off spots, each watched by one Ring doorbell or camera. Offer one when " +
+        "the user would rather not meet a stranger elsewhere ('somewhere safe', 'a public place'). Pass the user's area to " +
+        "list the nearest first.",
+      inputSchema: { area: text(120).optional().describe("e.g. 'UW campus'") },
+      outputSchema: outputs.list_meetup_points,
+      annotations: reads,
+    },
+    (args) => run("list_meetup_points", () => points.listMeetupPoints(deps, args.area)),
+  );
+
+  registerAppTool(
+    server,
+    "choose_meetup_point",
+    {
+      _meta: ui("market"),
+      title: "Meet at a PairUp Point",
+      description:
+        "Set a PairUp Point as the hand-off place for one of the user's open or confirmed deals. Without point_id the " +
+        "nearest point to both people is chosen. Both people see it on the deal. At the point they press the Ring doorbell " +
+        "and call check_in_at_point; Ring confirms each arrival. Without deal_id the user's latest open deal is used.",
+      inputSchema: {
+        user_id: userIdArg,
+        deal_id: id.optional(),
+        point_id: id.optional().describe("From list_meetup_points"),
+        idempotency_key: idempotencyKey,
+      },
+      outputSchema: outputs.choose_meetup_point,
+      annotations: { ...writes, idempotentHint: true },
+    },
+    (args) => write("choose_meetup_point", args, (userId) => points.chooseMeetupPoint(deps, userId, args), "market"),
+  );
+
+  registerAppTool(
+    server,
+    "check_in_at_point",
+    {
+      _meta: ui("market"),
+      title: "I'm at the PairUp Point",
+      description:
+        "The user says they have arrived at the PairUp Point of a confirmed deal ('I'm here'). Records the arrival and " +
+        "reads the point's Ring Event History: a doorbell press or a person within ten minutes confirms it. When Ring has " +
+        "confirmed both people, arrival.status is 'both_here' and the hand-off can go ahead. Without deal_id the user's " +
+        "latest confirmed deal at a point is used.",
+      inputSchema: { user_id: userIdArg, deal_id: id.optional(), idempotency_key: idempotencyKey },
+      outputSchema: outputs.check_in_at_point,
+      annotations: { ...writes, idempotentHint: true },
+    },
+    (args) => write("check_in_at_point", args, (userId) => points.checkInAtPoint(deps, userId, args), "market"),
   );
 
   server.registerTool(

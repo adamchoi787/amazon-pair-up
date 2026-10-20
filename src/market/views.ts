@@ -2,6 +2,7 @@ import { AMAZON_TRADE_IN_URL, amazonSearchUrl, hubPointFor, type HubPoint } from
 import { verdict, type BandSource } from "./pricing.js";
 import { num, type BuyIntentRow, type DealRow, type Kind, type ListingRow, type PriceUnit } from "./types.js";
 import { checkSchedule } from "./scheduling.js";
+import { arrivalView, pointById, type ArrivalRow } from "./points.js";
 
 // The ONLY place rows become tool output. Private limits are included solely
 // for their owner. Every tool response goes through these functions, and
@@ -94,6 +95,11 @@ export interface DealWithParties extends DealRow {
   request_location: string | null;
   seller_home: string | null;
   buyer_home: string | null;
+  /** The PairUp Point the two chose, if any (src/market/points.ts). */
+  meetup_point_id?: string | null;
+  meetup_status?: string | null;
+  meetup_both_here_at?: string | Date | null;
+  meetup_arrivals?: ArrivalRow[] | string | null;
 }
 
 export type Role = "buyer" | "seller" | "observer";
@@ -117,8 +123,9 @@ export function dealView(d: DealWithParties, viewerId: string) {
   // Older releases auto-approved service prices without checking the time.
   // A tentative legacy proposal still needs an actual provider yes.
   const sellerConfirmed = d.seller_confirmed && (d.status !== "proposed" || d.kind === "item" || scheduling?.status === "verified" || d.provider_explicit_yes);
-  // Items change hands; two people in the same area meet at its Amazon Hub point.
-  const hub = d.kind === "item"
+  // A PairUp Point the two chose comes first; else items in the same area meet at its Amazon Hub point.
+  const point = pointById(d.meetup_point_id);
+  const hub = d.kind === "item" && !point
     ? hubPointFor(d.offer_location ?? d.seller_home, d.request_location ?? d.buyer_home)
     : null;
   const waitingFor =
@@ -149,7 +156,15 @@ export function dealView(d: DealWithParties, viewerId: string) {
     seller_confirmed: sellerConfirmed,
     waiting_for: waitingFor,
     waiting_for_you: role !== "observer" && waitingFor.includes(role),
-    meetup: { place: hub ? hubPlace(hub) : d.meetup, availability: d.availability, hub_point: hub && { ...hub, demo: true } },
+    meetup: {
+      place: point ? `${point.name} (demo location)` : hub ? hubPlace(hub) : d.meetup,
+      availability: d.availability,
+      hub_point: hub && { ...hub, demo: true },
+      point: point && {
+        point_id: point.id, name: point.name, area: point.area, demo: true as const,
+        ...arrivalView(d.meetup_status ?? "chosen", d.meetup_both_here_at ?? null, arrivals(d.meetup_arrivals), viewerId),
+      },
+    },
     pickup: d.kind === "service" ? d.pickup : null,
     needed_by: d.kind === "service" ? iso(d.needed_by) : null,
     scheduling,
@@ -158,6 +173,9 @@ export function dealView(d: DealWithParties, viewerId: string) {
     updated_at: iso(d.updated_at)!,
   };
 }
+
+/** Arrivals as JSON from the deal query (a string on drivers that leave json unparsed). */
+const arrivals = (v: ArrivalRow[] | string | null | undefined): ArrivalRow[] => (typeof v === "string" ? JSON.parse(v) : v ?? []);
 
 /** How the agreed price compares with the typical range for the offer. */
 function priceCheck(d: DealWithParties, price: number) {

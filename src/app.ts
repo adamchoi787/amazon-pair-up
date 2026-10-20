@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 import compression from "compression";
 import express from "express";
-import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
+import { hostHeaderValidation, localhostHostValidation } from "@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js";
 import { agentMode, handleAgentTurn } from "./agent/index.js";
 import { oauthRouter, sendUnauthorized, userForAccessToken, WEB_CLIENT_ID, webRedirectUri } from "./auth/oauth.js";
 import type { Config } from "./config.js";
@@ -14,6 +14,8 @@ import { llmsTxt, serverCard } from "./mcp/discovery.js";
 import { createMcpServer, SERVER_INFO } from "./mcp/server.js";
 import { McpSessions } from "./mcp/sessions.js";
 import { subscriberCount } from "./mcp/subscriptions.js";
+import { recordRingNotification } from "./market/points.js";
+import { parseRingNotification, RING_WEBHOOK_PATH, verifyRingSignature } from "./ring/webhook.js";
 
 // HTTP surface:
 //   /mcp            Streamable HTTP, protocol 2025-11-25. Alexa+ and the web app both call it.
@@ -24,6 +26,7 @@ import { subscriberCount } from "./mcp/subscriptions.js";
 //                   or the offline planner); the web app runs the tools itself over /mcp
 //   /app/           the PairUp web app
 //   /dashboard/     operations view (see DASHBOARD_TOKEN)
+//   /api/ring/webhook  Ring Partner API notifications for PairUp Points (HMAC-signed)
 //   /health         liveness; /ready also checks the database (for load balancers)
 //   /.well-known/mcp/server-card.json, /llms.txt, /skills/…  discovery for agents
 // Tool calls never need a session, so stateless clients need no sticky sessions.
@@ -32,10 +35,15 @@ import { subscriberCount } from "./mcp/subscriptions.js";
 type Caller = { ok: true; userId?: string } | { ok: false };
 
 export function createApp(deps: Deps, cfg: Config) {
-  const app = createMcpExpressApp({
-    host: cfg.host,
-    allowedHosts: cfg.allowedHosts.length ? cfg.allowedHosts : undefined,
-  });
+  const app = express();
+  // As the MCP SDK's createMcpExpressApp: Host validation (DNS rebinding) before
+  // the JSON parser. The parser also keeps the Ring webhook's raw bytes, which
+  // its HMAC signature covers.
+  if (cfg.allowedHosts.length) app.use(hostHeaderValidation(cfg.allowedHosts));
+  else if (["127.0.0.1", "localhost", "::1"].includes(cfg.host)) app.use(localhostHostValidation());
+  app.use(express.json({
+    verify: (req, _res, buf) => { if ((req as express.Request).originalUrl === RING_WEBHOOK_PATH) (req as RawRequest).rawBody = Buffer.from(buf); },
+  }));
 
   // Stateless MCP responses end once the result is written, so compressing them
   // only shrinks the transfer (the MCP Apps view is ~0.5 MB of HTML, ~4× smaller gzipped).
@@ -105,6 +113,24 @@ export function createApp(deps: Deps, cfg: Config) {
   });
 
   if (cfg.authMode === "oauth") app.use(oauthRouter(deps.db, cfg));
+
+  // Ring at PairUp Points: a doorbell press or a person at a point's device.
+  // Off until RING_HMAC_KEY is set; every delivery must carry Ring's signature.
+  app.post(RING_WEBHOOK_PATH, accessLog("ring"), rateLimit(600), async (req, res) => {
+    const key = deps.cfg.ring?.hmacKey;
+    if (!key) return void res.status(404).json({ error: "not found" });
+    if (!verifyRingSignature((req as RawRequest).rawBody, req.header("x-signature"), key)) {
+      return void res.status(401).json({ error: "bad signature" });
+    }
+    const event = parseRingNotification(req.body);
+    try {
+      const result = event ? await recordRingNotification(deps, event) : { stored: false, confirmed: 0 };
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      log("error", "ring webhook failed", { requestId: res.locals.requestId, err });
+      res.status(500).json({ error: "internal" });
+    }
+  });
 
   /** Who is calling: the OAuth subject, or in local development the X-User-Id header. */
   async function caller(req: express.Request): Promise<Caller> {
@@ -238,6 +264,8 @@ export function createApp(deps: Deps, cfg: Config) {
 
   return app;
 }
+
+type RawRequest = express.Request & { rawBody?: Buffer };
 
 function decodeName(raw: string | undefined) {
   try {
