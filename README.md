@@ -1,5 +1,7 @@
 # PairUp — a voice-first C2C marketplace for Alexa+
 
+**Faster and cheaper to buy what you need. Make personal business great. C2C in the future.**
+
 > People who have something, people who can do something, and people who need
 > either just say so. Alexa+ pairs each buyer with a seller, settles the price
 > by a fixed rule inside limits each side set privately, and asks both for a
@@ -39,6 +41,27 @@ Neither side ever sees the other's limit. Our MCP server understands both
 requests, pairs each request with the best-fitting offer of the same kind,
 settles the price and records the deal; Alexa+ is the voice and the agent; each
 person just says yes or no.
+
+## Why it matters
+
+- **Faster and cheaper to buy what you need.** One sentence reaches the person
+  nearby who has it, and the deal closes the same day at a hand-off point. A $20
+  TI-84 sells for $18: the seller keeps all $18, where a resale site's 13–20%
+  commission would leave $16–17 after the buyer paid $20 plus shipping.
+- **Make personal business great.** 72.9 million Americans already earn on their own,
+  and 30% of adults under 30 have done gig work. On PairUp, opening a small
+  business takes one sentence ("I do lunch runs from the HUB, $4"), the price is
+  the seller's, the full price reaches the seller, and ratings and learned routines bring
+  customers back.
+- **C2C in the future.** Personal agents will buy and sell for people. PairUp is
+  where they meet: any MCP agent connects, an open-source rule sets every price,
+  and every deal ends with a human yes.
+
+Households hold about $3,000–4,000 of resellable items each, and 80% of discarded
+furniture goes to landfill. One UW campus alone could move about $1.9 million a
+year between students (model). Evidence, sources and the model's inputs:
+[research/](research/README.md) (the [business case PDF](research/PairUp-Business-Case.pdf), the [short read](research/IMPACT_PLAIN.md), the [full evidence](research/IMPACT.md) and [the papers](research/LITERATURE.md)). The range of markets and one student's year:
+[docs/USE_CASES.md](docs/USE_CASES.md).
 
 ## How a price is set: no haggling
 
@@ -289,7 +312,8 @@ data/trade-in-categories.json  categories Amazon Trade-In takes
 skills/pairup/     the Agent Skill (SKILL.md)
 agents/agentcore/        Strands Agents voice agent for Amazon Bedrock AgentCore Runtime
 scripts/                 seed, smoke test, latency benchmark (bench.ts), add-on assets
-docs/                    contract, award plan, Alexa+ setup, deploy, demo script, submission, friction log
+research/                impact evidence, papers, plain-language summary
+docs/                    use cases, contract, award plan, Alexa+ setup, deploy, demo script, submission, friction log
 vendor/pairing-core/     prebuilt module from https://github.com/rairurairu/pairing-core (refresh: node scripts/sync-pairing-core.mjs)
 Dockerfile, deploy/      container image, AWS CloudFormation + deploy scripts, Lightsail config
 ```

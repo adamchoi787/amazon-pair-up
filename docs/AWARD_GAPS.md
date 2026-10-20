@@ -10,7 +10,7 @@ Judging weighs four criteria equally: technical implementation, design, potentia
 |---|---|---|
 | Technical implementation | MCP server with schemas, MCP Apps views, OAuth 2.1, transactions, availability and overlap checks, privacy leak tests, CI | Deploy 0.7.0 and pass `npm run check:release`; record a live Bedrock request |
 | Design | Voice or typed conversation, cards with price, total, time and missing approval, a watch view | Watch two or three new people use it and fix what confuses them |
-| Potential impact | US-first launch on the UW campus in Seattle; items, errands and one-time jobs in one flow | Run the UW pilot ([USER_VALIDATION.md](USER_VALIDATION.md)) |
+| Potential impact | US-first launch on the UW campus in Seattle; items, errands and one-time jobs in one flow; sourced pain points, market size, per-deal savings and a campus model in [research/IMPACT.md](../research/IMPACT.md) | Run the UW pilot ([USER_VALIDATION.md](USER_VALIDATION.md)) and add its numbers to IMPACT.md |
 | Quality of idea | Standing requests, matching from either side, an open-source price rule, learned routines | A focused video that shows one complete exchange first |
 | Alexa+ | MCP server plus a web host that plays the Alexa+ conversation | Public sub-three-minute video and the Devpost form |
 | AWS Builder | Bedrock embeddings and Nova Lite, Strands agent for AgentCore Runtime, CloudFront + EC2 + CloudWatch | Screenshots or logs from the live services |

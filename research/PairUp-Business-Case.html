@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PairUp Business Case</title>
+<meta name="description" content="Why PairUp: faster and cheaper to buy what you need, make personal business great, C2C in the future.">
+<style>
+  :root {
+    --ink: #15171a; --muted: #5d6470; --line: #e3e6ea; --paper: #ffffff; --bg: #eef0f3;
+    --accent: #0b6bcb; --accent-soft: #e8f1fb; --accent-ink: #084a8c;
+    --good: #1b7f4b; --good-soft: #e7f5ee; --warn: #a15c00; --warn-soft: #fdf3e4;
+    --bar-other: #b8c0ca;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 11pt/1.5 "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif; }
+  .page { width: 8.5in; min-height: 11in; margin: 24px auto; background: var(--paper);
+    padding: 0.7in 0.75in 0.6in; position: relative; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+  .page + .page { break-before: page; }
+  .folio { position: absolute; bottom: 0.35in; left: 0.75in; right: 0.75in; display: flex;
+    justify-content: space-between; font-size: 8pt; color: var(--muted); border-top: 1px solid var(--line); padding-top: 6px; }
+  h1, h2, h3 { line-height: 1.15; margin: 0; letter-spacing: -0.015em; }
+  h2 { font-size: 20pt; margin-bottom: 6px; }
+  h2 + .lede { margin-top: 0; }
+  h3 { font-size: 12pt; margin: 18px 0 6px; }
+  .kicker { font-size: 8.5pt; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+  .lede { font-size: 12pt; color: var(--muted); margin: 6px 0 18px; }
+  p { margin: 0 0 10px; }
+  a { color: var(--accent-ink); }
+  sup a { text-decoration: none; font-size: 7.5pt; }
+  ul { margin: 0 0 10px; padding-left: 18px; }
+  li { margin-bottom: 4px; }
+  strong { font-weight: 650; }
+
+  /* Cover */
+  .cover { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+  .cover-top { background: var(--accent); color: #fff; padding: 0.9in 0.75in 0.7in; }
+  .cover-top .brand { font-size: 13pt; font-weight: 750; letter-spacing: .02em; opacity: .9; margin-bottom: 1.1in; }
+  .cover-top .doc { font-size: 10pt; letter-spacing: .14em; text-transform: uppercase; opacity: .85; margin-bottom: 10px; }
+  .cover-top h1 { font-size: 34pt; max-width: 15ch; letter-spacing: -0.03em; }
+  .cover-top .sub { font-size: 13pt; margin-top: 16px; max-width: 46ch; opacity: .95; }
+  .promises { padding: 0.5in 0.75in 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .promise { border-top: 3px solid var(--accent); padding-top: 10px; }
+  .promise .n { font-size: 9pt; color: var(--accent); font-weight: 700; }
+  .promise b { display: block; font-size: 13pt; line-height: 1.2; margin: 4px 0 6px; }
+  .promise span { font-size: 9.5pt; color: var(--muted); }
+  .cover-foot { margin-top: auto; padding: 0 0.75in 0.6in; font-size: 9pt; color: var(--muted); display: flex; justify-content: space-between; }
+
+  /* Blocks */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0 18px; }
+  .stats.four { grid-template-columns: repeat(4, 1fr); }
+  .stat { background: var(--accent-soft); border-radius: 10px; padding: 12px 14px; }
+  .stat .v { font-size: 20pt; font-weight: 750; color: var(--accent-ink); line-height: 1.1; letter-spacing: -0.02em; }
+  .stat .l { font-size: 9pt; color: var(--ink); margin-top: 4px; line-height: 1.35; }
+  .stat .s { font-size: 7.5pt; color: var(--muted); margin-top: 4px; }
+  .callout { border-left: 4px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 10px 10px 0; margin: 14px 0; }
+  .callout.good { border-color: var(--good); background: var(--good-soft); }
+  .callout p:last-child { margin: 0; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin: 8px 0 14px; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 8pt; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 650; border-bottom: 1.5px solid var(--ink); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.us td { background: var(--accent-soft); font-weight: 600; }
+  .yes { color: var(--good); font-weight: 700; }
+  .part { color: var(--warn); }
+  .dim { color: var(--muted); }
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 12px 0 16px; }
+  .step { border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .step .n { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 9pt; font-weight: 700; display: grid; place-items: center; margin-bottom: 8px; }
+  .step b { display: block; font-size: 10pt; margin-bottom: 4px; }
+  .step span { font-size: 9pt; color: var(--muted); }
+  .quote { font-size: 11pt; background: #f6f7f9; border-radius: 10px; padding: 10px 14px; margin: 6px 0; }
+  .quote .who { font-size: 8pt; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); display: block; margin-bottom: 2px; }
+  .chart { margin: 8px 0 4px; }
+  .chart text { font-family: inherit; }
+  .note { font-size: 8.5pt; color: var(--muted); }
+  .roadmap { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin: 12px 0 16px; }
+  .rm { padding: 12px 12px 12px 14px; border-top: 4px solid var(--bar-other); }
+  .rm.now { border-color: var(--accent); }
+  .rm .t { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+  .rm.now .t { color: var(--accent); }
+  .rm b { display: block; margin: 4px 0; font-size: 10.5pt; line-height: 1.25; }
+  .rm span { font-size: 9pt; color: var(--muted); }
+  .refs { font-size: 8.3pt; line-height: 1.4; columns: 2; column-gap: 22px; padding-left: 16px; }
+  .refs li { break-inside: avoid; margin-bottom: 5px; }
+  .ask { background: var(--ink); color: #fff; border-radius: 12px; padding: 20px 22px; margin-top: 14px; }
+  .ask h3 { color: #fff; margin-top: 0; font-size: 14pt; }
+  .ask ol { margin: 8px 0 0; padding-left: 20px; }
+  .ask li { margin-bottom: 6px; }
+
+  @page { size: Letter; margin: 0; }
+  @media print {
+    body { background: #fff; }
+    .page { margin: 0; box-shadow: none; width: 8.5in; height: 11in; min-height: 0; overflow: hidden; }
+  }
+  @media screen and (max-width: 860px) {
+    .page { width: auto; min-height: 0; margin: 12px; padding: 28px 16px 56px; }
+    .cover { padding: 0; }
+    .cover-top, .promises, .cover-foot { padding-left: 16px; padding-right: 16px; }
+    .promises, .stats, .stats.four, .two, .steps, .roadmap { grid-template-columns: 1fr; }
+    .refs { columns: 1; }
+    .folio { left: 16px; right: 16px; }
+    table { display: block; overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 1. Cover -->
+<section class="page cover">
+  <div class="cover-top">
+    <div class="brand">PairUp</div>
+    <div class="doc">Business case · October 2026</div>
+    <h1>Say what you need. A neighbor has it.</h1>
+    <p class="sub">A voice-first C2C marketplace on Alexa+ that pairs people who need something with people nearby who have it or can do it, at a fair price set by a published rule.</p>
+  </div>
+  <div class="promises">
+    <div class="promise"><div class="n">01</div><b>Faster and cheaper to buy what you need</b><span>One sentence finds it nearby. The whole price goes to the other person.</span></div>
+    <div class="promise"><div class="n">02</div><b>Make personal business great</b><span>Anyone opens a small business in one sentence and keeps what they earn.</span></div>
+    <div class="promise"><div class="n">03</div><b>C2C in the future</b><span>The open meeting point where personal AI agents trade for people.</span></div>
+  </div>
+  <div class="cover-foot"><span>Launch market: University of Washington, Seattle</span><span>Amazon Developer Hackathon · Alexa+ track</span></div>
+</section>
+
+<!-- 2. Executive summary -->
+<section class="page">
+  <div class="kicker">Executive summary</div>
+  <h2>Small local trades are worth billions, and most of them never happen</h2>
+  <p class="lede">The people who need something and the people who have it are often a short walk apart. Finding each other, agreeing a price and paying a platform's fee cost more than a $15 trade is worth, so the trade is skipped.</p>
+
+  <div class="stats four">
+    <div class="stat"><div class="v">$3–4K</div><div class="l">of resellable items sit unused in the average US home</div><div class="s">eBay Recommerce Report 2026<sup><a href="#r1">1</a></sup></div></div>
+    <div class="stat"><div class="v">13–20%</div><div class="l">of each sale kept by major resale sites</div><div class="s">Poshmark, Mercari, eBay fee schedules<sup><a href="#r2">2</a></sup></div></div>
+    <div class="stat"><div class="v">72.9M</div><div class="l">Americans already earn money working for themselves</div><div class="s">MBO Partners 2025<sup><a href="#r3">3</a></sup></div></div>
+    <div class="stat"><div class="v">600M+</div><div class="l">Alexa devices sold; 97% can run Alexa+</div><div class="s">Amazon at CES 2026<sup><a href="#r4">4</a></sup></div></div>
+  </div>
+
+  <h3>The opportunity</h3>
+  <p>PairUp lets anyone say what they need, have or can do. It pairs the two sides, settles the price inside limits each side set privately, proposes a public hand-off point and asks both people for a yes. Things, errands, hourly help and event staffing all run through the same engine, by voice.</p>
+
+  <h3>Why it wins</h3>
+  <ul>
+    <li><strong>Cheaper for both sides.</strong> The agreed price passes in full from buyer to seller. On a $20 calculator, the seller receives $18.00 on PairUp against $16.00–17.12 on resale sites, and the buyer pays $18.00 against $20 plus shipping.</li>
+    <li><strong>Faster.</strong> One sentence replaces photos, a listing form, chat and haggling. Requests stand, so the next matching seller is paired the moment they post.</li>
+    <li><strong>Built for agents.</strong> Any AI assistant connects over the open MCP standard. Prices come from a published, open-source rule, so agents never haggle and cannot be talked into a worse deal. Research shows AI negotiators can be swayed by tone.<sup><a href="#r15">15</a></sup></li>
+    <li><strong>Strong fit with Amazon.</strong> Alexa+ is the voice, Amazon Hub Lockers and Counters are the hand-off points, amazon.com covers every need no neighbor can meet, and AWS runs it.</li>
+  </ul>
+
+  <div class="callout good">
+    <p><strong>Recommendation.</strong> Launch at the University of Washington in Seattle: 52,316 students in walking distance with needs that repeat every quarter. Our model puts one campus at about <strong>$1.9 million a year</strong> of trades between students. Measure for one quarter, then expand campus by campus.</p>
+  </div>
+
+  <div class="folio"><span>PairUp business case</span><span>2</span></div>
+</section>
+
+<!-- 3. The problem -->
+<section class="page">
+  <div class="kicker">The problem</div>
+  <h2>Trading with the person next door is slow, costly and risky</h2>
+  <p class="lede">Five pains, each backed by public data.</p>
+
+  <table>
+    <thead><tr><th style="width:24%">Pain</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Fees eat small sales</strong></td><td>Poshmark keeps 20% of sales of $15 and up; Mercari 10% plus 2.9% + $0.30 for payment; eBay about 12.9–15% plus $0.30 per order.<sup><a href="#r2">2</a></sup></td></tr>
+      <tr><td><strong>Small errands cost more than the errand</strong></td><td>A $39 restaurant meal cost $47.10 on the major delivery apps before service fees.<sup><a href="#r5">5</a></sup> Grocery items averaged 11% above in-store prices, plus delivery fees.<sup><a href="#r6">6</a></sup> Hired help adds a service fee and a Trust &amp; Support fee on each hour.<sup><a href="#r7">7</a></sup></td></tr>
+      <tr><td><strong>Strangers are risky</strong></td><td>Americans reported $12.5 billion lost to fraud in 2024, up 25%. Online shopping was the second most reported category, with $432 million lost.<sup><a href="#r8">8</a></sup></td></tr>
+      <tr><td><strong>Haggling leaks and stalls</strong></td><td>On millions of eBay Best Offer negotiations, the listing price itself signalled how eager a seller was: round-number listings drew offers 8–12% lower.<sup><a href="#r13">13</a></sup> Bargaining with private values loses deals both sides wanted.<sup><a href="#r12">12</a></sup></td></tr>
+      <tr><td><strong>Useful things are thrown away</strong></td><td>The US generated 12.1 million tons of furniture waste in 2018; 80.1% went to landfill.<sup><a href="#r9">9</a></sup> Students are budgeted about $1,290 a year for books and supplies.<sup><a href="#r10">10</a></sup></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Why the market skips these trades</h3>
+  <p>Economics has explained this for decades. Searching costs time, so buyers settle for worse prices (Stigler, 1961).<sup><a href="#r11">11</a></sup> Every market trade carries costs of finding, negotiating and enforcing it, and trades worth less than those costs never happen (Coase, 1937).<sup><a href="#r11">11</a></sup> A $4 lunch run and a $15 lamp sit squarely below that line today.</p>
+
+  <div class="callout">
+    <p><strong>What this means.</strong> The demand and the supply already exist on every campus and street. The missing piece is a way to connect them that costs one sentence and charges no commission on the deal.</p>
+  </div>
+
+  <div class="folio"><span>PairUp business case</span><span>3</span></div>
+</section>
+
+<!-- 4. The solution -->
+<section class="page">
+  <div class="kicker">The solution</div>
+  <h2>One sentence in, one yes out</h2>
+  <p class="lede">PairUp runs as an MCP server for Alexa+ and any AI assistant. People talk; code pairs, prices and schedules.</p>
+
+  <div class="quote"><span class="who">Seller</span>"Alexa, sell my TI-84 for $20. I'll take anything above $15."</div>
+  <div class="quote"><span class="who">Buyer</span>"Alexa, I need a graphing calculator today, max $18."</div>
+  <div class="quote"><span class="who">Alexa+</span>"Found it: TI-84 Plus for $18, $2 below asking. Meet-up at the Amazon Hub Counter on campus. Should I confirm it?"</div>
+
+  <div class="steps">
+    <div class="step"><div class="n">1</div><b>Say it</b><span>Need, offer or skill, by voice or text. Requests stand until a match appears.</span></div>
+    <div class="step"><div class="n">2</div><b>Pair</b><span>Semantic search, distance, urgency and track record rank every fitting offer.</span></div>
+    <div class="step"><div class="n">3</div><b>Price</b><span>One published rule settles the price inside both private limits.</span></div>
+    <div class="step"><div class="n">4</div><b>Yes</b><span>Both people confirm. They meet at a public point and pay at the hand-off.</span></div>
+  </div>
+
+  <h3>Six markets, one engine</h3>
+  <table>
+    <thead><tr><th>Market</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td>Used things</td><td>Textbooks, calculators, lamps, a mini fridge at move-out</td></tr>
+      <tr><td>Errands</td><td>Lunch from the HUB to McCarty Hall, $4; cold medicine to a dorm</td></tr>
+      <tr><td>Hands by the hour</td><td>Two hours of moving help with a trolley, $12 an hour</td></tr>
+      <tr><td>Organizations</td><td>A club staffs registration, AV and a photographer for one Saturday</td></tr>
+      <tr><td>Neighborhood care</td><td>Cat sitting and plant watering while away</td></tr>
+      <tr><td>Needs not yet spoken</td><td>The usual weekday lunch run, offered before noon; every post waits for a yes</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Trust built in</h3>
+  <p>Private limits never leave the server. A price check asks "did you mean…?" on prices far from normal and warns buyers about deals that look too good. Banned items and services are refused with a reason. Ratings build each person's track record, reports pause pairing until reviewed, and hand-offs happen at public Amazon Hub points.</p>
+
+  <div class="folio"><span>PairUp business case</span><span>4</span></div>
+</section>
+
+<!-- 5. Value -->
+<section class="page">
+  <div class="kicker">Value · Faster and cheaper to buy what you need</div>
+  <h2>The same calculator, four ways</h2>
+  <p class="lede">A $20 TI-84. The buyer's budget is $18; the seller's private minimum is $15.</p>
+
+  <svg class="chart" viewBox="0 0 680 230" width="100%" role="img" aria-label="Seller receives: Poshmark $16.00, eBay $17.05, Mercari $17.12, PairUp $18.00">
+    <text x="0" y="14" font-size="11" font-weight="650" fill="#15171a">What the seller receives</text>
+    <g font-size="11" fill="#15171a">
+      <text x="0" y="52">Poshmark</text><text x="0" y="96">eBay</text><text x="0" y="140">Mercari</text><text x="0" y="184" font-weight="700">PairUp</text>
+    </g>
+    <g>
+      <rect x="90" y="36" width="400" height="24" rx="4" fill="#b8c0ca"/>
+      <rect x="90" y="80" width="426.25" height="24" rx="4" fill="#b8c0ca"/>
+      <rect x="90" y="124" width="428" height="24" rx="4" fill="#b8c0ca"/>
+      <rect x="90" y="168" width="450" height="24" rx="4" fill="#0b6bcb"/>
+    </g>
+    <g font-size="11" font-variant-numeric="tabular-nums">
+      <text x="498" y="52" fill="#15171a">$16.00</text>
+      <text x="524" y="96" fill="#15171a">$17.05</text>
+      <text x="526" y="140" fill="#15171a">$17.12</text>
+      <text x="548" y="184" fill="#084a8c" font-weight="700">$18.00</text>
+    </g>
+    <line x1="90" y1="28" x2="90" y2="200" stroke="#15171a" stroke-width="1"/>
+    <text x="90" y="220" font-size="9" fill="#5d6470">$0</text>
+    <text x="590" y="220" font-size="9" fill="#5d6470" text-anchor="end">$20 asking price</text>
+    <line x1="590" y1="28" x2="590" y2="200" stroke="#5d6470" stroke-dasharray="3 3"/>
+  </svg>
+
+  <table>
+    <thead><tr><th></th><th class="num">Seller receives</th><th class="num">Buyer pays</th><th>Effort for the seller</th></tr></thead>
+    <tbody>
+      <tr><td>Poshmark (20%)</td><td class="num">$16.00</td><td class="num">$20 + shipping</td><td>Photos, listing, offers, shipping label</td></tr>
+      <tr><td>eBay (about 13.25% + $0.30)</td><td class="num">$17.05</td><td class="num">$20 + shipping</td><td>Photos, listing, offers, shipping</td></tr>
+      <tr><td>Mercari (10% + 2.9% + $0.30)</td><td class="num">$17.12</td><td class="num">$20 + shipping</td><td>Photos, listing, offers, shipping</td></tr>
+      <tr class="us"><td>PairUp</td><td class="num">$18.00</td><td class="num">$18.00</td><td>One sentence and one yes; same-day hand-off on campus</td></tr>
+    </tbody>
+  </table>
+  <p class="note">Fee rates from published fee guides;<sup><a href="#r2">2</a></sup> resale rows assume the item sells at its $20 ask.</p>
+
+  <div class="two">
+    <div>
+      <h3>For errands</h3>
+      <p>The lunch costs its counter price. The requester offers up to $5, a student already walking that way takes it for $4, and the whole $4 goes to the student who carried it.</p>
+    </div>
+    <div>
+      <h3>For the buyer's time</h3>
+      <p>No browsing, no shipping wait. A standing request keeps working: when the next matching seller posts, PairUp pairs them at once and tells the buyer's agent.</p>
+    </div>
+  </div>
+
+  <div class="folio"><span>PairUp business case</span><span>5</span></div>
+</section>
+
+<!-- 6. Personal business -->
+<section class="page">
+  <div class="kicker">Value · Make personal business great</div>
+  <h2>Everyone has a small business in them</h2>
+  <p class="lede">A desk to sell in June, a free afternoon, a trolley, a daily walk past the pharmacy. PairUp turns each into income with one sentence.</p>
+
+  <div class="stats">
+    <div class="stat"><div class="v">72.9M</div><div class="l">US independent workers in 2025, including 37.4M occasional earners</div><div class="s">MBO Partners<sup><a href="#r3">3</a></sup></div></div>
+    <div class="stat"><div class="v">30%</div><div class="l">of US adults aged 18–29 have earned money through an online gig platform</div><div class="s">Pew Research Center<sup><a href="#r17">17</a></sup></div></div>
+    <div class="stat"><div class="v">2×+</div><div class="l">the surplus drivers get from choosing their own hours, against fixed schedules</div><div class="s">Chen et al., JPE 2019<sup><a href="#r18">18</a></sup></div></div>
+  </div>
+
+  <table>
+    <thead><tr><th style="width:32%">A seller on PairUp</th><th>How</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Opens in one sentence</strong></td><td>"I do lunch runs from the HUB on weekdays, $4." The offer stands and is paired whenever a request fits.</td></tr>
+      <tr><td><strong>Sets the price</strong></td><td>A public ask, a private minimum, and automatic acceptance of any offer at or above it.</td></tr>
+      <tr><td><strong>Keeps the earnings</strong></td><td>The agreed price is paid in full at the hand-off.</td></tr>
+      <tr><td><strong>Sets the hours</strong></td><td>PairUp books work only inside the hours the provider states, and one person's bookings never overlap.</td></tr>
+      <tr><td><strong>Builds a reputation</strong></td><td>Ratings after every deal feed a track record that moves reliable people up the ranking.</td></tr>
+      <tr><td><strong>Gets regulars</strong></td><td>PairUp learns routines like the weekday lunch run and offers them again, so a regular helper gets regular work.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <p><strong>From research.</strong> Peer markets let owners earn from goods they use only part of the time (Horton &amp; Zeckhauser, 2016),<sup><a href="#r19">19</a></sup> and add the most value at peak moments when regular supply runs short (Farronato &amp; Fradkin, AER 2022)<sup><a href="#r20">20</a></sup>: the exam-morning calculator, the move-out van.</p>
+  </div>
+
+  <div class="folio"><span>PairUp business case</span><span>6</span></div>
+</section>
+
+<!-- 7. Market -->
+<section class="page">
+  <div class="kicker">Market opportunity</div>
+  <h2>A large market, entered one campus at a time</h2>
+  <p class="lede">Secondhand goods, independent work and voice assistants are each large and growing. PairUp sits where they meet.</p>
+
+  <table>
+    <thead><tr><th>Layer</th><th>Size</th></tr></thead>
+    <tbody>
+      <tr><td>US secondhand apparel (one category)</td><td>Grew 14% in 2024; projected $74 billion by 2029. 58% of US consumers bought secondhand apparel in 2024.<sup><a href="#r21">21</a></sup></td></tr>
+      <tr><td>Idle goods in homes</td><td>About $3,000–4,000 of resellable items per household.<sup><a href="#r1">1</a></sup></td></tr>
+      <tr><td>People earning on their own</td><td>72.9 million US independent workers.<sup><a href="#r3">3</a></sup></td></tr>
+      <tr><td>Voice reach</td><td>Over 600 million Alexa devices sold; 97% can run Alexa+.<sup><a href="#r4">4</a></sup></td></tr>
+      <tr><td>US college students</td><td>About 19 million; fall 2025 enrollment up 1.0%.<sup><a href="#r22">22</a></sup></td></tr>
+      <tr><td>Launch campus</td><td>52,316 students at UW Seattle, autumn 2025.<sup><a href="#r23">23</a></sup></td></tr>
+    </tbody>
+  </table>
+
+  <h3>One campus, modelled</h3>
+  <div class="two">
+    <div>
+      <p class="dim" style="margin-bottom:4px">Inputs (change any and recompute)</p>
+      <ul>
+        <li>52,316 UW Seattle students</li>
+        <li>10% use PairUp in a quarter: about 5,200 people</li>
+        <li>2 exchanges a month each</li>
+        <li>$15 average: a textbook, a calculator, a lamp or two lunch runs</li>
+      </ul>
+    </div>
+    <div class="stats" style="grid-template-columns:1fr 1fr; margin-top:0">
+      <div class="stat"><div class="v">10,500</div><div class="l">exchanges a month</div></div>
+      <div class="stat"><div class="v">$1.9M</div><div class="l">a year between students</div></div>
+      <div class="stat"><div class="v">$250–375K</div><div class="l">a year kept from 13–20% commissions</div></div>
+      <div class="stat"><div class="v">$680M</div><div class="l">a year at the same rates across US students</div></div>
+    </div>
+  </div>
+  <p class="note">Model figures are our estimates from the inputs shown. The UW pilot will replace them with measured results.</p>
+
+  <h3>Why campuses first</h3>
+  <p>Campuses are dense and walkable. Needs repeat every quarter (textbooks, calculators), and move-in and move-out refill supply every year. Student clubs bring organization demand. Each new campus is a self-contained market that reaches density quickly.</p>
+
+  <div class="folio"><span>PairUp business case</span><span>7</span></div>
+</section>
+
+<!-- 8. Why now / C2C future -->
+<section class="page">
+  <div class="kicker">Why now · C2C in the future</div>
+  <h2>Personal agents will trade for people. They need a fair place to meet.</h2>
+  <p class="lede">Commerce is moving from apps people browse to assistants that act for them. Research on AI agents in markets points to three requirements, and PairUp meets each one.</p>
+
+  <table>
+    <thead><tr><th style="width:30%">What research finds</th><th style="width:32%">Source</th><th>PairUp's answer</th></tr></thead>
+    <tbody>
+      <tr><td>AI negotiators show anchoring; one acting desperate gains about 20%</td><td>Bianchi et al., ICML 2024<sup><a href="#r15">15</a></sup></td><td>Agents never bargain. One published rule in open-source pairing-core sets every price.</td></tr>
+      <tr><td>AI shoppers favor the first offer they receive, and quality falls as markets grow</td><td>Magentic Marketplace, Microsoft Research 2025<sup><a href="#r16">16</a></sup></td><td>The server ranks every fitting offer before an agent sees it, so the best match wins.</td></tr>
+      <tr><td>Markets of AI agents need new institutions to work well</td><td>Hadfield &amp; Koh, NBER Handbook 2025<sup><a href="#r24">24</a></sup></td><td>An open protocol (MCP), shared test vectors for the price rule, and a required human yes.</td></tr>
+      <tr><td>No bilateral trading rule is perfect on every count</td><td>Myerson &amp; Satterthwaite 1983<sup><a href="#r12">12</a></sup></td><td>A simple rule with its trade-offs published: public ask, automatic best-offer acceptance.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Open by design</h3>
+  <ul>
+    <li><strong>Any assistant connects:</strong> Alexa+, a Strands agent on Bedrock AgentCore, or any MCP client, through OAuth 2.1 with Login with Amazon.</li>
+    <li><strong>Any host settles the same way:</strong> pairing-core is MIT-licensed Rust compiled to WebAssembly, with shared test vectors.</li>
+    <li><strong>People stay in charge:</strong> agents find, explain and prepare; people confirm. Every person can be a buyer and a seller at once, through the assistant they already use.</li>
+  </ul>
+
+  <h3>Fit with Amazon</h3>
+  <div class="stats four">
+    <div class="stat"><div class="l"><strong>Alexa+</strong><br>The voice for local buying and selling</div></div>
+    <div class="stat"><div class="l"><strong>Amazon Hub</strong><br>Lockers and Counters as safe hand-off points</div></div>
+    <div class="stat"><div class="l"><strong>amazon.com</strong><br>The new price and a link when no neighbor has it</div></div>
+    <div class="stat"><div class="l"><strong>AWS</strong><br>Bedrock, AgentCore, CloudFront, EC2, CloudWatch</div></div>
+  </div>
+
+  <div class="folio"><span>PairUp business case</span><span>8</span></div>
+</section>
+
+<!-- 9. Competition, risks -->
+<section class="page">
+  <div class="kicker">Position</div>
+  <h2>One front door for needs that live in five apps today</h2>
+
+  <table>
+    <thead><tr><th>Today's option</th><th>Things</th><th>Errands</th><th>Hourly help</th><th>Price set by</th><th>Seller pays</th></tr></thead>
+    <tbody>
+      <tr><td>Group chats and forums</td><td class="yes">●</td><td class="part">◐</td><td class="part">◐</td><td>Haggling in chat</td><td>Nothing</td></tr>
+      <tr><td>Resale sites</td><td class="yes">●</td><td class="dim">–</td><td class="dim">–</td><td>Haggling or offers</td><td>13–20% of the sale</td></tr>
+      <tr><td>Delivery apps</td><td class="dim">–</td><td class="part">◐ food, groceries</td><td class="dim">–</td><td>The platform</td><td>Commission; buyer pays fees</td></tr>
+      <tr><td>Task apps</td><td class="dim">–</td><td class="yes">●</td><td class="yes">●</td><td>Hourly rate</td><td>Client pays service fees</td></tr>
+      <tr class="us"><td>PairUp</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td>Published rule, private limits</td><td>Nothing on the deal</td></tr>
+    </tbody>
+  </table>
+  <p class="note">● full · ◐ partial · – not offered. PairUp also takes voice and AI-agent requests, keeps requests standing, and learns routines.</p>
+
+  <h3>Risks and how we handle them</h3>
+  <table>
+    <thead><tr><th style="width:26%">Risk</th><th>Plan</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Too few people at first</strong></td><td>Start on one dense campus; requests stand until a match arrives; move-in, move-out and club events bring both sides at once.</td></tr>
+      <tr><td><strong>Safety between strangers</strong></td><td>Signed-in accounts, ratings, reports that pause pairing, banned-item rules, a too-good-to-be-true warning, and public Amazon Hub meet-ups.</td></tr>
+      <tr><td><strong>Agents gaming prices</strong></td><td>Prices come from code; one offer below the ask per buyer and listing; limits never leave the server; a human yes on every deal.</td></tr>
+      <tr><td><strong>Mistyped or misheard prices</strong></td><td>The price check asks "did you mean…?" against reference prices and the market's own trades, weighted so staged trades barely move it.</td></tr>
+      <tr><td><strong>Payment</strong></td><td>People pay each other at the hand-off today; in-app payment through Amazon is the natural next step.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>How we will measure success</h3>
+  <table>
+    <thead><tr><th>Promise</th><th>Metric</th></tr></thead>
+    <tbody>
+      <tr><td>Faster</td><td>Time from request to proposed deal</td></tr>
+      <tr><td>Cheaper</td><td>Price paid against the typical range and the new price on Amazon</td></tr>
+      <tr><td>Personal business</td><td>Share of the price kept by sellers; repeat providers; returning routines</td></tr>
+      <tr><td>C2C future</td><td>Requests paired from either side and through outside agents</td></tr>
+      <tr><td>Trust</td><td>Unaided task success; correct understanding of cost and time; reports per thousand deals</td></tr>
+    </tbody>
+  </table>
+
+  <div class="folio"><span>PairUp business case</span><span>9</span></div>
+</section>
+
+<!-- 10. Roadmap + ask -->
+<section class="page">
+  <div class="kicker">Roadmap and recommendation</div>
+  <h2>Start at UW. Grow campus by campus.</h2>
+
+  <div class="roadmap">
+    <div class="rm now"><div class="t">Now</div><b>UW Seattle</b><span>Campus and nearby neighborhoods; 52,316 students</span></div>
+    <div class="rm"><div class="t">Next</div><b>Seattle area</b><span>Other campuses and neighborhoods</span></div>
+    <div class="rm"><div class="t">Then</div><b>US campuses</b><span>About 19 million students, with campus Hub points</span></div>
+    <div class="rm"><div class="t">Beyond</div><b>Every neighborhood</b><span>Any household, any MCP-connected agent</span></div>
+  </div>
+
+  <h3>Ready today</h3>
+  <ul>
+    <li>A live MCP server (spec 2025-11-25) with OAuth 2.1, MCP Apps cards, and a web app that plays the Alexa+ conversation in any browser.</li>
+    <li>Pairing from either side with pgvector and full-text search; prices by open-source pairing-core; schedules checked against each helper's hours.</li>
+    <li>Trust and safety: banned-item rules, ratings, reports, price check, data deletion.</li>
+    <li>Learned routines, Bee context and an Apple Watch view; every suggestion waits for a yes.</li>
+    <li>Running on AWS with Bedrock, a Strands agent for AgentCore Runtime, CloudFront, EC2 Graviton and CloudWatch.</li>
+  </ul>
+
+  <div class="ask">
+    <h3>Recommendation</h3>
+    <ol>
+      <li><strong>Launch the UW Seattle pilot</strong> with students on both sides: requesters and providers.</li>
+      <li><strong>Measure for one quarter</strong>: time to deal, price against alternatives, seller earnings, unaided success.</li>
+      <li><strong>Connect Amazon services</strong>: the Hub locator for hand-offs and live amazon.com prices for the fallback.</li>
+      <li><strong>Expand</strong> to the next Seattle campus once the first reaches steady weekly trades.</li>
+    </ol>
+  </div>
+
+  <p style="margin-top:18px; font-size:13pt; font-weight:650">Say what you need. A neighbor has it. PairUp makes the deal fair, safe and fast.</p>
+
+  <div class="folio"><span>PairUp business case</span><span>10</span></div>
+</section>
+
+<!-- 11. References -->
+<section class="page">
+  <div class="kicker">Evidence</div>
+  <h2>References</h2>
+  <p class="lede">Full notes on each paper: <a href="LITERATURE.md">LITERATURE.md</a>. All figures with context: <a href="IMPACT.md">IMPACT.md</a>.</p>
+  <ol class="refs">
+    <li id="r1">eBay Recommerce Report 2026, reported in <a href="https://lavocedinewyork.com/en/lifestyles/2026/10/09/secondhand-shopping-takes-off-as-americans-look-to-save-money/">La Voce di New York</a>, Oct 9, 2026.</li>
+    <li id="r2">Seller fee guides for <a href="https://closo.co/blogs/fees/poshmark-seller-fee-2025-complete-guide-to-payouts-fees-profit-margins">Poshmark</a>, <a href="https://closo.co/blogs/fees/mercari-fee-2025-full-breakdown-comparison-with-ebay-seller-fees">Mercari</a> and <a href="https://closo.co/blogs/fees/ebay-final-sale-fee-2025-complete-guide-to-ebay-s-final-value-fee-how-it-affects-your-profit">eBay</a>, Closo, 2025.</li>
+    <li id="r3">MBO Partners, <a href="https://www.mbopartners.com/blog/news/the-rise-of-the-independent-workforce-key-insights-from-the-2025-state-of-independence-report">State of Independence 2025</a>.</li>
+    <li id="r4">TechCrunch, <a href="https://techcrunch.com/2026/01/12/amazon-says-97-of-its-devices-can-support-alexa">Amazon says 97% of its devices can support Alexa+</a>, Jan 12, 2026.</li>
+    <li id="r5">Star Tribune, <a href="https://www.startribune.com/article/600169619">How to spot hidden charges in food delivery apps</a>.</li>
+    <li id="r6">CHOICE, <a href="https://www.choice.com.au/shopping/everyday-shopping/supermarkets/articles/doordash-milkrun-and-uber-eats-grocery-delivery-costs-compared">DoorDash, Milkrun and Uber Eats grocery prices compared</a>.</li>
+    <li id="r7">Taskrabbit Help Center, <a href="https://support.taskrabbit.com/hc/en-us/articles/204411610-What-s-the-Taskrabbit-Service-Fee-">What's the Taskrabbit Service Fee?</a></li>
+    <li id="r8">FTC Consumer Sentinel 2024 data, reported by <a href="https://www.securityweek.com/fraud-losses-reached-12-5-billion-in-2024-ftc/">SecurityWeek</a>, March 2025.</li>
+    <li id="r9">US EPA, <a href="https://19january2025snapshot.epa.gov/facts-and-figures-about-materials-waste-and-recycling/durable-goods-product-specific-data">Durable Goods: Product-Specific Data</a> (2018 figures).</li>
+    <li id="r10">College Board figures via <a href="https://bestcolleges.com/research/average-cost-of-college-textbooks-statistics/">BestColleges</a>, 2024–25.</li>
+    <li id="r11">Stigler, G. J. (1961). The Economics of Information. <em>Journal of Political Economy</em> 69(3). · Coase, R. H. (1937). The Nature of the Firm. <em>Economica</em> 4(16).</li>
+    <li id="r12">Myerson, R. B. &amp; Satterthwaite, M. A. (1983). Efficient Mechanisms for Bilateral Trading. <em>Journal of Economic Theory</em> 29(2). · Chatterjee, K. &amp; Samuelson, W. (1983). Bargaining under Incomplete Information. <em>Operations Research</em> 31(5).</li>
+    <li id="r13">Backus, M., Blake, T. &amp; Tadelis, S. (2019). On the Empirical Content of Cheap-Talk Signaling: An Application to Bargaining. <em>Journal of Political Economy</em> 127(4).</li>
+    <li id="r14">Einav, L., Farronato, C. &amp; Levin, J. (2016). <a href="https://nber.org/papers/w21496">Peer-to-Peer Markets</a>. <em>Annual Review of Economics</em> 8. · Roth, A. E. (2008). What Have We Learned from Market Design? <em>The Economic Journal</em> 118(527).</li>
+    <li id="r15">Bianchi, F. et al. (2024). <a href="https://arxiv.org/abs/2402.05863">How Well Can LLMs Negotiate? NegotiationArena Platform and Analysis</a>. ICML 2024.</li>
+    <li id="r16">Bansal, G. et al. (2025). <a href="https://arxiv.org/abs/2510.25779">Magentic Marketplace: An Open-Source Environment for Studying Agentic Markets</a>. Microsoft Research.</li>
+    <li id="r17">Pew Research Center (2021). <a href="https://www.pewresearch.org/internet/2021/12/08/the-state-of-gig-work-in-2021/">The State of Gig Work in 2021</a>.</li>
+    <li id="r18">Chen, M. K., Rossi, P. E., Chevalier, J. A. &amp; Oehlsen, E. (2019). <a href="https://www.nber.org/papers/w23296">The Value of Flexible Work: Evidence from Uber Drivers</a>. <em>Journal of Political Economy</em> 127(6).</li>
+    <li id="r19">Horton, J. J. &amp; Zeckhauser, R. J. (2016). <a href="https://www.nber.org/papers/w22029">Owning, Using and Renting: Some Simple Economics of the "Sharing Economy"</a>. NBER w22029.</li>
+    <li id="r20">Farronato, C. &amp; Fradkin, A. (2022). <a href="https://www.nber.org/papers/w24361">The Welfare Effects of Peer Entry: The Case of Airbnb and the Accommodation Industry</a>. <em>American Economic Review</em> 112(6).</li>
+    <li id="r21">ThredUp 2025 Resale Report, via <a href="https://chainstoreage.com/thredup-us-secondhand-apparel-sales-reach-74b-2029">Chain Store Age</a> and <a href="https://www.retaildive.com/news/thredup-2025-resale-report-tariffs-fast-fashion/743095/">Retail Dive</a>.</li>
+    <li id="r22">National Student Clearinghouse Research Center, <a href="https://www.studentclearinghouse.org/news/?p=73935">Fall 2025 enrollment</a>.</li>
+    <li id="r23">UW News, <a href="https://www.washington.edu/news/2025/10/30/washington-residents-make-up-nearly-two-thirds-of-incoming-class-as-enrollment-increases-across-all-three-uw-campuses/">Enrollment increases across all three UW campuses</a>, Oct 30, 2025.</li>
+    <li id="r24">Hadfield, G. K. &amp; Koh, A. (2025). <a href="https://arxiv.org/abs/2509.01063">An Economy of AI Agents</a>. NBER Handbook on the Economics of Transformative AI.</li>
+    <li id="r25">Further reading: Resnick &amp; Zeckhauser (2002) on eBay reputation; Tadelis (2016) on platform feedback; Katz &amp; Krueger (2019) on alternative work; Cohen et al. (2016) on consumer surplus from Uber; Castellani, Sala &amp; Mirabella (2015) on the environmental benefit of reuse.</li>
+  </ol>
+  <div class="folio"><span>PairUp business case</span><span>11</span></div>
+</section>
+
+</body>
+</html>

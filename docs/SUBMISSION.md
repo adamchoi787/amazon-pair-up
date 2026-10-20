@@ -10,6 +10,8 @@ A student at the University of Washington needs a graphing calculator for tomorr
 
 PairUp lets people just say what they need, what they have or what they can do. It starts on the UW campus in Seattle. Requests stay open, so the right person can turn up an hour or a day later.
 
+Our three goals: **faster and cheaper to buy what you need, make personal business great, and C2C in the future.**
+
 ### What it does
 A seller says, “Sell my TI-84 for $20. I'll take anything above $15.” A buyer says, “I need a graphing calculator today, max $18.” PairUp proposes the TI-84 at $18, names an Amazon Hub Counter on campus for the hand-off, and asks the buyer for a yes. The seller's minimum stays private and the buyer's budget becomes their offer.
 
@@ -28,6 +30,15 @@ Amazon Bedrock runs Titan embeddings for retrieval and Nova Lite for intent extr
 
 ### What makes it different
 Requests are standing posts, and matching runs whenever either side posts. Agents interpret and coordinate; code sets every price and checks every schedule. Each deal ends with an explicit yes from both people. The tool surface, Agent Skill, server card and llms.txt let any agent use PairUp safely without custom wiring.
+
+### Impact
+**Faster and cheaper to buy what you need.** Resale sites keep 13–20% of a sale, and delivery apps add markups and fees to a $5 errand. On PairUp, a $20 TI-84 sells for $18 the same day, and the seller keeps all $18. A lunch run costs the counter price plus the $4 the requester offered, and the student who walks keeps the $4.
+
+**Make personal business great.** 72.9 million Americans already earn independently (MBO Partners 2025), and 30% of adults under 30 have done gig work (Pew). On PairUp, opening a small business takes one sentence. The seller sets the price, receives all of it, and builds a track record. Learned routines bring regular customers back.
+
+**C2C in the future.** Personal agents will buy and sell for people. AI negotiators are easy to sway: one that acts desperate gains about 20% (Bianchi et al., ICML 2024). PairUp gives agents one place to meet, where any MCP agent connects, an open-source rule sets every price, and every deal ends with a human yes.
+
+**Scale.** The average US household holds $3,000–4,000 of resellable items (eBay Recommerce Report 2026). US secondhand apparel alone is projected to reach $74 billion by 2029 (ThredUp). 80% of discarded furniture goes to landfill (EPA). Our model for UW Seattle (52,316 students, 10% using it twice a month at $15) gives about $1.9 million a year in exchanges between students. Sources, inputs and the research papers behind them: [research/](../research/README.md).
 
 ### Status
 The test suite covers matching, pricing, privacy, scheduling, OAuth, MCP transport and scripted agent conversations. The seed market, reference prices and Hub locations are labelled demo data, and the learning experiment runs on a simulated market. Next is an observed pilot with UW students ([USER_VALIDATION.md](USER_VALIDATION.md)).
