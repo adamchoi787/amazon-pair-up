@@ -52,6 +52,8 @@ export interface BuyIntentRow {
   hours: string | number | null;
   pickup: string | null;
   schedule: string | null;
+  /** Items: "meetup" or "delivery". */
+  handoff: string;
   time_zone: string;
   service_start: string | Date | null;
   service_end: string | Date | null;
@@ -73,6 +75,10 @@ export interface DealRow {
   buyer_confirmed: boolean;
   seller_confirmed: boolean;
   meetup: string | null;
+  /** Items: "meetup" at a Hub point, or "delivery" by Amazon Hub delivery. */
+  handoff: string;
+  /** Amazon Hub delivery: the shipment reference, set when both sides confirm. */
+  delivery_ref: string | null;
   created_at: string | Date;
   updated_at: string | Date;
   expires_at: string | Date | null;

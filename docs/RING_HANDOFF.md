@@ -21,7 +21,7 @@ PairUp Points are small unstaffed hand-off spots, each watched by one Ring doorb
 
 ## Left to do
 1. `test/points.test.ts` passes (5/5) and typecheck is clean. Run the full `npm test` once more after the merge.
-2. Merge with main: another session ("Delivery and robotic fulfillment support") is adding Amazon Hub delivery in the same files (views.ts `handoff`/`delivery`, service.ts, server.ts, schemas.ts). When delivery is chosen, `meetup` is empty, so `meetup.point` must be null for delivery deals too.
+2. Done: merged origin/main (81256df, Amazon Hub delivery) into this branch; meetup.point is null for delivery deals. points, delivery, amazon and schema tests pass (21/21). Still to run: the full `npm test`, then fast-forward main to this branch (ask the user before pushing main or deploying).
 3. Done: `npm run ring:probe` (real Playground call: devices + history, prints the RING_POINT_DEVICES line) and `npm run ring:simulate` (signed Ring v1.1 webhook to the local server, labelled demo).
 4. Done: card panel in `src/apps/view.ts` (Meet at a PairUp Point, arrival chips, I'm here), bundles rebuilt. Not yet checked visually in a browser; rebuild after the merge (build-info.json fingerprint).
 5. Done: offline planner phrases ("I'm here" → check_in_at_point, "meet at a PairUp Point" → choose_meetup_point). Still to do: one sentence about points in the server instructions (server.ts).

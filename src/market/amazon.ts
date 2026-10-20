@@ -64,3 +64,54 @@ export function hubPointFor(sellerArea: string | null | undefined, buyerArea: st
   const point = area?.hub_points[0];
   return point ? { name: point.name, type: point.type, area: area.name } : null;
 }
+
+// ---------- Amazon Hub delivery ----------
+
+/** How an item changes hands: in person at a Hub point, or carried by Amazon between two Hub points. */
+export const HANDOFFS = ["meetup", "delivery"] as const;
+export type Handoff = (typeof HANDOFFS)[number];
+
+interface DeliveryRates {
+  provider: string;
+  max_weight_lb: number;
+  same_area: { fee: number; eta: string };
+  cross_area: { fee: number; eta: string };
+}
+
+let rates: { file: string; rates: DeliveryRates } | null = null;
+
+function deliveryRates(file = "data/delivery-rates.json") {
+  if (rates?.file !== file) rates = { file, rates: JSON.parse(readFileSync(file, "utf8")) as DeliveryRates };
+  return rates.rates;
+}
+
+/** The first locker of an area, else its first counter: lockers take pickups at any hour. */
+function hubIn(area: string | null | undefined, prefer: "locker" | "counter", file?: string): HubPoint | null {
+  if (!area) return null;
+  const a = hubAreas(file).get(norm(area));
+  const point = a?.hub_points.find((p) => p.type === prefer) ?? a?.hub_points[0];
+  return a && point ? { name: point.name, type: point.type, area: a.name } : null;
+}
+
+export interface DeliveryQuote {
+  provider: string;
+  drop_off: HubPoint;
+  pick_up: HubPoint;
+  fee: number;
+  eta: string;
+  max_weight_lb: number;
+}
+
+/**
+ * Amazon Hub delivery for an item: the seller drops it at a Hub Counter in
+ * their area, the buyer collects it from a Hub Locker in theirs. Neither side
+ * learns the other's address. Null when either area has no Hub point.
+ */
+export function deliveryQuote(sellerArea: string | null | undefined, buyerArea: string | null | undefined, opts: { hubs?: string; rates?: string } = {}): DeliveryQuote | null {
+  const drop = hubIn(sellerArea, "counter", opts.hubs);
+  const pick = hubIn(buyerArea, "locker", opts.hubs);
+  if (!drop || !pick) return null;
+  const r = deliveryRates(opts.rates);
+  const band = norm(drop.area) === norm(pick.area) ? r.same_area : r.cross_area;
+  return { provider: r.provider, drop_off: drop, pick_up: pick, fee: band.fee, eta: band.eta, max_weight_lb: r.max_weight_lb };
+}

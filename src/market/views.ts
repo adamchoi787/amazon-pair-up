@@ -1,4 +1,4 @@
-import { AMAZON_TRADE_IN_URL, amazonSearchUrl, hubPointFor, type HubPoint } from "./amazon.js";
+import { AMAZON_TRADE_IN_URL, amazonSearchUrl, deliveryQuote, hubPointFor, type DeliveryQuote, type HubPoint } from "./amazon.js";
 import { verdict, type BandSource } from "./pricing.js";
 import { num, type BuyIntentRow, type DealRow, type Kind, type ListingRow, type PriceUnit } from "./types.js";
 import { checkSchedule } from "./scheduling.js";
@@ -123,11 +123,16 @@ export function dealView(d: DealWithParties, viewerId: string) {
   // Older releases auto-approved service prices without checking the time.
   // A tentative legacy proposal still needs an actual provider yes.
   const sellerConfirmed = d.seller_confirmed && (d.status !== "proposed" || d.kind === "item" || scheduling?.status === "verified" || d.provider_explicit_yes);
-  // A PairUp Point the two chose comes first; else items in the same area meet at its Amazon Hub point.
-  const point = pointById(d.meetup_point_id);
-  const hub = d.kind === "item" && !point
-    ? hubPointFor(d.offer_location ?? d.seller_home, d.request_location ?? d.buyer_home)
-    : null;
+  // Items change hands; two people in the same area meet at its Amazon Hub point.
+  // Or Amazon carries it between a Hub point in each area, when the buyer asks for delivery.
+  // A PairUp Point the two chose replaces the Hub point.
+  const sellerArea = d.offer_location ?? d.seller_home;
+  const buyerArea = d.request_location ?? d.buyer_home;
+  const quote = d.kind === "item" ? deliveryQuote(sellerArea, buyerArea) : null;
+  const delivering = d.kind === "item" && d.handoff === "delivery" && quote != null;
+  const point = delivering ? null : pointById(d.meetup_point_id);
+  const hub = d.kind === "item" && !delivering && !point ? hubPointFor(sellerArea, buyerArea) : null;
+  const itemTotal = dealTotal(price, d.price_unit, hours);
   const waitingFor =
     d.status !== "proposed" ? [] : [
       ...(d.buyer_confirmed ? [] : ["buyer" as const]),
@@ -146,7 +151,7 @@ export function dealView(d: DealWithParties, viewerId: string) {
     price,
     price_unit: d.price_unit,
     hours: d.price_unit === "hour" ? hours : null,
-    total: dealTotal(price, d.price_unit, hours),
+    total: delivering && itemTotal != null ? +(itemTotal + quote.fee).toFixed(2) : itemTotal,
     ask_price: ask,
     saved_vs_ask: +(ask - price).toFixed(2),
     price_check: priceCheck(d, price),
@@ -156,15 +161,19 @@ export function dealView(d: DealWithParties, viewerId: string) {
     seller_confirmed: sellerConfirmed,
     waiting_for: waitingFor,
     waiting_for_you: role !== "observer" && waitingFor.includes(role),
-    meetup: {
-      place: point ? `${point.name} (demo location)` : hub ? hubPlace(hub) : d.meetup,
-      availability: d.availability,
-      hub_point: hub && { ...hub, demo: true },
-      point: point && {
-        point_id: point.id, name: point.name, area: point.area, demo: true as const,
-        ...arrivalView(d.meetup_status ?? "chosen", d.meetup_both_here_at ?? null, arrivals(d.meetup_arrivals), viewerId),
-      },
-    },
+    meetup: delivering
+      ? { place: null, availability: null, hub_point: null, point: null }
+      : {
+          place: point ? `${point.name} (demo location)` : hub ? hubPlace(hub) : d.meetup,
+          availability: d.availability,
+          hub_point: hub && { ...hub, demo: true },
+          point: point && {
+            point_id: point.id, name: point.name, area: point.area, demo: true as const,
+            ...arrivalView(d.meetup_status ?? "chosen", d.meetup_both_here_at ?? null, arrivals(d.meetup_arrivals), viewerId),
+          },
+        },
+    handoff: d.kind === "item" ? (delivering ? ("delivery" as const) : ("meetup" as const)) : null,
+    delivery: d.kind === "item" && quote ? deliveryView(quote, delivering, delivering ? d.delivery_ref : null) : null,
     pickup: d.kind === "service" ? d.pickup : null,
     needed_by: d.kind === "service" ? iso(d.needed_by) : null,
     scheduling,
@@ -204,6 +213,25 @@ export function reportView(r: { id: string; reason: string; deal_id: string | nu
 /** A rating as its author sees it; the other side's rating of them stays private. */
 export function ratingView(r: { deal_id: string; stars: number; ratee_role: string }) {
   return { deal_id: r.deal_id, stars: Number(r.stars), rated_role: r.ratee_role as "buyer" | "seller" };
+}
+
+/**
+ * Amazon Hub delivery for an item deal: offered on every item deal whose two
+ * areas have Hub points, chosen when `selected`. The seller drops it off, the
+ * buyer collects it; neither address is shared.
+ */
+function deliveryView(q: DeliveryQuote, selected: boolean, ref: string | null) {
+  return {
+    selected,
+    provider: q.provider,
+    drop_off: { ...q.drop_off, demo: true },
+    pick_up: { ...q.pick_up, demo: true },
+    fee: q.fee,
+    eta: q.eta,
+    max_weight_lb: q.max_weight_lb,
+    reference: ref,
+    demo: true as const,
+  };
 }
 
 /** "Amazon Hub Counter, HUB ground floor, UW campus". */

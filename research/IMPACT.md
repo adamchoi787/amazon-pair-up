@@ -124,6 +124,10 @@ seller at once, through whatever assistant they already talk to.
 | Then | US campuses, one at a time, with campus Hub points for hand-offs | About 19 million students |
 | Beyond | Any neighborhood, any MCP-connected agent | Every Alexa household and personal agent |
 
+Delivery grows in the same steps: Amazon Hub delivery between lockers now, then
+campus sidewalk robots, Prime Air drones where they fly, and robot-ready Hub
+Lockers. See [DELIVERY.md](../docs/DELIVERY.md).
+
 Campuses are a strong first market: dense, walkable, with needs that repeat every
 quarter, and a move-in and move-out cycle that refills supply each year.
 

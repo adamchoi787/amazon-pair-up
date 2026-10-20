@@ -12,7 +12,7 @@ import {
   decideReview, DEFAULT_REPORT_THRESHOLD, reviewIfReported, reviewQueue, reviewStatus, type ReportReason, type ReviewDecision,
 } from "./trust.js";
 import { num, type BuyIntentRow, type DealRow, type Kind, type ListingRow, type PriceUnit, type RequestSource, type ServiceUnit } from "./types.js";
-import { tradeInCategory } from "./amazon.js";
+import { tradeInCategory, type Handoff } from "./amazon.js";
 import type { RingSettings } from "./points.js";
 import { checkSchedule, DEFAULT_TIME_ZONE, hasBookingConflict, itemDeadline, providerBookings, resolveServiceTime, validTimeZone } from "./scheduling.js";
 import { dealView, fallbackView, offerView, ratingView, reportView, requestView, tradeInView, type DealView, type DealWithParties } from "./views.js";
@@ -258,9 +258,14 @@ export interface PostRequestInput {
   needed_by?: string;
   location?: string;
   source?: RequestSource;
+  /** Items: meet up at a Hub point (default), or Amazon Hub delivery. */
+  handoff?: Handoff;
   /** The user confirmed a budget the price check questioned. */
   confirm_price?: boolean;
 }
+
+/** Item requests that ask for it to come to them: "ship it", "delivered to my locker". */
+const WANTS_DELIVERY = /\b(deliver(ed|y)?|ship(ped|ping)?|mail(ed)?|send it|to my (locker|place|door))\b/i;
 
 /** Ask for an item or a task. Pair it with the best offer right away, or keep it waiting for one. */
 export async function postRequest(deps: Deps, input: PostRequestInput) {
@@ -313,8 +318,8 @@ export async function postRequest(deps: Deps, input: PostRequestInput) {
   const { rows } = await db.query<BuyIntentRow>(
     `INSERT INTO buy_intents (id, buyer_id, kind, price_unit, need, raw_request, source, category, min_condition, quantity,
                               hours, pickup, schedule, currency, max_price, needed_by, location, embedding, price_flag,
-                              time_zone, service_start, service_end)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::vector,$19,$20,$21,$22) RETURNING *`,
+                              time_zone, service_start, service_end, handoff)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::vector,$19,$20,$21,$22,$23) RETURNING *`,
     [
       id, input.user_id, kind, unit, need, input.raw_request ?? null, input.source ?? "voice", category,
       service ? "for_parts" : input.min_condition ?? extracted?.min_condition ?? "for_parts",
@@ -324,6 +329,7 @@ export async function postRequest(deps: Deps, input: PostRequestInput) {
       schedule,
       currency, maxPrice, neededBy, input.location ?? extracted?.location ?? null, toVector(embedding), flag ?? null,
       timeZone, work?.start ?? null, work?.end ?? null,
+      service ? "meetup" : input.handoff ?? (input.raw_request && WANTS_DELIVERY.test(input.raw_request) ? "delivery" : "meetup"),
     ],
   );
   await logEvent(db, "intent_created", input.user_id, id, { need, kind, unit, source: input.source ?? "voice" });
@@ -487,6 +493,10 @@ export async function confirmDeal(deps: Deps, userId: string, dealId: string) {
       // An item is sold once; a service offer stands and takes the next job.
       await tx.query(`UPDATE listings SET status=$2 WHERE id=$1`, [d.listing_id, d.kind === "item" ? "sold" : "active"]);
       await tx.query(`UPDATE buy_intents SET status='fulfilled' WHERE id=$1`, [d.buy_intent_id]);
+      // Amazon Hub delivery: book the shipment (a demo reference until the Amazon Shipping API is connected).
+      if (d.kind === "item" && d.handoff === "delivery") {
+        await tx.query(`UPDATE deals SET delivery_ref=$2 WHERE id=$1`, [dealId, `DEMO-${dealId.replace(/^deal_/, "").toUpperCase()}`]);
+      }
     }
     await logEvent(tx, done ? "deal_confirmed" : "deal_half_confirmed", userId, dealId, { by: isBuyer ? "buyer" : "seller" });
     const deal = dealView(await getDealWithParties(tx, dealId), userId);
@@ -519,6 +529,39 @@ export async function confirmQuestion(deps: Deps, userId: string, dealId: string
       ? `Book ${deal.counterpart} for ${deal.task ?? deal.title}, ${dealPrice(deal)}?`
       : `Take the job ${deal.task ?? deal.title} for ${deal.counterpart}, ${dealPrice(deal)}?`;
   return `${what}${placeLine(deal)}${deal.your_role === "buyer" ? priceWarning(deal) : ""}`;
+}
+
+/**
+ * The buyer picks how an item changes hands: a Hub meet-up, or Amazon Hub
+ * delivery (the seller drops it at a Hub Counter, the buyer collects it from a
+ * Hub Locker, the buyer pays the fee). Switching asks the seller again, since a
+ * drop-off is a different errand from a meet-up. The price stays as settled.
+ */
+export async function chooseHandoff(deps: Deps, userId: string, dealId: string, method: Handoff) {
+  const { db } = deps;
+  await sweep(deps);
+  const d = await getDealWithParties(db, dealId);
+  if (userId !== d.buyer_id) throw new MarketError(userId === d.seller_id ? "The buyer chooses meet-up or delivery." : "You're not part of this deal.");
+  if (d.kind !== "item") throw new MarketError("Delivery is for items. For a task, the helper comes to you.");
+  if (d.status !== "proposed") throw new MarketError(closedDealLine(d.status));
+  const before = dealView(d, userId);
+  if (method === "delivery" && !before.delivery) {
+    throw new MarketError("Amazon Hub delivery isn't available between these two areas yet. You can meet up instead.", "delivery_unavailable");
+  }
+  if (before.handoff === method) return { deal: before, say: handoffLine(before, "already") };
+  await db.query(
+    `UPDATE deals SET handoff=$2, seller_confirmed=false, updated_at=now() WHERE id=$1 AND status='proposed'`,
+    [dealId, method],
+  );
+  await logEvent(db, "handoff_chosen", userId, dealId, { method });
+  const deal = dealView(await getDealWithParties(db, dealId), userId);
+  return { deal, say: handoffLine(deal, "changed") };
+}
+
+function handoffLine(deal: DealView, mode: "changed" | "already") {
+  const lead = mode === "already" ? "That's already the plan." : deal.handoff === "delivery" ? "Switched to Amazon Hub delivery." : "Switched to a meet-up.";
+  const ask = deal.buyer_confirmed ? ` I'll ask the seller to confirm.` : ` Should I confirm? The seller gives the final yes.`;
+  return `${lead}${placeLine(deal)} Total ${fmt(deal.total ?? deal.price, deal.currency)}.${mode === "changed" ? ask : ""}`;
 }
 
 /** Say no to a deal. Both posts go back on the market and get re-paired with their next-best match. */
@@ -815,6 +858,11 @@ const hoursText = (h: number) => `${Number.isInteger(h) ? h : h.toFixed(1)} hour
 /** Where and when, as spoken: items meet up; services name the pickup, the place and the time. */
 function placeLine(deal: DealView) {
   const { place, availability } = deal.meetup;
+  if (deal.kind === "item" && deal.handoff === "delivery" && deal.delivery) {
+    const v = deal.delivery;
+    return ` Amazon Hub delivery: drop-off at ${v.drop_off.name}, pickup at ${v.pick_up.name}, ${v.pick_up.area}, ${v.eta},` +
+      ` ${fmt(v.fee, deal.currency)} delivery (demo estimate).`;
+  }
   if (deal.kind === "item") return place ? ` Meet-up: ${place}.` : "";
   const route = deal.pickup && place ? `From ${deal.pickup} to ${place}` : deal.pickup ? `Pickup at ${deal.pickup}` : place ? `At ${place}` : "";
   const work = deal.scheduling;
@@ -902,7 +950,9 @@ function providerJobLine(deal: DealView) {
 function doneLine(deal: DealView) {
   if (deal.kind === "item") {
     return `Done! ${deal.title} for ${fmt(deal.price, deal.currency)} with ${deal.counterpart}.` +
-      (deal.meetup.place ? ` Meet-up: ${deal.meetup.place}${deal.meetup.availability ? `, ${deal.meetup.availability}` : ""}.` : "");
+      (deal.handoff === "delivery"
+        ? `${placeLine(deal)}${deal.delivery?.reference ? ` Shipment ${deal.delivery.reference}: the seller gets the drop-off label and you get a pickup code.` : ""}`
+        : deal.meetup.place ? ` Meet-up: ${deal.meetup.place}${deal.meetup.availability ? `, ${deal.meetup.availability}` : ""}.` : "");
   }
   return `Booked! ${deal.title} with ${deal.counterpart}, ${dealPrice(deal)}.${placeLine(deal)}`;
 }
@@ -914,7 +964,9 @@ function statusLine(d: DealView) {
   switch (d.status) {
     case "confirmed":
       return d.kind === "item"
-        ? `${what}: confirmed with ${d.counterpart}${d.meetup.place ? `, meet-up at ${d.meetup.place}` : ""}.`
+        ? d.handoff === "delivery"
+          ? `${what}: confirmed with ${d.counterpart}, by Amazon Hub delivery to ${d.delivery?.pick_up.name ?? "your Hub Locker"}.`
+          : `${what}: confirmed with ${d.counterpart}${d.meetup.place ? `, meet-up at ${d.meetup.place}` : ""}.`
         : `${what}: booked.${placeLine(d)}`;
     case "proposed": return d.waiting_for_you ? `${what}: waiting for your yes.` : `${what}: waiting for the ${d.waiting_for.join(" and ")}.`;
     case "expired": return `${what}: expired without an answer.`;

@@ -349,6 +349,10 @@ All output goes through [views.ts](../src/market/views.ts); the tests fail on an
 `deal_id`*. Call **only after the user explicitly says yes.**
 → `{ deal, say }`.
 
+### `choose_handoff`
+`deal_id`*, `method`* (`meetup` | `delivery`). Buyer only, item deals while proposed.
+→ `{ deal, say }`. `delivery`: the seller drops the item at an Amazon Hub Counter in their area and the buyer collects it from a Hub Locker in theirs; no address is shared. The price stays as settled, `deal.total` adds the delivery fee, and the seller is asked to confirm again. Every item deal carries `handoff` and `delivery` (the quote, or null when either area has no Hub point); confirmed delivery deals get `delivery.reference`. `post_request` also takes `handoff`, and an item request that says "shipped" or "delivered" asks for delivery. Demo rates and locations; see [DELIVERY.md](DELIVERY.md).
+
 ### `decline_deal`
 `deal_id`*
 → `{ deal_id, status: "declined", next_deal | null, say }`. `next_deal` is the user's next best offer, or for a provider the next job.
