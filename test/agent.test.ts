@@ -224,7 +224,10 @@ test("a budget below the seller's minimum hears the asking price, and a yes buys
 test("tools declare the AmazonPairUp MCP Apps view, and the view is served", async () => {
   const s = await session("u_viewer");
   const withUi = s.tools.filter((t) => (t._meta as { ui?: { resourceUri?: string } } | undefined)?.ui?.resourceUri === "ui://amazonpairup/market.html");
-  assert.deepEqual(withUi.map((t) => t.name).sort(), ["confirm_deal", "decline_deal", "find_matches", "get_deal_status", "list_my_posts", "negotiate", "post_offer", "post_request"]);
+  assert.deepEqual(withUi.map((t) => t.name).sort(), [
+    "accept_suggestion", "confirm_deal", "decline_deal", "find_matches", "get_deal_status", "get_my_routines", "get_suggestions",
+    "list_my_posts", "negotiate", "post_offer", "post_request",
+  ]);
   const client = new Client({ name: "res", version: "0" });
   await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), { requestInit: { headers: { "X-User-Id": "u_viewer" } } }));
   const { resources } = await client.listResources();

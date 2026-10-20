@@ -174,10 +174,12 @@ export function mockExtractIntent(text: string, now = new Date()): ExtractedInte
   // Strip filler so "need" is a clean search phrase; for a service, the task itself.
   let need = text
     .replace(/^(alexa,?\s*)?(please\s+)?(can you\s+)?/i, "")
-    .replace(/^(i\s+(really\s+)?(need|want|am looking for|'m looking for)|find( me)?|get( me)?|looking for|hire)\s+/i, "")
+    .replace(/^((i\s+(really\s+)?)?(need|want|buy|am looking for|'m looking for)|find( me)?|get( me)?|looking for|hire)\s+/i, "")
     .replace(/^an? (helper|hand)\s+(for|with|at)\s+/i, "help $2 ")
     .replace(/^(some ?one|somebody|anyone|any ?body|an? (guy|person|helper|runner|hand|tutor|student))\s+(to|who can|who could|for)\s+/i, "");
   if (service) need = need.replace(/\s*,.*$/, "").replace(/\s+(from|by|before|for \d|on (mon|tues|wednes|thurs|fri|satur|sun)day)\b.*$/i, "");
+  // "a graphing calculator before the exam": the reason isn't part of the item.
+  else need = need.replace(/\s+(before|for|by)\s+(the|my|our|next|this)\s+\w+.*$/i, "");
   out.need = need
     .replace(/\s*(,|\.)?\s*(under|below|max(imum)?|up to|at most|budget|no more than)\b.*$/i, "")
     .replace(/\b(today|tonight|tomorrow|asap|right now)\b/gi, "")

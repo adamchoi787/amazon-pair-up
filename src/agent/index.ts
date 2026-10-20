@@ -2,7 +2,7 @@ import type { Config } from "../config.js";
 import { log } from "../http/log.js";
 import type { Deps } from "../market/service.js";
 import { bedrockTurn } from "./bedrock.js";
-import { planOffline, WITHDRAW } from "./offline.js";
+import { planOffline, spokenLines, WITHDRAW } from "./offline.js";
 import { toolSpecs } from "./tools.js";
 import {
   agentRequest, isExplicitYes, isToolResult, isToolUse, lastUserText, type AgentMessage, type AgentTurn, type Block,
@@ -60,13 +60,11 @@ export function sayFromResults(messages: AgentMessage[]): string | null {
     return undefined;
   };
   if (results.some((r) => toolOf(r.toolResult.toolUseId) === "list_my_posts") && WITHDRAW.test(lastUserText(messages))) return null;
-  const says: string[] = [];
   for (const r of results) {
     const json = r.toolResult.content.find((c): c is { json: Record<string, unknown> } => "json" in c)?.json;
     if (typeof json?.say !== "string" || !json.say) return null;
-    says.push(json.say);
   }
-  return says.join(" ");
+  return spokenLines(messages, results);
 }
 
 /**
@@ -74,6 +72,10 @@ export function sayFromResults(messages: AgentMessage[]): string | null {
  * decides: a confirm_deal call without one becomes a question.
  */
 export function requireExplicitYes(content: Block[], userText: string): Block[] {
-  if (!content.some((b) => isToolUse(b) && b.toolUse.name === "confirm_deal") || isExplicitYes(userText)) return content;
+  const guarded = content.filter(isToolUse).find(b => ['confirm_deal','accept_suggestion','delete_my_data'].includes(b.toolUse.name));
+  if (!guarded || isExplicitYes(userText)) return content;
+  if (guarded.toolUse.name === 'accept_suggestion' && /^\s*\$?\d+(?:\.\d{1,2})?\s*(?:dollars?|bucks)?\s*$/i.test(userText)) return content;
+  if (guarded.toolUse.name === 'delete_my_data') return [{text:'Should I delete your data? This cannot be undone.'}];
+  if (guarded.toolUse.name === 'accept_suggestion') return [{text:'Should I post that request for you?'}];
   return [{ text: "Just to be sure: should I confirm it?" }];
 }

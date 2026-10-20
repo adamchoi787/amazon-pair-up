@@ -1,3 +1,4 @@
+import { seedLifestyle } from "../src/db/demo-lifestyle.js";
 // Load data/seed-listings.json. `npm run reset` wipes all tables first.
 import { createAi } from "../src/ai/index.js";
 import { config } from "../src/config.js";
@@ -15,5 +16,6 @@ const deps = { db, ai: createAi(config), cfg: config };
 
 const added = await seedMarketplace(deps);
 const { rows } = await db.query<{ n: number }>(`SELECT count(*)::int AS n FROM listings`);
+if(process.argv.includes("--lifestyle"))console.log(`DEMO DATA: added ${await seedLifestyle(deps)} closed lunch-run requests for u_tony.`);
 console.log(`Seeded ${added} listings (${rows[0].n} total) with ${deps.ai.mode} embeddings.`);
 await db.close();

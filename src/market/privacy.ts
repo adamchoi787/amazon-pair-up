@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import type { Db } from "../db/client.js";
-import { log } from "../http/log.js";
 import { MarketError, withdrawPost, type Deps } from "./service.js";
 
 // "Delete my data": the right to erasure, as one idempotent operation.
@@ -61,9 +60,11 @@ export async function deleteMyData(deps: Deps, userId: string) {
   const events = await count(
     db,
     `DELETE FROM events WHERE actor_id = $1 OR ref_id = ANY($2) OR detail->>'listing_id' = ANY($2) OR detail->>'intent_id' = ANY($2)`,
-    [userId, posts],
+    [userId, [...posts, ...deals]],
   );
   await db.query(`DELETE FROM failed_offers WHERE buyer_id = $1 OR listing_id = ANY($2)`, [userId, dropListings]);
+  await db.query(`DELETE FROM reports WHERE reporter_id = $1 OR reported_id = $1`, [userId]);
+  await db.query(`DELETE FROM ratings WHERE rater_id = $1 OR ratee_id = $1`, [userId]);
 
   // 2. Posts no one else needs.
   const deleted =
@@ -90,15 +91,15 @@ export async function deleteMyData(deps: Deps, userId: string) {
   // 4b. Retry results, sign-in codes and tokens (deleting a token revokes it), then the account.
   await db.query(`DELETE FROM idempotent_calls WHERE user_id = $1`, [userId]);
   await db.query(`DELETE FROM oauth_codes WHERE user_id = $1`, [userId]);
-  const tokens = await count(db, `DELETE FROM oauth_tokens WHERE user_id = $1`, [userId]);
-  let account = 0;
-  try {
-    account = await count(db, `DELETE FROM users WHERE id = $1`, [userId]);
-  } catch (err) {
-    // A table added later still points at the account: keep the row, drop the name.
-    log("warn", "account row kept after deletion; clearing its name", { err });
-    await db.query(`UPDATE users SET display_name = 'Former member', home_area = NULL WHERE id = $1`, [userId]);
-  }
+  await db.query(`DELETE FROM user_passcodes WHERE user_id = $1`, [userId]);
+  await db.query(`DELETE FROM context_signals WHERE user_id = $1`, [userId]);
+  await db.query(`DELETE FROM routine_feedback WHERE user_id = $1`, [userId]);
+  const devices = await ids(db, `SELECT id FROM device_tokens WHERE user_id = $1`, [userId]);
+  const tokens = (await count(db, `DELETE FROM oauth_tokens WHERE user_id = $1`, [userId])) +
+    (await count(db, `DELETE FROM device_tokens WHERE user_id = $1`, [userId]));
+  const { clearVoiceHistory } = await import('../agent/runner.js');
+  clearVoiceHistory(userId, devices);
+  const account = await count(db, `DELETE FROM users WHERE id = $1`, [userId]);
 
   const anonymised = keptListings.length + keptIntents.length;
   const anything = live.length + deleted + anonymised + events + learningRows + tokens + account > 0;

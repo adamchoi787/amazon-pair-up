@@ -113,3 +113,9 @@ SSM deploys without SSH or key pairs; CloudFront in front of one instance gave
 HTTPS and HTTP/3 with no certificate work. Needs work: DLM validation errors
 surface only at stack creation and roll the whole stack back; the AWS CLI under
 Git Bash rewrites parameter names (both in the friction log).
+
+## Bee and watch draft
+
+PairUp turns Bee to-dos and need snippets into prepared marketplace requests, with budgets learned from the user’s own history. A watch Shortcut sends speech to the server and reads the reply; the browser watch view shows one suggestion or waiting deal. The included Bee replay is demo data. Choose the Bee track only after checking its device requirements and validating a real Bee.
+
+Bee product feedback to validate: the CLI stream, MCP data access and public todos API provide useful integration paths. Document actual live-device experience after testing; local replay alone does not establish hardware experience.

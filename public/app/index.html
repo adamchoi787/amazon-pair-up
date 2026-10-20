@@ -73,6 +73,7 @@
   #composer.busy input { opacity: .6; }
   button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   @media (max-width: 480px) { .bubble { max-width: 92%; } #send { display: none; } }
+#for-you {padding:0 16px; max-height:35dvh; overflow:auto} #for-you h2{font-size:18px} #for-you article{padding:8px 12px;border:1px solid var(--line);border-radius:14px;margin-bottom:8px;background:var(--surface)} #for-you button,#panel-devices button{min-height:44px;margin:4px;padding:8px 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--fg)} #panel-devices input,#panel-devices select,#for-you input{padding:10px;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:8px} #panel-devices pre{white-space:pre-wrap;overflow-wrap:anywhere} nav{overflow:auto} @media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important;transition:none!important}}
 </style>
 </head>
 <body>
@@ -100,13 +101,16 @@
     <button role="tab" data-tab="assistant" aria-selected="true" type="button">Assistant</button>
     <button role="tab" data-tab="deals" aria-selected="false" type="button">Deals <span id="deals-badge" class="badge" hidden>0</span></button>
     <button role="tab" data-tab="posts" aria-selected="false" type="button">My posts</button>
+    <button role="tab" data-tab="devices" aria-selected="false" type="button">Devices</button>
   </nav>
   <main>
     <section id="panel-assistant" role="tabpanel">
       <div id="log" aria-live="polite"></div>
+      <section id="for-you" aria-label="For you" hidden></section>
       <div id="suggestions"></div>
     </section>
     <section id="panel-deals" class="panel" role="tabpanel" hidden></section>
+    <section id="panel-devices" class="panel" role="tabpanel" hidden></section>
     <section id="panel-posts" class="panel" role="tabpanel" hidden></section>
   </main>
   <form id="composer" autocomplete="off">

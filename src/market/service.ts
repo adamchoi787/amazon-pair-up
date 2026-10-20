@@ -11,7 +11,7 @@ import { DEFAULT_PRICE_POLICY, priceBand, verdict, type PriceBand, type PricePol
 import {
   decideReview, DEFAULT_REPORT_THRESHOLD, reviewIfReported, reviewQueue, reviewStatus, type ReportReason, type ReviewDecision,
 } from "./trust.js";
-import { num, type BuyIntentRow, type DealRow, type Kind, type ListingRow, type PriceUnit, type ServiceUnit } from "./types.js";
+import { num, type BuyIntentRow, type DealRow, type Kind, type ListingRow, type PriceUnit, type RequestSource, type ServiceUnit } from "./types.js";
 import { tradeInCategory } from "./amazon.js";
 import { dealView, fallbackView, offerView, ratingView, reportView, requestView, tradeInView, type DealView, type DealWithParties } from "./views.js";
 
@@ -247,7 +247,7 @@ export interface PostRequestInput {
   currency?: string;
   needed_by?: string;
   location?: string;
-  source?: "voice" | "bee_context";
+  source?: RequestSource;
   /** The user confirmed a budget the price check questioned. */
   confirm_price?: boolean;
 }
@@ -746,7 +746,7 @@ function matchView(m: ListingRow & { score: number }, intent: BuyIntentRow, view
 }
 
 /** "$17", "$4 a job", "$9 an hour". */
-function rate(amount: number, unit: PriceUnit, currency: string) {
+export function rate(amount: number, unit: PriceUnit, currency: string) {
   return fmt(amount, currency) + (unit === "hour" ? " an hour" : unit === "job" ? " a job" : "");
 }
 

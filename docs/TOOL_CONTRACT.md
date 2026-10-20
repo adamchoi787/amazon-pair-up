@@ -422,3 +422,31 @@ unconfirmed. Clients without elicitation use the tool's spoken confirmation flow
 delete_my_data asks for confirmation; pass confirm: true only after the user's
 explicit yes. It withdraws live posts, releases holds, erases the account, tokens,
 history and learning rows, and anonymizes past deals needed by the counterpart.
+
+## Lifestyle suggestions and devices
+
+| Tool | Use and result |
+|---|---|
+| get_suggestions | On sign-in, on arrival, or when asked what the user needs. Returns private suggestions from their own history or context. |
+| accept_suggestion | After explicit yes; pass suggestion_id and max_price if a budget is missing. Returns a posted request and any proposed deal. |
+| dismiss_suggestion | Not now skips this occurrence. forget: true stops the routine; device snippets are removed on dismissal. |
+| add_context | source bee/watch/phone, kind todo/conversation/journal/fact/location/note, need text or place, optional stable external_id, observed_at and time_zone. Returns a suggestion when relevant. |
+| get_my_routines | Explain the learned need, usual budget, time, route and contributing devices. |
+
+Request source can be voice, bee_context, device_context or routine. Suggestions
+are private to their owner and need explicit acceptance before posting. Repeated
+dismissals pause a routine; forget stops it. Budgets are learned from that user's
+own requests. When the budget is unknown, ask before accepting.
+
+The signed-in web session creates, lists and revokes devices with POST/GET
+/api/devices and DELETE /api/devices/:id. Create with kind watch/bee/phone and an
+optional label. Up to ten active tokens; the raw apd_ token is shown once and
+stored only as a hash. Device tokens authorize POST /api/voice (text,
+time_zone, optional conversation_id → say) and POST /api/context (a signal or
+{signals:[…]} → suggestions and say). A device token cannot manage devices.
+Voice history lasts ten minutes; context need snippets expire after thirty days.
+
+For an agent holding Bee MCP data: read the user's todos or daily summary, call
+add_context for a need clause with source bee and a stable external_id, then
+get_suggestions. Ask for a budget if needed and wait for yes before accepting.
+See [BEE.md](BEE.md) and [APPLE_WATCH.md](APPLE_WATCH.md).

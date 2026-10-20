@@ -11,8 +11,8 @@ import { App, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 // Rendered by any MCP Apps host. Data comes from the tool result's
 // structuredContent; actions call the server's tools through the host.
 
-type View = "deal" | "options" | "deals" | "posts";
-const viewFor = (d: Data): View => (d.matches ? "options" : d.deals ? "deals" : d.offers || d.requests ? "posts" : "deal");
+type View = "deal" | "options" | "deals" | "posts" | "suggestions" | "routines";
+const viewFor = (d: Data): View => (d.suggestions ? "suggestions" : d.routines ? "routines" : d.matches ? "options" : d.deals ? "deals" : d.offers || d.requests ? "posts" : "deal");
 
 type Kind = "item" | "service";
 type Unit = "each" | "job" | "hour";
@@ -39,6 +39,9 @@ interface Fallback { reason: "no_seller" | "over_budget"; new_price: number | nu
 interface TradeIn { category: string; url: string; say: string }
 type Data = Record<string, unknown> & {
   say?: string; fallback?: Fallback | null; trade_in?: TradeIn | null; deal?: Deal | null; next_deal?: Deal | null; deals?: Deal[]; offer?: Offer; request?: Request;
+  suggestions?: {suggestion_id:string;say:string;reason:string;request:{max_price:number|null}}[];
+  routines?: {routine_id:string;need:string;when:string;usual_budget:number;price_unit:Unit;pickup:string|null;location:string|null;next_at:string}[];
+  time_zone?: string;
   request_id?: string; matches?: Offer[]; alternatives?: Offer[]; offers?: Offer[]; requests?: Request[]; waiting_requests?: number;
 };
 
@@ -318,6 +321,27 @@ function renderPosts(d: Data) {
   return items.length > INLINE_MAX ? [...items.slice(0, INLINE_MAX), h("p", { class: "more" }, `And ${items.length - INLINE_MAX} more`)] : items;
 }
 
+function renderSuggestions(d:Data) {
+  if(!d.suggestions?.length)return [h('p',{class:'muted'},'Nothing to suggest right now.')];
+  return d.suggestions.map(s=>{
+    const budget=h('input',{type:'number',min:'0.01',max:'100000',step:'0.01','aria-label':'Your budget',placeholder:'Your budget'}) as HTMLInputElement;
+    return h('article',{class:'card'},h('h3',{},s.say),h('p',{class:'muted small'},s.reason),s.request.max_price===null?budget:null,
+      h('div',{class:'actions'},button('Yes','primary',()=>{
+        const max=s.request.max_price??Number(budget.value);
+        if(!(max>0)){note='Enter your budget first.';budget.focus();return;}
+        void act('accept_suggestion',{suggestion_id:s.suggestion_id,max_price:max,idempotency_key:crypto.randomUUID()},r=>{data=r;});
+      }),button('Not now','secondary',()=>void act('dismiss_suggestion',{suggestion_id:s.suggestion_id},()=>{data={...data,suggestions:data?.suggestions?.filter(x=>x.suggestion_id!==s.suggestion_id)};})),
+      button('Forget','secondary',()=>void act('dismiss_suggestion',{suggestion_id:s.suggestion_id,forget:true},()=>{data={...data,suggestions:data?.suggestions?.filter(x=>x.suggestion_id!==s.suggestion_id)};}))));
+  });
+}
+function renderRoutines(d:Data) {
+  if(!d.routines?.length)return [h('p',{class:'muted'},'No routines learned yet.')];
+  return d.routines.map(r=>h('article',{class:'card'},h('h3',{},r.need),h('p',{},r.when),h('p',{class:'muted'},[rate(r.usual_budget,r.price_unit),r.pickup,r.location].filter(Boolean).join(' · ')),
+    button('Forget','secondary',()=>{
+      const date=new Intl.DateTimeFormat('en-CA',{timeZone:d.time_zone??'Asia/Hong_Kong',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(r.next_at)).replaceAll('-','');
+      void act('dismiss_suggestion',{suggestion_id:'sug_'+r.routine_id+'_'+date,forget:true},()=>{data={...data,routines:data?.routines?.filter(x=>x.routine_id!==r.routine_id)};});
+    })));
+}
 function render() {
   root.replaceChildren();
   if (!data) {

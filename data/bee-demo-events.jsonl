@@ -1,0 +1,8 @@
+# Demo events in the shape `bee stream --json` prints (one JSON object per line, no event field).
+# Written for the demo; replay with: npm run bee:bridge -- --replay data/bee-demo-events.jsonl
+{"conversation":{"id":"demo-conv-1","short_summary":"Chatted with Sam about the weekend hiking trip and which trail to take."},"conversation_uuid":"demo-conv-1"}
+{"utterance":{"text":"Did you see the game last night?","speaker":"speaker_2"},"conversation_uuid":"demo-conv-2"}
+{"location":{"name":"Hall 5"}}
+{"conversation":{"id":"demo-conv-3","short_summary":"Realized my calculator broke; need a graphing calculator before the stats exam on Friday."},"conversation_uuid":"demo-conv-3"}
+{"todo":{"id":"demo-todo-1","text":"Buy printer paper for the club flyers","completed":false,"alarmAt":null}}
+{"todo":{"id":"demo-todo-2","text":"Email the professor about office hours","completed":false,"alarmAt":null}}

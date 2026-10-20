@@ -19,6 +19,8 @@ const common = {
 
 await build({ ...common, entryPoints: ["src/web/main.ts"], outfile: "public/app/app.js" });
 
+await build({ ...common, entryPoints: ["src/web/watch.ts"], outfile: "public/watch/watch.js" });
+
 const view = await build({ ...common, entryPoints: ["src/apps/view.ts"], write: false });
 const js = view.outputFiles[0].text.replace(/<\/script/gi, "<\\/script");
 const css = readFileSync("src/apps/view.css", "utf8").replace(/\r\n/g, "\n");
