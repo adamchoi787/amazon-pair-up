@@ -280,3 +280,20 @@ When the requester posts first, the order flips: the request waits, and the
 offer's `post_offer` opens the deal ("A buyer was already looking for one…", or
 "New job from Mei: … Want it?"). The requester hears about it through
 `get_deal_status`.
+
+## Live resources, confirmations and deletion
+
+An initialized session returns Mcp-Session-Id. Keep it on subsequent calls and
+open GET /mcp for SSE notifications. Subscribe to deals://me and posts://me
+with resources/subscribe; on notifications/resources/updated, read the URI.
+Resources contain only the signed-in user's view. resources/unsubscribe stops
+updates and DELETE /mcp closes the session. An expired session returns 404;
+initialize again. Calls without a session id continue to work.
+
+Clients declaring form elicitation receive elicitation/create for unusual
+prices and deal confirmation. Declining or cancelling leaves the action
+unconfirmed. Clients without elicitation use the tool's spoken confirmation flow.
+
+delete_my_data asks for confirmation; pass confirm: true only after the user's
+explicit yes. It withdraws live posts, releases holds, erases the account, tokens,
+history and learning rows, and anonymizes past deals needed by the counterpart.

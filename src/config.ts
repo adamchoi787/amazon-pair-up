@@ -43,6 +43,11 @@ export const config = {
   postsPerHour: Number(env("POSTS_PER_HOUR", "30")),
   maxOpenRequests: Number(env("MAX_OPEN_REQUESTS", "10")),
   mcpCallsPerMinute: Number(env("MCP_CALLS_PER_MINUTE", "120")),
+  // Streamable HTTP sessions (src/mcp/sessions.ts): an initialize gets an Mcp-Session-Id
+  // for subscriptions, the GET stream and elicitation. "off" keeps every request stateless.
+  mcpSessions: env("MCP_SESSIONS", "on") !== "off",
+  mcpSessionIdleMinutes: Number(env("MCP_SESSION_IDLE_MINUTES", "30")),
+  mcpMaxSessions: Number(env("MCP_MAX_SESSIONS", "1000")),
   // Learning to pair better (src/market/learning.ts): how often to train and judge a ranking model.
   learnIntervalHours: Number(env("LEARN_INTERVAL_HOURS", "24")),
   learnMinOutcomes: Number(env("LEARN_MIN_OUTCOMES", "60")),

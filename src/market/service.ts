@@ -391,6 +391,25 @@ export async function confirmDeal(deps: Deps, userId: string, dealId: string) {
   };
 }
 
+/**
+ * The question a host asks the user before confirm_deal records their yes
+ * (MCP elicitation), or null when the deal isn't waiting for this user, so
+ * confirmDeal gives its usual answer.
+ */
+export async function confirmQuestion(deps: Deps, userId: string, dealId: string) {
+  await sweep(deps);
+  const { rows } = await deps.db.query<DealWithParties>(`${DEAL_WITH_PARTIES} WHERE d.id = $1`, [dealId]);
+  if (!rows[0] || rows[0].status !== "proposed") return null;
+  const deal = dealView(rows[0], userId);
+  if (!deal.waiting_for_you) return null;
+  const what = deal.kind === "item"
+    ? `${deal.your_role === "buyer" ? "Buy" : "Sell"} ${deal.title} for ${dealPrice(deal)}, with ${deal.counterpart}?`
+    : deal.your_role === "buyer"
+      ? `Book ${deal.counterpart} for ${deal.task ?? deal.title}, ${dealPrice(deal)}?`
+      : `Take the job ${deal.task ?? deal.title} for ${deal.counterpart}, ${dealPrice(deal)}?`;
+  return `${what}${placeLine(deal)}${deal.your_role === "buyer" ? priceWarning(deal) : ""}`;
+}
+
 /** Say no to a deal. Both posts go back on the market and get re-paired with their next-best match. */
 export async function declineDeal(deps: Deps, userId: string, dealId: string) {
   const { db, cfg } = deps;
