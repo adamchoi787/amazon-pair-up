@@ -11,6 +11,7 @@ import { log, metric } from "../http/log.js";
 import { once } from "../market/idempotency.js";
 import { deleteMyData } from "../market/privacy.js";
 import * as market from "../market/service.js";
+import { HANDOFFS } from "../market/amazon.js";
 import type { Deps } from "../market/service.js";
 import { REPORT_REASONS } from "../market/trust.js";
 import { KINDS, REQUEST_SOURCES, SERVICE_UNITS } from "../market/types.js";
@@ -250,6 +251,7 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
           .describe("ISO 8601: an item's deadline or a job's start time; the request stops pairing after it and offers expire by then"),
         min_condition: condition.optional().describe("Items: worst acceptable condition"),
         quantity: z.number().int().positive().max(1000).optional().describe("Items: how many"),
+        handoff: z.enum(HANDOFFS).optional().describe("Items: 'delivery' when the user wants it brought to them (Amazon Hub delivery to a locker in their area); default 'meetup'"),
         source: z.enum(REQUEST_SOURCES).optional().describe("'bee_context' when inferred from Bee, 'device_context' from a watch or phone"),
         confirm_price: confirmPrice,
         idempotency_key: idempotencyKey,
@@ -337,6 +339,24 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
         }
         return market.confirmDeal(deps, userId, args.deal_id);
       }, "market"),
+  );
+
+  registerAppTool(
+    server,
+    "choose_handoff",
+    {
+      _meta: ui("market"),
+      title: "Meet up or deliver",
+      description:
+        "Buyer only, item deals while proposed: choose 'delivery' (the seller drops the item at an Amazon Hub Counter, " +
+        "Amazon carries it to a Hub Locker in the buyer's area, the buyer pays the fee shown in deal.delivery) or 'meetup' " +
+        "(hand-off in person at a Hub point). The price stays as settled; the seller is asked to confirm again. Offer " +
+        "delivery when deal.delivery is set and the user can't meet, lives in another area, or asks for it.",
+      inputSchema: { user_id: userIdArg, deal_id: id, method: z.enum(HANDOFFS), idempotency_key: idempotencyKey },
+      outputSchema: outputs.choose_handoff,
+      annotations: writes,
+    },
+    (args) => write("choose_handoff", args, (userId) => market.chooseHandoff(deps, userId, args.deal_id, args.method), "market"),
   );
 
   registerAppTool(

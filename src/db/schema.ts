@@ -89,6 +89,11 @@ ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS price_unit TEXT NOT NULL DEFAUL
 ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS hours      NUMERIC(5,2);
 ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS pickup     TEXT;
 ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS schedule   TEXT;
+-- Items change hands at a Hub point ('meetup') or by Amazon Hub delivery
+-- ('delivery', src/market/amazon.ts). The deal keeps its own copy, set by the buyer.
+ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS handoff    TEXT NOT NULL DEFAULT 'meetup';
+ALTER TABLE deals       ADD COLUMN IF NOT EXISTS handoff    TEXT NOT NULL DEFAULT 'meetup';
+ALTER TABLE deals       ADD COLUMN IF NOT EXISTS delivery_ref TEXT;
 -- Natural-language schedules are retained for speech; concrete work windows
 -- are stored separately for availability and overlap checks. Existing rows
 -- are interpreted conservatively from their original creation time.

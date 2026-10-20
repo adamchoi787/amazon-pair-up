@@ -187,14 +187,15 @@ export async function propose(
        ),
        hold_listing AS (UPDATE listings SET status = 'pending' WHERE id = $2 AND EXISTS (SELECT 1 FROM ok) RETURNING id),
        hold_intent  AS (UPDATE buy_intents SET status = 'matched' WHERE id = $3 AND EXISTS (SELECT 1 FROM ok) RETURNING id)
-       INSERT INTO deals (id, listing_id, buy_intent_id, price, currency, seller_confirmed, meetup, expires_at)
-       SELECT $1, $2, $3, $4, $5, $6, $7, LEAST(now() + make_interval(secs => $8), $9::timestamptz)
+       INSERT INTO deals (id, listing_id, buy_intent_id, price, currency, seller_confirmed, meetup, expires_at, handoff)
+       SELECT $1, $2, $3, $4, $5, $6, $7, LEAST(now() + make_interval(secs => $8), $9::timestamptz), $10
        WHERE EXISTS (SELECT 1 FROM hold_listing) AND EXISTS (SELECT 1 FROM hold_intent)
        RETURNING *`,
       [
         shortId("deal"), listing.id, intent.id, result.price, listing.currency,
         listing.auto_accept && (listing.kind === "item" || scheduling.status === "verified"),
         meetingPlace(listing, intent), s.holdHours * 3600, intent.needed_by,
+        listing.kind === "item" ? intent.handoff : "meetup",
       ],
     );
     const deal = rows[0];

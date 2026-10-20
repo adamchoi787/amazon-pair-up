@@ -127,6 +127,18 @@ export const dealOut = z.object({
     availability: z.string().nullable(),
     hub_point: hubPoint.nullable().describe("Items, both sides in the same area: that area's Amazon Hub Locker or Counter, the suggested hand-off place"),
   }).describe("Where and when: the meet-up for an item; for a service, where the job is (drop-off for errands) and when"),
+  handoff: z.enum(["meetup", "delivery"]).nullable().describe("Items: how it changes hands; the buyer switches it with choose_handoff. null for services"),
+  delivery: z.object({
+    selected: z.boolean().describe("true: this deal goes by Amazon Hub delivery; false: available, the buyer can choose it"),
+    provider: z.string().describe("Amazon Shipping"),
+    drop_off: hubPoint.describe("Where the seller drops the item off: a Hub Counter or Locker in their area"),
+    pick_up: hubPoint.describe("Where the buyer collects it with a pickup code: a Hub Locker in their area"),
+    fee: money.describe("Delivery fee the buyer pays on top of the price; included in total when selected"),
+    eta: z.string(),
+    max_weight_lb: z.number(),
+    reference: z.string().nullable().describe("Shipment reference once both sides confirmed"),
+    demo: z.boolean().describe("true: demo rates and locations"),
+  }).nullable().describe("Items: Amazon Hub delivery between the two areas; neither side's address is shared. null when unavailable"),
   pickup: z.string().nullable().describe("Errands: where to collect from"),
   needed_by: z.string().nullable().describe("Services: when the job is due or starts"),
   scheduling: z.object({
@@ -182,6 +194,7 @@ const marketOutputs = {
     say,
   },
   confirm_deal: { deal: dealOut, say },
+  choose_handoff: { deal: dealOut, say },
   decline_deal: {
     deal_id: z.string(),
     status: z.literal("declined"),

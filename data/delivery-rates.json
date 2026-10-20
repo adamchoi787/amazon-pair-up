@@ -1,0 +1,7 @@
+{
+  "_note": "DEMO DATA. Estimated buyer-paid fees for Amazon Hub delivery between two people: the seller drops the item at a Hub Counter or Locker in their area, Amazon carries it to a Hub Locker in the buyer's area, and the buyer collects it with a pickup code. Amazon Shipping lists counter drop-off with no pickup fee and same-day collection before 2 p.m. (shipping.amazon.com/locations). Production reads live rates from the Amazon Shipping API.",
+  "provider": "Amazon Shipping",
+  "max_weight_lb": 50,
+  "same_area": { "fee": 3.99, "eta": "same day if dropped off by 2 p.m." },
+  "cross_area": { "fee": 5.99, "eta": "next day" }
+}

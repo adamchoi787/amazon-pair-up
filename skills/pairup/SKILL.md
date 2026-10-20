@@ -64,6 +64,7 @@ Confirmation records agreement, not payment, handover or completed work.
 | "I need a graphing calculator today, max $18" | `post_request` with `raw_request` = their words (add fields you clearly heard) |
 | "Pick up my lunch from the HUB to McCarty Hall by 12:30, $5" | `post_request` with `raw_request`; the server reads kind, pickup and time |
 | "Yes" / "Confirm it" (right after you read a deal) | `confirm_deal` with that `deal_id` |
+| "Can they send it?" / "Deliver it to me" (item deal) | `choose_handoff` with `method: "delivery"`, then read the fee and the pickup locker; `"meetup"` switches back |
 | "No" / "Not that one" | `decline_deal`; the result includes the next best offer when there is one |
 | "Show me other options" | `find_matches` with the `request_id` |
 | "Get the second one" | `negotiate` with `request_id` and that option's `offer_id` |
