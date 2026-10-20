@@ -11,6 +11,8 @@ REGION=$(TOKEN=$(curl -fsS -X PUT http://169.254.169.254/latest/api/token -H "X-
   && curl -fsS -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
 
 secret() { aws ssm get-parameter --region "$REGION" --name "$1" --with-decryption --query Parameter.Value --output text; }
+# Writes NAME=value for a parameter the deploy script stores only when it is configured.
+optional() { local value; if value=$(secret "$2" 2>/dev/null) && [ -n "$value" ]; then echo "$1=$value"; fi; }
 
 # Environment: public settings from the deploy script, secrets from Parameter Store.
 umask 027
@@ -18,6 +20,9 @@ umask 027
   echo "$ENV_B64" | base64 -d
   echo "ORIGIN_SECRET=$(secret /amazonpairup/origin-secret)"
   echo "DASHBOARD_TOKEN=$(secret /amazonpairup/dashboard-token)"
+  optional LWA_CLIENT_ID /amazonpairup/lwa-client-id
+  optional LWA_CLIENT_SECRET /amazonpairup/lwa-client-secret
+  optional DEMO_LOGIN_PASSCODE /amazonpairup/demo-login-passcode
 } > /etc/amazonpairup.env.new
 chown root:amazonpairup /etc/amazonpairup.env.new
 mv -f /etc/amazonpairup.env.new /etc/amazonpairup.env

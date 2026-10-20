@@ -25,7 +25,7 @@ access opens.
 | Streamable HTTP, MCP spec 2025-11-25 | `POST /mcp` ([src/app.ts](../src/app.ts)) |
 | Public HTTPS URL | [DEPLOY.md](DEPLOY.md): tunnel today, Lightsail for the demo |
 | Round trip under 500 ms | `[mcp] … NNms` log lines; under 10 ms in mock mode |
-| Account linking (optional, but we need it to tell the buyer from the seller) | `AUTH_MODE=oauth` ([src/auth/oauth.ts](../src/auth/oauth.ts)) |
+| Account linking (optional, but we need it to tell the buyer from the seller) | `AUTH_MODE=oauth` ([src/auth/oauth.ts](../src/auth/oauth.ts)), people sign in with Login with Amazon |
 | Privacy policy and terms URLs (HTTPS) | `/privacy.html`, `/terms.html` |
 | Icons at 72, 64, 88, 126, 180 and 241 px, plus a 600×900 carousel image | `/addon/icon-<size>.png`, `/addon/carousel-600x900.png` |
 
@@ -70,11 +70,30 @@ ALLOWED_HOSTS=<host>,127.0.0.1,localhost \
 OAUTH_CLIENT_ID=amazonpairup-alexa \
 OAUTH_CLIENT_SECRET=<long random string> \
 OAUTH_REDIRECT_URIS=<filled in after step 4> \
+LWA_CLIENT_ID=<security profile client ID> \
+LWA_CLIENT_SECRET=<security profile client secret> \
+DEMO_MODE=true \
 DEMO_LOGIN_PASSCODE=<optional> \
 npm start
 ```
 
 To generate a client secret, run `openssl rand -base64 32`. Keep it out of git and the chat.
+On the AWS deployment, `deploy/aws/deploy.sh` sets these for you
+([DEPLOY.md](DEPLOY.md#sign-in)).
+
+**Sign-in.** Our OAuth server signs people in with **Login with Amazon**:
+
+1. In the [Login with Amazon console](https://developer.amazon.com/loginwithamazon/console/site/lwa/overview.html),
+   create a security profile.
+2. In its **Web Settings**, add the allowed return URL `https://<host>/oauth/amazon/callback`
+   (`<PUBLIC_BASE_URL>/oauth/amazon/callback`).
+3. Put its client ID and secret in `LWA_CLIENT_ID` and `LWA_CLIENT_SECRET`.
+
+`DEMO_MODE=true` adds the judge demo sign-in, labelled "Demo sign-in for judges",
+next to Login with Amazon. It takes a name and a passcode: the first sign-in with a
+name sets its passcode, and later sign-ins with that name use it.
+`DEMO_LOGIN_PASSCODE` is an optional access code every demo sign-in also enters.
+A public server starts with Login with Amazon, `DEMO_MODE=true`, or both.
 
 ## Step 3: Create the add-on
 
@@ -117,7 +136,14 @@ The CLI reference lists a `--config-file` flag, and the account-linking guide sh
 | PKCE | S256 |
 
 Alexa discovers the rest from `https://<host>/.well-known/oauth-protected-resource`
-and `https://<host>/.well-known/oauth-authorization-server`.
+and `https://<host>/.well-known/oauth-authorization-server`, which also list
+`https://<host>/oauth/revoke` (RFC 7009 token revocation, for unlinking).
+
+Alexa uses the pre-registered client above. Other MCP clients (Claude, ChatGPT,
+Cursor) register themselves with a Client ID Metadata Document or at
+`https://<host>/oauth/register` (RFC 7591), up to `DCR_PER_HOUR` registrations per
+IP address per hour (default 20, `0` turns it off); see
+[TOOL_CONTRACT.md](TOOL_CONTRACT.md#connecting-a-client).
 
 ## Step 5: Deploy and test
 
@@ -128,9 +154,9 @@ alexa-ai deploy
 Open the [Alexa+ simulator](https://developer.amazon.com/alexa/console/ask/addons/simulator)
 and choose the stage **development**. Use **Isolation** mode to test our tools directly,
 and **Global** mode to check that Alexa+ routes marketplace requests to us. When asked,
-link the account with the sign-in page and use two different names for seller and buyer.
-You'll probably need two Amazon accounts or two linking sessions; note what works in the
-friction log.
+link the account on our sign-in page: seller and buyer each sign in with their own
+Amazon account, or with two names in the judge demo sign-in. You'll probably need
+two Alexa accounts or two linking sessions; note what works in the friction log.
 
 Test script:
 1. "Sell my TI-84 graphing calculator for 20 dollars. I'll accept anything above 15."

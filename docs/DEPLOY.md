@@ -25,7 +25,7 @@ Browser / MCP clients (Alexa+, Claude, the web app)
 
 Everything is in [deploy/aws/amazonpairup.yaml](../deploy/aws/amazonpairup.yaml) (CloudFormation).
 No AWS access keys exist on the server: Bedrock, S3 and Parameter Store are reached
-through the instance role. The origin and dashboard secrets live in Parameter Store.
+through the instance role. The origin, dashboard and sign-in secrets live in Parameter Store.
 
 **Once:**
 
@@ -38,6 +38,8 @@ through the instance role. The origin and dashboard secrets live in Parameter St
    ```bash
    AWS_PROFILE=amazonpairup AWS_REGION=us-east-1 npx tsx scripts/check-bedrock.ts
    ```
+4. Set up sign-in (see [Sign-in](#sign-in) below). The first deploy works with the
+   judge demo sign-in alone, so you can add Login with Amazon after it prints the URL.
 
 **Deploy (first time and every release):**
 
@@ -51,6 +53,59 @@ installs it on the instance through SSM, switches releases atomically, waits for
 Settings: `AGENT_MODEL` / `INTENT_MODEL` (Bedrock model or inference profile ids,
 default `us.amazon.nova-lite-v1:0`), `INSTANCE_TYPE`, `STACK`, `ALERT_EMAIL` (gets an
 email when an alarm fires; confirm the subscription once).
+
+### Sign-in
+
+The deployed server runs `AUTH_MODE=oauth`. People and MCP clients sign in through
+its OAuth 2.1 server ([src/auth/oauth.ts](../src/auth/oauth.ts)), which offers:
+
+- **Login with Amazon**, the identity provider. The user id is the Amazon account's
+  `user_id`; other people see the profile's first name.
+- **The judge demo sign-in**, labelled "Demo sign-in for judges", with `DEMO_MODE=true`.
+  It takes a name and a passcode: the first sign-in with a name sets that name's
+  passcode, and later sign-ins with the name need it. Wrong guesses are throttled.
+  `DEMO_LOGIN_PASSCODE` adds an access code every demo sign-in enters as well, for
+  example one you hand to the judges.
+
+A server on a public URL starts with Login with Amazon configured, `DEMO_MODE=true`,
+or both. On `http://localhost` and `127.0.0.1` the demo sign-in is always on.
+
+**Login with Amazon, once:**
+
+1. Open the [Login with Amazon console](https://developer.amazon.com/loginwithamazon/console/site/lwa/overview.html)
+   and create a security profile (name, description, privacy notice URL
+   `https://<id>.cloudfront.net/privacy.html`).
+2. Under the profile's **Web Settings**, add the allowed return URL
+   `https://<id>.cloudfront.net/oauth/amazon/callback` (`<PUBLIC_BASE_URL>/oauth/amazon/callback`;
+   the deploy script prints it).
+3. Copy the client ID and client secret, and deploy with them in your environment:
+   ```bash
+   read -rs LWA_CLIENT_SECRET && export LWA_CLIENT_SECRET   # paste, then Enter
+   AWS_PROFILE=amazonpairup AWS_REGION=us-east-1 LWA_CLIENT_ID=amzn1.application-oa2-client.… deploy/aws/deploy.sh
+   ```
+
+The script stores them as the SecureStrings `/amazonpairup/lwa-client-id` and
+`/amazonpairup/lwa-client-secret` through a private temp file, so the secret stays
+off command lines, and later deploys reuse them. The instance reads them from
+Parameter Store when it installs a release.
+
+**Which sign-in a deploy turns on:**
+
+| Your environment / Parameter Store | Deployed sign-in |
+|---|---|
+| Login with Amazon stored | Login with Amazon |
+| Login with Amazon stored, `DEMO_MODE=true` | Login with Amazon and the judge demo sign-in |
+| No Login with Amazon stored | The judge demo sign-in (`DEMO_MODE=true` is written for you) |
+
+`DEMO_LOGIN_PASSCODE` in your environment is stored as `/amazonpairup/demo-login-passcode`
+and reused; delete that parameter to drop the access code.
+
+**Other MCP clients.** Claude, ChatGPT, Cursor and other clients connect to `/mcp`
+on their own, with a Client ID Metadata Document or by registering at
+`POST /oauth/register` (RFC 7591). `DCR_PER_HOUR` (default 20) caps registrations
+per IP address per hour, and `0` turns registration off. Tokens are revoked at
+`POST /oauth/revoke` (RFC 7009). The full flow is in
+[TOOL_CONTRACT.md](TOOL_CONTRACT.md#connecting-a-client).
 
 **Operate:**
 
@@ -156,6 +211,7 @@ Notes:
 - Secrets such as `MCP_API_KEY` and AWS keys go in the deployment's environment, not in git.
 - **Dashboard:** set `DASHBOARD_TOKEN` to a long random string to use `/api/dashboard` on a deployed server, and open the page as `https://<host>/dashboard/#token=<token>`. Without it, the dashboard is off whenever `AUTH_MODE=oauth`.
 - **Web app:** served at `https://<host>/app/`. With `AUTH_MODE=oauth` and `PUBLIC_BASE_URL` set it signs people in as the built-in public client `amazonpairup-web` (PKCE, redirect `<PUBLIC_BASE_URL>/app/`); the Alexa+ client variables are only needed for Alexa account linking.
+- **Sign-in:** set `LWA_CLIENT_ID` and `LWA_CLIENT_SECRET` (Login with Amazon, allowed return URL `<PUBLIC_BASE_URL>/oauth/amazon/callback`), `DEMO_MODE=true` for the labelled judge demo sign-in, or both; see [Sign-in](#sign-in).
 - **Assistant:** `AI_MODE=bedrock` with `BEDROCK_AGENT_MODEL_ID` (or `BEDROCK_INTENT_MODEL_ID`) runs the web app's assistant on Bedrock; otherwise the offline planner answers.
 - **Policy:** `DEAL_HOLD_HOURS`, `POSTS_PER_HOUR`, `MAX_OPEN_REQUESTS` and `MCP_CALLS_PER_MINUTE` have production defaults; see [.env.example](../.env.example).
 
