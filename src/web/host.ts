@@ -38,11 +38,17 @@ export async function renderView(
   container.append(frame);
 
   const context = { theme: themeNow(), displayMode: "inline", platform: "web", locale: navigator.language } as const;
-  const bridge = new AppBridge(null, { name: "AmazonPairUp", version: "1.0.0" }, { serverTools: {}, logging: {} }, { hostContext: context });
+  const bridge = new AppBridge(null, { name: "AmazonPairUp", version: "1.0.0" }, { serverTools: {}, logging: {}, openLinks: {} }, { hostContext: context });
   bridge.oncalltool = async (params) => {
     const r = await mcp.call(params.name, (params.arguments ?? {}) as Record<string, unknown>);
     onToolCall(params.name, r);
     return r;
+  };
+  // The view links only to Amazon (search fallback, Trade-In); anything else is refused.
+  bridge.onopenlink = async ({ url }) => {
+    const ok = URL.canParse(url) && new URL(url).protocol === "https:" && new URL(url).hostname === "www.amazon.com";
+    if (ok) window.open(url, "_blank", "noopener,noreferrer");
+    return ok ? {} : { isError: true };
   };
   bridge.onsizechange = ({ height }) => {
     if (height) {

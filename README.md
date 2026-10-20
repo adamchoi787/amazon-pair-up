@@ -193,7 +193,21 @@ without a human wiring it up:
 - **Safety:** OAuth 2.1 with PKCE, Origin validation, CDN-only origin, per-caller rate
   limits, per-user posting limits, bounded inputs, private limits redacted in one
   place and leak-tested.
-- **Tests:** 91 server tests (unit, end-to-end over MCP, HTTP, OAuth, schemas, privacy,
+- **Speed:** `npm run bench` drives real MCP clients over Streamable HTTP (seller
+  lists, buyer asks, more options, buyer says yes; fresh users each round) and prints
+  p50/p95/p99 per tool. Local run (Ryzen 7 5700U laptop, embedded PGlite, mock AI,
+  seeded market of 162 posts; Bedrock embedding and parsing calls add to this):
+
+  | Clients at once | post_request p50 / p95 / p99 | find_matches | confirm_deal | Throughput |
+  |---|---|---|---|---|
+  | 1 | 63 / 172 / 174 ms | 20 / 34 / 49 ms | 19 / 35 / 37 ms | 21 calls/s |
+  | 10 | 492 / 853 / 1602 ms | 399 / 917 / 1538 ms | 194 / 619 / 737 ms | 21 calls/s |
+
+  One voice turn, pairing and settlement included, takes well under 200 ms. Throughput
+  is bound by the single embedded PGlite connection (calls queue for it under load);
+  `DATABASE_URL` on RDS PostgreSQL with a connection pool is the path past it.
+  `npm run bench -- --url <server>/mcp --concurrency 10 --rounds 10` measures any deployment.
+- **Tests:** 101 server tests (unit, end-to-end over MCP, HTTP, OAuth, schemas, privacy,
   idempotency) plus the Strands agent against a real server, on every push.
 
 ## Repo map
@@ -214,6 +228,7 @@ src/
   market/negotiation.ts  price settlement via pairing-core (Rust → WebAssembly)
   market/pricing.ts      price check: reference prices, robust trade-history range
   market/learning.ts     learning to pair better: features, model, guarded rollout
+  market/amazon.ts       hand-offs to Amazon: search fallback, Trade-In, Hub meet-up points
   market/service.ts      business operations behind each tool
   market/views.ts        the only place rows become output (privacy redaction)
   market/idempotency.ts  retry-safe writes (idempotency_key)
@@ -225,10 +240,11 @@ src/apps/                the MCP Apps view (deal card, options, deals, posts)
 public/app/              web app shell + built bundle (npm run build:web)
 public/mcp-apps/         built single-file MCP Apps view
 public/dashboard/        operations dashboard
-data/seed-listings.json  seed market: 162 posts from 22 people, items and services
+data/seed-listings.json  seed market: 162 posts from 22 people, items and services; demo Amazon Hub points per area
+data/trade-in-categories.json  categories Amazon Trade-In takes
 skills/amazonpairup/     the Agent Skill (SKILL.md)
 agents/agentcore/        Strands Agents voice agent for Amazon Bedrock AgentCore Runtime
-scripts/                 seed, smoke test, add-on assets
+scripts/                 seed, smoke test, latency benchmark (bench.ts), add-on assets
 docs/                    contract, award plan, Alexa+ setup, deploy, demo script, submission, friction log
 vendor/pairing-core/     prebuilt pairing-core module (refresh: node scripts/sync-pairing-core.mjs)
 Dockerfile, deploy/      container image, AWS CloudFormation + deploy scripts, Lightsail config
@@ -241,3 +257,5 @@ See [docs/AWARD_GAPS.md](docs/AWARD_GAPS.md) for the award analysis and the day-
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+Local benchmark (2026-10-20, Windows, Node v24.14.1, mock AI, PGlite, real HTTP MCP, 2 workers × 5 rounds, fresh users, 40 calls, zero errors): post_offer p50/p95/p99 49/235/235 ms; post_request 79/134/134 ms; find_matches 32/75/75 ms; confirm_deal 29/41/41 ms. Throughput 26.2 calls/s. This small local sample includes cold calls; measure Bedrock and the deployed network separately with `npm run bench`.

@@ -8,7 +8,8 @@ import {
 import { learningReport } from "./learning.js";
 import { DEFAULT_PRICE_POLICY, priceBand, verdict, type PriceBand, type PricePolicy } from "./pricing.js";
 import { num, type BuyIntentRow, type DealRow, type Kind, type ListingRow, type PriceUnit, type ServiceUnit } from "./types.js";
-import { dealView, offerView, requestView, type DealView, type DealWithParties } from "./views.js";
+import { tradeInCategory } from "./amazon.js";
+import { dealView, fallbackView, offerView, requestView, tradeInView, type DealView, type DealWithParties } from "./views.js";
 
 // Business operations. MCP tools (src/mcp/server.ts) are thin wrappers around
 // these, so the web app and the tests call the same functions.
@@ -157,6 +158,9 @@ export async function postOffer(deps: Deps, input: PostOfferInput) {
   const deal = paired ? dealView(await getDealWithParties(db, paired.deal.id), input.user_id) : null;
   const ask = rate(input.ask_price, unit, offer.currency);
   const posted = kind === "item" ? `Listed ${input.title} for ${ask}.` : `You're on the market: ${input.title}, ${ask}.`;
+  // Nobody asking yet for something Amazon Trade-In takes: say it's an option.
+  const tradeInFit = kind === "item" && !deal && waiting === 0 ? tradeInCategory(input) : null;
+  const trade_in = tradeInFit && tradeInView(tradeInFit);
 
   let say: string;
   if (deal) {
@@ -171,9 +175,10 @@ export async function postOffer(deps: Deps, input: PostOfferInput) {
       (input.min_price != null && minPrice < input.ask_price
         ? `I'll accept down to ${rate(minPrice, unit, offer.currency)}${offer.auto_accept ? " without asking you" : ""}, and nobody will see that number. `
         : `I'll hold out for your price. `) +
-      (kind === "item" ? `I'll pair you with a buyer as soon as one asks.` : `I'll bring you jobs as people ask.`);
+      (kind === "item" ? `I'll pair you with a buyer as soon as one asks.` : `I'll bring you jobs as people ask.`) +
+      (trade_in ? ` ${trade_in.say}` : "");
   }
-  return { offer, deal, waiting_requests: waiting, say };
+  return { offer, deal, waiting_requests: waiting, trade_in, say };
 }
 
 // ---------- Request side ----------
@@ -259,12 +264,18 @@ export async function postRequest(deps: Deps, input: PostRequestInput) {
   const lowBudget = !deal && band && verdict(maxPrice, band, policy) === "far_below"
     ? ` Heads up: ${service ? "jobs like this usually pay" : "these usually go for"} ${range(band, unit, intentRow.currency)}, so it may take a while.`
     : "";
+  // An item nobody nearby can sell yet: the same thing new on Amazon, while the request keeps waiting.
+  const fallback = !deal && !service
+    ? fallbackView(need, closest ? "over_budget" : "no_seller", band?.source === "reference" ? band.newPrice ?? null : null)
+    : null;
+  const amazonLine = fallback?.new_price != null ? ` If you can't wait, it's about ${fmt(fallback.new_price, "USD")} new on Amazon.` : "";
 
   return {
     request: requestView(intentRow, input.user_id),
     deal,
     // With nothing in reach, the closest offers at their asking price, the one named in `say` first.
     alternatives: (deal ? alternatives : [...outOfReach, ...alternatives].slice(0, ALTERNATIVES)).map((m) => matchView(m, intentRow, input.user_id)),
+    fallback,
     say: deal
       ? buyerOfferLine(deal, "found")
       : closest
@@ -272,7 +283,7 @@ export async function postRequest(deps: Deps, input: PostRequestInput) {
           `and ${service ? "they" : "the seller"} can't go as low as your budget. Want ${service ? "them at that rate" : "it at that price"}? Otherwise I'll keep looking.`
       : service
         ? `Got it: ${need}, up to ${budget}. Nobody's free for it yet, so I'll keep asking and pair you as soon as someone offers. Helpers won't see your budget.${lowBudget}`
-        : `Got it: ${need}, up to ${budget}. Nothing fits yet, so I'll keep looking and pair you as soon as a seller lists one. Sellers won't see your budget.${lowBudget}`,
+        : `Got it: ${need}, up to ${budget}. Nothing fits yet, so I'll keep looking and pair you as soon as a seller lists one. Sellers won't see your budget.${lowBudget}${amazonLine}`,
   };
 }
 
@@ -535,7 +546,8 @@ const DEAL_WITH_PARTIES = `
   SELECT d.*, l.kind, l.price_unit, l.title, l.condition, l.ask_price, l.ref_low, l.ref_high, l.ref_source,
          CASE WHEN l.kind = 'service' THEN COALESCE(i.schedule, l.availability) ELSE l.availability END AS availability,
          i.hours, i.pickup, i.needed_by, i.need AS task, l.seller_id, i.buyer_id,
-         su.display_name AS seller_name, bu.display_name AS buyer_name
+         su.display_name AS seller_name, bu.display_name AS buyer_name,
+         l.location AS offer_location, i.location AS request_location, su.home_area AS seller_home, bu.home_area AS buyer_home
   FROM deals d
   JOIN listings l    ON l.id = d.listing_id
   JOIN buy_intents i ON i.id = d.buy_intent_id

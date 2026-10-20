@@ -61,7 +61,7 @@ test("TI-84 demo: a buyer's request is paired and negotiated in one turn", async
   assert.equal(req.deal.price, 18, "a budget below the ask is the buyer's offer");
   assert.equal(req.deal.saved_vs_ask, 2);
   assert.equal(req.deal.counterpart, "seller");
-  assert.deepEqual(req.deal.meetup, { place: "HKUST campus", availability: null });
+  assert.deepEqual(req.deal.meetup, { place: "HKUST campus", availability: null, hub_point: null }, "the buyer gave no area, so no Hub point");
   assert.equal(req.deal.seller_confirmed, true, "seller pre-authorised via auto_accept");
   assert.equal(req.deal.waiting_for_you, true, "buyer must still say yes");
   assert.match(req.say, /\$18, \$2 below asking.*Should I confirm it\?/);
@@ -383,7 +383,7 @@ test("lunch run: a request is paired with a runner in one turn, and the runner t
   assert.equal(req.deal.price, 4, "a $5 budget pays the runner's $4 rate");
   assert.equal(req.deal.total, 4);
   assert.equal(req.deal.pickup, "LG7 canteen");
-  assert.deepEqual(req.deal.meetup, { place: "Hall 5", availability: "by 12:30" }, "the job happens where and when the requester needs it");
+  assert.deepEqual(req.deal.meetup, { place: "Hall 5", availability: "by 12:30", hub_point: null }, "the job happens where and when the requester needs it");
   assert.ok(new Date(req.deal.on_hold_until) <= new Date(req.request.needed_by), "a lunch offer never outlives lunch");
   assert.ok(!req.alternatives.some((m: { kind: string }) => m.kind !== "service"), "only services as alternatives");
   assert.match(req.say, /^Found someone: runner_ken can do it for \$4\. From LG7 canteen to Hall 5, by 12:30\. Should I confirm\? runner_ken gives the final yes\.$/);

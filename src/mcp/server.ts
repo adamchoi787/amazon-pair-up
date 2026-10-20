@@ -68,7 +68,9 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
         "A price far from what similar things go for returns an error with code 'confirm_price': read its 'say', then " +
         "call again with confirm_price: true if the user confirms, or with the price they meant. Every result has " +
         "a 'say' field: one short sentence you can speak as is. Write tools take an optional idempotency_key: " +
-        "send a fresh one per action and the same one on a retry, so nothing is posted or confirmed twice.",
+        "send a fresh one per action and the same one on a retry, so nothing is posted or confirmed twice. When nobody " +
+        "nearby can help, results point to Amazon: post_request's 'fallback' (an amazon.com link and the new price) and " +
+        "post_offer's 'trade_in' (Amazon Trade-In). Offer them as an option; the post keeps waiting either way.",
     },
   );
 
@@ -102,7 +104,8 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
         "deliveries, event help, tutoring). If someone is already waiting for it, the server pairs them and settles " +
         "the price inside both private limits in the same call, and returns the proposed deal. min_price is the user's private " +
         "lowest price (nobody sees it); with auto_accept the user pre-approves any deal at or above it. A service offer " +
-        "stays open after each booked job.",
+        "stays open after each booked job. An item nobody is asking for yet, in a category Amazon Trade-In takes " +
+        "(electronics, books, game consoles), comes back with a 'trade_in' link.",
       inputSchema: {
         user_id: userIdArg,
         kind: kind.optional().describe("'item' to sell a thing (default), 'service' to offer to do a task"),
@@ -139,7 +142,8 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
         "call: when 'deal' is returned, read the offer and ask the user to confirm. When nothing fits yet, the request " +
         "waits and is paired as soon as someone offers. Also returns up to four alternatives. Pass the fields you heard " +
         "plus the user's own words as raw_request; the server reads kind, price unit, hours, pickup and time from them " +
-        "when you leave those out.",
+        "when you leave those out. An item with no deal comes back with a 'fallback': an amazon.com search link and the " +
+        "typical new price, for a user who can't wait; the request keeps waiting for a seller.",
       inputSchema: {
         user_id: userIdArg,
         need: text(200).optional().describe("The item ('graphing calculator') or the task ('pick up my lunch')"),

@@ -143,6 +143,26 @@ deal far below the usual price hears a safety note (meet in public, pay on
 handover). The check never sets, blocks or settles a price. Thresholds:
 `PRICE_FAR_BELOW`, `PRICE_FAR_ABOVE`, `PRICE_REFERENCE_MATCH`, `PRICE_TRADE_MATCH`.
 
+## Hand-offs to Amazon
+
+The local market covers what Amazon retail doesn't (a used item under $20, an
+errand, an hour of help). When it can't help, the result points to Amazon, and
+the post keeps waiting on the market either way. All three rules are
+deterministic ([amazon.ts](../src/market/amazon.ts)).
+
+| When | Result field | What it carries |
+|---|---|---|
+| `post_request` for an item ends without a deal | `fallback` | `reason` (`no_seller`, or `over_budget` when offers exist but none fits the budget), `new_price` (typical price new on Amazon.com, from `new_price` in `data/reference-prices.json`; `null` when no reference matches), `currency: "USD"`, `amazon_url` (`https://www.amazon.com/s?k=<need>`), `still_waiting: true`, `say` ("Nobody nearby has one yet. New on Amazon it's about $110.") |
+| `post_offer` for an item nobody is asking for, in a Trade-In category | `trade_in` | `category` (`electronics`, `books` or `game_consoles`, matched by whole words of the category and title; list in `data/trade-in-categories.json`), `url: "https://www.amazon.com/tradein"`, `say` |
+| a deal for an item where both sides are in the same area | `deal.meetup.hub_point` | That area's Amazon Hub Locker or Counter (`name`, `type` (`locker` or `counter`), `area`, `demo`); `meetup.place` names it as the suggested hand-off place |
+
+A side's area is the post's `location`, else the person's home area. Services
+get none of these: an errand happens where the requester needs it. When
+`new_price` is known and nothing at all is nearby, `say` ends with "If you
+can't wait, it's about $110 new on Amazon." The Hub points in
+`data/seed-listings.json` (`areas`) are made-up demo data and come back with
+`demo: true`; production reads them from the Amazon Hub locator.
+
 ## Learning to pair better
 
 Every deal the engine proposes records its features
@@ -186,11 +206,11 @@ All output goes through [views.ts](../src/market/views.ts); the tests fail on an
 
 ### `post_offer`
 `title`*, `ask_price`*, `kind` (`item|service`, default `item`), `price_unit` (services: `job|hour`, default `job`), `min_price` (default `ask_price`), `description`, `category`, `auto_accept` (default true for items, false for services), `condition` (items: `new|like_new|good|fair|for_parts`, default `good`), `quantity` (items), `location`, `availability`, `confirm_price` (only after a `confirm_price` error)
-→ `{ offer, deal | null, waiting_requests, say }`. The offer carries `typical_price: { low, high, source } | null`. `deal` is opened when someone was already waiting; `waiting_requests` counts the requests this offer satisfies.
+→ `{ offer, deal | null, waiting_requests, trade_in | null, say }`. The offer carries `typical_price: { low, high, source } | null`. `deal` is opened when someone was already waiting; `waiting_requests` counts the requests this offer satisfies. `trade_in`: see [Hand-offs to Amazon](#hand-offs-to-amazon).
 
 ### `post_request`
 `need` and/or `raw_request`*, `max_price` (required unless stated in `raw_request`; per hour for hourly work), `kind`, `price_unit`, `hours`, `pickup`, `location`, `schedule`, `needed_by` (ISO 8601, in the future: an item's deadline or a job's start), `min_condition` (items), `quantity` (items), `source` (`voice|bee_context`), `confirm_price` (only after a `confirm_price` error)
-→ `{ request, deal | null, alternatives: [offer + within_budget_at_ask + score] (up to 4), say }`. With no deal, `alternatives` and `say` also name the closest offers the budget can't reach, at their asking price. Structured args win; `raw_request` is parsed to fill the gaps, including kind, unit, hours, pickup, place and time ("find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5").
+→ `{ request, deal | null, alternatives: [offer + within_budget_at_ask + score] (up to 4), fallback | null, say }`. With no deal, `alternatives` and `say` also name the closest offers the budget can't reach, at their asking price, and an item request gets a `fallback` (see [Hand-offs to Amazon](#hand-offs-to-amazon)). Structured args win; `raw_request` is parsed to fill the gaps, including kind, unit, hours, pickup, place and time ("find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5").
 
 ### `find_matches`
 `request_id`*, `limit` (1–10, default 3)
@@ -220,7 +240,7 @@ All output goes through [views.ts](../src/market/views.ts); the tests fail on an
 → `{ post_id, kind: "offer"|"request", status: "withdrawn"|"cancelled", released_deal_id | null, say }`.
 
 ### Deal object
-`deal_id`, `offer_id`, `request_id`, `kind`, `title` (the offer), `task` (services: what was asked for), `condition` (items), `your_role` (`buyer|seller`), `counterpart`, `price`, `price_unit` (`each|job|hour`), `hours`, `total`, `ask_price`, `saved_vs_ask`, `price_check` (`{ verdict: typical|below_typical|above_typical|far_below|far_above, typical_low, typical_high, source } | null`), `currency`, `status` (`proposed|confirmed|declined|replaced|expired|withdrawn`), `buyer_confirmed`, `seller_confirmed`, `waiting_for` (`["buyer"|"seller"]`), `waiting_for_you`, `meetup: { place, availability }` (for a service: where the job is and when), `pickup` (errands), `needed_by` (services), `on_hold_until` (while proposed), `created_at`, `updated_at`.
+`deal_id`, `offer_id`, `request_id`, `kind`, `title` (the offer), `task` (services: what was asked for), `condition` (items), `your_role` (`buyer|seller`), `counterpart`, `price`, `price_unit` (`each|job|hour`), `hours`, `total`, `ask_price`, `saved_vs_ask`, `price_check` (`{ verdict: typical|below_typical|above_typical|far_below|far_above, typical_low, typical_high, source } | null`), `currency`, `status` (`proposed|confirmed|declined|replaced|expired|withdrawn`), `buyer_confirmed`, `seller_confirmed`, `waiting_for` (`["buyer"|"seller"]`), `waiting_for_you`, `meetup: { place, availability, hub_point | null }` (for a service: where the job is and when; for an item in one area: the Amazon Hub point), `pickup` (errands), `needed_by` (services), `on_hold_until` (while proposed), `created_at`, `updated_at`.
 
 ## MCP Apps view
 
@@ -232,6 +252,7 @@ client lifecycle). `resources/read` returns one self-contained HTML document
 | Result | Layout |
 |---|---|
 | `deal` / `next_deal`, or a new `offer` / `request` | Deal card: price (per job or per hour, with the total), savings, counterpart, meet-up or pickup → drop-off and time, hold time; Confirm / Decline (Take the job / Pass for a provider) while it waits for the user; alternatives as a carousel |
+| `fallback` / `trade_in` on a waiting post | A secondary button: "New on Amazon · about $110" (the amazon.com search) or "Amazon Trade-In", opened through the host |
 | `matches` | Options carousel with "Get this one" / "Book this one" (`negotiate`) |
 | `deals` | The user's deals and jobs, those waiting for their yes first |
 | `offers` / `requests` | The user's posts with "Take down" (`withdraw_post`) |

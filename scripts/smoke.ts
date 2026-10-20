@@ -42,11 +42,13 @@ const { offer } = await call(seller, "Seller", "post_offer", {
   availability: "weekdays after 5pm",
 });
 
-// "Alexa, I need a graphing calculator today, maximum $18."
+// "Alexa, I need a graphing calculator today, maximum $18." (The buyer is on campus too.)
 const { deal, alternatives } = await call(buyer, "Buyer", "post_request", {
   raw_request: "I need a graphing calculator today, maximum $18",
+  location: "HKUST campus",
 }, ["min_price"]);
 if (!deal || deal.offer_id !== offer.offer_id) throw new Error("Expected the TI-84 to be paired in one turn");
+if (!deal.meetup.hub_point) throw new Error("Expected an Amazon Hub point as the campus meet-up");
 for (const m of alternatives) console.log(`   other option: ${m.title}, ask ${m.ask_price} (score ${m.score})`);
 
 // Buyer: "Yes."

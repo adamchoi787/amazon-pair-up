@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS reference_prices (
   hash        TEXT NOT NULL,                      -- re-embed only when an entry changes
   embedding   vector(${embeddingDim})
 );
+-- new_price: items only, the typical price new on Amazon.com (the Amazon fallback).
+ALTER TABLE reference_prices ADD COLUMN IF NOT EXISTS new_price NUMERIC(10,2);
 -- ref_source: reference | trades. price_flag: far_below | far_above.
 ALTER TABLE listings    ADD COLUMN IF NOT EXISTS ref_low    NUMERIC(10,2);
 ALTER TABLE listings    ADD COLUMN IF NOT EXISTS ref_high   NUMERIC(10,2);

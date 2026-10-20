@@ -64,6 +64,28 @@ export const requestOut = z.object({
 
 const party = z.enum(["buyer", "seller"]);
 
+const hubPoint = z.object({
+  name: z.string(),
+  type: z.enum(["locker", "counter"]),
+  area: z.string(),
+  demo: z.boolean().describe("true: a made-up demo location, not a real Amazon Hub point"),
+});
+
+export const fallbackOut = z.object({
+  reason: z.enum(["no_seller", "over_budget"]).describe("no_seller = nothing like it nearby; over_budget = nothing nearby within the budget"),
+  new_price: money.nullable().describe("Typical price new on Amazon.com; null when unknown"),
+  currency: z.literal("USD"),
+  amazon_url: z.string().describe("amazon.com search for the request"),
+  still_waiting: z.literal(true).describe("The request stays on the market and is paired when a seller lists one"),
+  say: z.string().describe("e.g. \"Nobody nearby has one yet. New on Amazon it's about $110.\""),
+}).describe("Items only, when no deal: the same thing new on Amazon, as an option if the user can't wait");
+
+export const tradeInOut = z.object({
+  category: z.enum(["electronics", "books", "game_consoles"]),
+  url: z.literal("https://www.amazon.com/tradein"),
+  say: z.string(),
+}).describe("Items in an Amazon Trade-In category that nobody is asking for yet");
+
 export const dealOut = z.object({
   deal_id: z.string(),
   offer_id: z.string(),
@@ -94,8 +116,11 @@ export const dealOut = z.object({
   seller_confirmed: z.boolean(),
   waiting_for: z.array(party).describe("Who still has to say yes"),
   waiting_for_you: z.boolean(),
-  meetup: z.object({ place: z.string().nullable(), availability: z.string().nullable() })
-    .describe("Where and when: the meet-up for an item; for a service, where the job is (drop-off for errands) and when"),
+  meetup: z.object({
+    place: z.string().nullable().describe("The suggested hand-off place: the Amazon Hub point when there is one, else the area"),
+    availability: z.string().nullable(),
+    hub_point: hubPoint.nullable().describe("Items, both sides in the same area: that area's Amazon Hub Locker or Counter, the suggested hand-off place"),
+  }).describe("Where and when: the meet-up for an item; for a service, where the job is (drop-off for errands) and when"),
   pickup: z.string().nullable().describe("Errands: where to collect from"),
   needed_by: z.string().nullable().describe("Services: when the job is due or starts"),
   on_hold_until: z.string().nullable().describe("While proposed: when the offer expires if nobody answers"),
@@ -108,12 +133,14 @@ export const outputs = {
     offer: offerOut,
     deal: dealOut.nullable().describe("Opened when someone was already waiting"),
     waiting_requests: z.number().int().describe("Open requests this offer satisfies"),
+    trade_in: tradeInOut.nullable().describe("Set when nobody is asking for this item yet and Amazon Trade-In takes it"),
     say,
   },
   post_request: {
     request: requestOut,
     deal: dealOut.nullable().describe("The best offer, already settled; null while the request waits"),
     alternatives: z.array(matchOut).describe("Other options, best first (3–5 for a carousel)"),
+    fallback: fallbackOut.nullable().describe("Items with no deal: the Amazon option; null otherwise"),
     say,
   },
   find_matches: {

@@ -1,3 +1,4 @@
+import { AMAZON_TRADE_IN_URL, amazonSearchUrl, hubPointFor, type HubPoint } from "./amazon.js";
 import { verdict, type BandSource } from "./pricing.js";
 import { num, type BuyIntentRow, type DealRow, type Kind, type ListingRow, type PriceUnit } from "./types.js";
 
@@ -75,6 +76,11 @@ export interface DealWithParties extends DealRow {
   ref_low: string | number | null;
   ref_high: string | number | null;
   ref_source: string | null;
+  /** Where each side is: the post's area, else the person's home area. */
+  offer_location: string | null;
+  request_location: string | null;
+  seller_home: string | null;
+  buyer_home: string | null;
 }
 
 export type Role = "buyer" | "seller" | "observer";
@@ -90,6 +96,10 @@ export function dealView(d: DealWithParties, viewerId: string) {
   const price = num(d.price)!;
   const ask = num(d.ask_price)!;
   const hours = num(d.hours);
+  // Items change hands; two people in the same area meet at its Amazon Hub point.
+  const hub = d.kind === "item"
+    ? hubPointFor(d.offer_location ?? d.seller_home, d.request_location ?? d.buyer_home)
+    : null;
   const waitingFor =
     d.status !== "proposed" ? [] : [
       ...(d.buyer_confirmed ? [] : ["buyer" as const]),
@@ -118,7 +128,7 @@ export function dealView(d: DealWithParties, viewerId: string) {
     seller_confirmed: d.seller_confirmed,
     waiting_for: waitingFor,
     waiting_for_you: role !== "observer" && waitingFor.includes(role),
-    meetup: { place: d.meetup, availability: d.availability },
+    meetup: { place: hub ? hubPlace(hub) : d.meetup, availability: d.availability, hub_point: hub && { ...hub, demo: true } },
     pickup: d.kind === "service" ? d.pickup : null,
     needed_by: d.kind === "service" ? iso(d.needed_by) : null,
     on_hold_until: d.status === "proposed" && d.expires_at ? iso(d.expires_at) : null,
@@ -135,3 +145,33 @@ function priceCheck(d: DealWithParties, price: number) {
 }
 
 export type DealView = ReturnType<typeof dealView>;
+
+/** "Amazon Hub Counter, LG7 convenience store, HKUST campus". */
+const hubPlace = (hub: HubPoint) => `${hub.name}, ${hub.area}`;
+
+const usd = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
+
+/**
+ * For an item request nobody nearby can fill: the same thing new on Amazon.
+ * The request keeps waiting; this is only the "if you can't wait" option.
+ */
+export function fallbackView(need: string, reason: "no_seller" | "over_budget", newPrice: number | null) {
+  const lead = reason === "no_seller" ? "Nobody nearby has one yet." : "Nobody nearby has one in your budget yet.";
+  return {
+    reason,
+    new_price: newPrice,
+    currency: "USD" as const,
+    amazon_url: amazonSearchUrl(need),
+    still_waiting: true as const,
+    say: newPrice != null ? `${lead} New on Amazon it's about ${usd(newPrice)}.` : `${lead} You can also look for a new one on Amazon.`,
+  };
+}
+
+/** For an item offer nobody is asking for yet, in a category Amazon Trade-In takes. */
+export function tradeInView(category: { id: string; label: string }) {
+  return {
+    category: category.id,
+    url: AMAZON_TRADE_IN_URL,
+    say: `You can check whether Amazon Trade-In accepts your ${category.label} for Amazon credit.`,
+  };
+}

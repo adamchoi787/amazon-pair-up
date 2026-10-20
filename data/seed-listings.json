@@ -1,5 +1,15 @@
 {
-  "_note": "Offers for the seed market: items for sale and services on offer (kind: service, price_unit: job or hour). min_price is the PRIVATE minimum. Keep the demo posts out of here (the TI-84 and the campus lunch runs): they are created live in the video and by npm run smoke.",
+  "_note": "Offers for the seed market: items for sale and services on offer (kind: service, price_unit: job or hour). min_price is the PRIVATE minimum. Keep the demo posts out of here (the TI-84 and the campus lunch runs): they are created live in the video and by npm run smoke. areas: DEMO DATA. The Amazon Hub Locker and Counter spots are made-up, plausible hand-off points for the demo areas, not real Amazon locations; production reads them from the Amazon Hub locator. A deal between two people in the same area suggests the area's first Hub point as the hand-off place.",
+  "areas": [
+    { "name": "HKUST campus", "hub_points": [
+      { "name": "Amazon Hub Counter, LG7 convenience store", "type": "counter" },
+      { "name": "Amazon Hub Locker, Atrium by the bus stop", "type": "locker" } ] },
+    { "name": "Hang Hau station", "hub_points": [ { "name": "Amazon Hub Locker, Exit B concourse", "type": "locker" } ] },
+    { "name": "Tseung Kwan O", "hub_points": [ { "name": "Amazon Hub Counter, PopCorn mall level 1", "type": "counter" } ] },
+    { "name": "Po Lam", "hub_points": [ { "name": "Amazon Hub Locker, Metro Town podium", "type": "locker" } ] },
+    { "name": "Sai Kung", "hub_points": [ { "name": "Amazon Hub Locker, Sai Kung pier bus terminus", "type": "locker" } ] },
+    { "name": "Diamond Hill", "hub_points": [ { "name": "Amazon Hub Counter, Plaza Hollywood level 2", "type": "counter" } ] }
+  ],
   "users": [
     { "id": "u_mei", "display_name": "Mei", "home_area": "HKUST campus" },
     { "id": "u_jason", "display_name": "Jason", "home_area": "Hang Hau station" },
