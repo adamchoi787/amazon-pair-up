@@ -21,7 +21,7 @@ export function registerPrompts(server: McpServer) {
     },
     ({ what, price, lowest }) =>
       user(
-        `Post an offer on AmazonPairUp: ${what}, asking ${price}` +
+        `Post an offer on PairUp: ${what}, asking ${price}` +
           (lowest ? `, and I'll accept anything from ${lowest} (keep that private)` : "") +
           ". If someone is already waiting for it, read me the proposed deal and wait for my yes before confirming.",
       ),
@@ -39,7 +39,7 @@ export function registerPrompts(server: McpServer) {
     },
     ({ need, budget }) =>
       user(
-        `On AmazonPairUp I need ${need}, budget ${budget} (keep my budget private). ` +
+        `On PairUp I need ${need}, budget ${budget} (keep my budget private). ` +
           "Post the request, tell me the best offer in one sentence, and only confirm it after I say yes.",
       ),
   );
@@ -50,6 +50,6 @@ export function registerPrompts(server: McpServer) {
       title: "Any news?",
       description: "Deals waiting for your yes, booked jobs and meet-up details.",
     },
-    () => user("Any news on AmazonPairUp? Tell me which deals are waiting for my yes first, then my meet-ups and jobs."),
+    () => user("Any news on PairUp? Tell me which deals are waiting for my yes first, then my meet-ups and jobs."),
   );
 }

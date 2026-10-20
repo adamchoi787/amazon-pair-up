@@ -9,7 +9,7 @@ import { MY_DEALS, MY_POSTS } from "./subscriptions.js";
 //   /.well-known/mcp/server-card.json  what the server is, where /mcp is, how to authenticate,
 //                                      and its tools, prompts and views (MCP server card, SEP-1649)
 //   /llms.txt                          the same in plain Markdown, for agents that read the web
-//   /skills/amazonpairup/SKILL.md      the Agent Skill: how to run a deal well, step by step
+//   /skills/pairup/SKILL.md      the Agent Skill: how to run a deal well, step by step
 // Everything is read from the server's own initialize / tools/list / prompts/list,
 // so the card can never drift from what /mcp actually serves.
 
@@ -31,7 +31,7 @@ export function surface(deps: Deps): Promise<Surface> {
   cached ??= (async () => {
     const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
     await createMcpServer(deps).connect(serverSide);
-    const client = new Client({ name: "amazonpairup-discovery", version: SERVER_INFO.version });
+    const client = new Client({ name: "pairup-discovery", version: SERVER_INFO.version });
     await client.connect(clientSide);
     const [tools, prompts, resources] = await Promise.all([client.listTools(), client.listPrompts(), client.listResources()]);
     const s: Surface = {
@@ -100,7 +100,7 @@ export async function serverCard(deps: Deps, cfg: CardConfig, host?: string) {
     capabilities: capabilities(s, cfg),
     liveUpdates: liveUpdates(cfg),
     instructions: s.instructions,
-    agentSkill: `${url}/skills/amazonpairup/SKILL.md`,
+    agentSkill: `${url}/skills/pairup/SKILL.md`,
     tools: s.tools.map((t) => ({ name: t.name, title: t.title, description: t.description, annotations: t.annotations, inputSchema: t.inputSchema, outputSchema: t.outputSchema })),
     prompts: s.prompts,
     resources: s.resources,
@@ -119,7 +119,7 @@ export async function llmsTxt(deps: Deps, cfg: CardConfig, host?: string) {
   far from the usual range, to confirm a deal before recording the yes, and to approve delete_my_data.
 - Tool calls without a session id keep working statelessly; they just can't be pushed to or asked.`
     : `- Sessions are off on this server: poll get_deal_status for news. A far-off price returns an error with code confirm_price.`;
-  return `# AmazonPairUp
+  return `# PairUp
 
 > A voice-first C2C marketplace for things and services. People post what they have, can do or need; the server pairs
 > each request with the best offer, settles the price by a fixed rule inside limits each side keeps private, and
@@ -130,7 +130,7 @@ export async function llmsTxt(deps: Deps, cfg: CardConfig, host?: string) {
 - MCP endpoint: ${url}/mcp (Streamable HTTP, protocol ${PROTOCOL_VERSION}; ${cfg.mcpSessions ? "stateless calls, or a session for live updates" : "stateless"})
 - Authentication: ${cfg.authMode === "oauth" ? `OAuth 2.1 with PKCE; metadata at ${url}/.well-known/oauth-protected-resource` : "none in local development (send X-User-Id)"}
 - Server card: ${url}/.well-known/mcp/server-card.json
-- Agent Skill: ${url}/skills/amazonpairup/SKILL.md
+- Agent Skill: ${url}/skills/pairup/SKILL.md
 - Web app (an MCP host with voice): ${url}/app/
 - Source and tool contract: ${REPO}
 

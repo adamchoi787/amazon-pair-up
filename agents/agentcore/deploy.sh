@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy the AmazonPairUp Strands agent to Amazon Bedrock AgentCore Runtime:
+# Deploy the PairUp Strands agent to Amazon Bedrock AgentCore Runtime:
 # an ECR image (ARM64), an execution role, and the agent runtime itself.
 # Re-run to ship a new image; it updates the runtime in place.
 #

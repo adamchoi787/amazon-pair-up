@@ -1,3 +1,5 @@
+> Completed locally on October 20, 2026: all six branches merged into main and renamed PairUp 0.6.0. See [HANDOFF.md](HANDOFF.md) and [VALIDATION.md](VALIDATION.md). The original instructions below are retained as a record.
+
 # Handoff to Codex (2026-10-20, HKT afternoon)
 
 Claude's session limit is close. Finish every open piece below, merge it all

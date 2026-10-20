@@ -18,7 +18,7 @@ Deadline **Oct 23, 12:00pm PDT (Oct 24, 3:00am HKT)**. Submit by Fri 21:00 HKT.
 
 ## Description draft
 
-**AmazonPairUp** is an agentic C2C marketplace for Alexa+ that pairs buyers and
+**PairUp** is an agentic C2C marketplace for Alexa+ that pairs buyers and
 sellers directly, for things and for services. People just talk: "Sell my TI-84
 for $20, I'll take anything above $15", "Find someone to pick up my lunch from
 LG7 canteen to Hall 5 by 12:30, $5", or "Get me a helper for the event on
@@ -49,7 +49,7 @@ before the user asks.
 
 ## AWS section draft (AWS Builder)
 
-AmazonPairUp runs on AWS end to end, and every AWS piece does real work in the
+PairUp runs on AWS end to end, and every AWS piece does real work in the
 product:
 
 - **Amazon Bedrock, Titan Text Embeddings V2.** Every offer, request and

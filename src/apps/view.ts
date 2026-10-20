@@ -1,6 +1,6 @@
 import { App, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 
-// The AmazonPairUp MCP Apps view. One view for every tool; the layout follows
+// The PairUp MCP Apps view. One view for every tool; the layout follows
 // the shape of the tool result:
 //   deal     an offer (or a new post), with Confirm / Decline when it waits for this user
 //   options  other offers for a request, with "Get this one"
@@ -45,7 +45,7 @@ type Data = Record<string, unknown> & {
   request_id?: string; matches?: Offer[]; alternatives?: Offer[]; offers?: Offer[]; requests?: Request[]; waiting_requests?: number;
 };
 
-const app = new App({ name: "AmazonPairUp", version: "1.0.0" }, {}, { autoResize: true });
+const app = new App({ name: "PairUp", version: "1.0.0" }, {}, { autoResize: true });
 const root = document.getElementById("root")!;
 let data: Data | null = null;
 let busy = false;
@@ -256,7 +256,7 @@ function renderDeal(d: Data) {
       h("p", { class: "muted small" }, service ? "You'll be paired as soon as someone offers." : "You'll be paired as soon as a seller lists one."),
       d.fallback ? h("p", { class: "muted small" }, d.fallback.say) : null,
       d.fallback ? h("div", { class: "actions" }, button(
-        d.fallback.new_price != null ? `New on Amazon · about ${money(d.fallback.new_price, d.fallback.currency)}` : "Look on Amazon",
+        d.fallback.new_price != null ? `New on Amazon · about ${money(d.fallback.new_price, d.fallback.currency)} (demo estimate)` : "Look on Amazon",
         "secondary", () => void openLink(d.fallback!.amazon_url),
       )) : null,
     ));
@@ -349,7 +349,11 @@ function render() {
     return;
   }
   const view = viewFor(data);
-  const parts = view === "options" ? renderOptions(data) : view === "deals" ? renderDeals(data) : view === "posts" ? renderPosts(data) : renderDeal(data);
+  const parts = view === "suggestions" ? renderSuggestions(data)
+    : view === "routines" ? renderRoutines(data)
+    : view === "options" ? renderOptions(data)
+    : view === "deals" ? renderDeals(data)
+    : view === "posts" ? renderPosts(data) : renderDeal(data);
   root.append(...parts.filter(Boolean) as Node[]);
   if (note) root.append(h("p", { class: "note", role: "status" }, note));
 }

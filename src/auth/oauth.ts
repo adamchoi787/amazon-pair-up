@@ -17,7 +17,7 @@ import { ensureUser } from "../market/service.js";
 //   - RFC 7009 revocation at /oauth/revoke (a refresh token takes its whole grant)
 //   - bearer tokens only in the Authorization header
 // Clients:
-//   - the AmazonPairUp web app: built in, public (PKCE, no secret), redirects
+//   - the PairUp web app: built in, public (PKCE, no secret), redirects
 //     only to this server's own /app/
 //   - Alexa+ account linking: confidential, when OAUTH_CLIENT_ID,
 //     OAUTH_CLIENT_SECRET and OAUTH_REDIRECT_URIS are set
@@ -48,8 +48,8 @@ export interface OAuthOptions {
   fetch?: typeof fetch;
 }
 
-/** The AmazonPairUp web app's client id (public client, PKCE only). */
-export const WEB_CLIENT_ID = "amazonpairup-web";
+/** The PairUp web app's client id (public client, PKCE only). */
+export const WEB_CLIENT_ID = "pairup-web";
 
 interface OAuthClient {
   id: string;
@@ -72,7 +72,7 @@ export const LWA = {
 };
 
 function builtInClients(cfg: AuthConfig): OAuthClient[] {
-  const clients: OAuthClient[] = [{ id: WEB_CLIENT_ID, redirectUris: [webRedirectUri(cfg)], kind: "web", name: "AmazonPairUp" }];
+  const clients: OAuthClient[] = [{ id: WEB_CLIENT_ID, redirectUris: [webRedirectUri(cfg)], kind: "web", name: "PairUp" }];
   if (cfg.oauthClientId && cfg.oauthClientSecret) {
     clients.push({ id: cfg.oauthClientId, secret: cfg.oauthClientSecret, redirectUris: cfg.oauthRedirectUris, kind: "alexa", name: "Alexa" });
   }
@@ -703,9 +703,9 @@ function consentPage(
     .map((k) => `<input type="hidden" name="${k}" value="${esc(params[k])}">`)
     .join("");
   const thirdParty = client.kind === "metadata" || client.kind === "registered";
-  const title = client.kind === "alexa" ? "Link AmazonPairUp to Alexa"
-    : thirdParty ? `Allow ${client.name} to use AmazonPairUp?`
-    : "Sign in to AmazonPairUp";
+  const title = client.kind === "alexa" ? "Link PairUp to Alexa"
+    : thirdParty ? `Allow ${client.name} to use PairUp?`
+    : "Sign in to PairUp";
   const intro = client.kind === "alexa" ? "<p>Sign in so Alexa can buy, sell and find help for you.</p>"
     : thirdParty ? consentDetails(client, params.redirect_uri)
     : "<p>Sign in to buy, sell and get help from people nearby, by voice.</p>";
@@ -740,7 +740,7 @@ function consentDetails(client: OAuthClient, redirectUri: string) {
   const identity = client.kind === "metadata"
     ? `Published by <strong>${esc(new URL(client.id).hostname)}</strong>`
     : "This app registered itself; its name is not verified";
-  return `<p><strong>${esc(client.name)}</strong> wants to use your AmazonPairUp account.</p>
+  return `<p><strong>${esc(client.name)}</strong> wants to use your PairUp account.</p>
     <ul>
       <li>${identity}.</li>
       <li>After you sign in, you go back to <strong>${esc(new URL(redirectUri).host)}</strong>.</li>

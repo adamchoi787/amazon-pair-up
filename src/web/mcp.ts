@@ -7,7 +7,7 @@ import type { Auth } from "./auth.js";
 // resources/read over Streamable HTTP, with the signed-in user's credentials.
 
 export class Mcp {
-  readonly client = new Client({ name: "amazonpairup-web", version: "1.0.0" });
+  readonly client = new Client({ name: "pairup-web", version: "1.0.0" });
   private tools = new Map<string, Tool>();
   private views = new Map<string, Promise<string>>();
 

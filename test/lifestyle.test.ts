@@ -102,6 +102,7 @@ test("a Bee to-do that names a need becomes a suggestion with the usual budget; 
 
   const again = await addContext(deps, "mei", { source: "bee", kind: "todo", text: "Need a graphing calculator before the exam", external_id: "bee-todo-1" });
   assert.equal(again.duplicate, true, "a resend is ignored");
+  assert.equal(typeof again.say, 'string', 'a duplicate context result still satisfies the MCP spoken-result contract');
 
   const list = await getSuggestions(deps, "mei");
   assert.equal(list.suggestions.length, 1);

@@ -74,7 +74,7 @@ test("the server card describes the live tool surface", async () => {
   assert.equal(res.status, 200);
   const card = await res.json();
   assert.equal(card.protocolVersion, "2025-11-25");
-  assert.equal(card.serverInfo.name, "amazon-pairup");
+  assert.equal(card.serverInfo.name, "pairup");
   assert.match(card.transport.endpoint, /\/mcp$/);
   const names = card.tools.map((t: { name: string }) => t.name);
   for (const t of ["post_offer", "post_request", "confirm_deal", "decline_deal", "withdraw_post"]) assert.ok(names.includes(t), t);
@@ -87,11 +87,11 @@ test("llms.txt and the Agent Skill are served for agents", async () => {
   const llms = await fetch(`${base}/llms.txt`);
   assert.equal(llms.status, 200);
   const text = await llms.text();
-  assert.match(text, /^# AmazonPairUp/);
+  assert.match(text, /^# PairUp/);
   assert.match(text, /`post_request`/);
-  const skill = await fetch(`${base}/skills/amazonpairup/SKILL.md`);
+  const skill = await fetch(`${base}/skills/pairup/SKILL.md`);
   assert.equal(skill.status, 200);
-  assert.match(await skill.text(), /^---\r?\nname: amazonpairup\r?\n/);
+  assert.match(await skill.text(), /^---\r?\nname: pairup\r?\n/);
 });
 
 test("GET and DELETE on /mcp return 405 (stateless server)", async () => {

@@ -16,7 +16,7 @@ const pairup = createPairUpAgent({
 });
 
 const rl = createInterface({ input: process.stdin, output: process.stdout });
-console.log(`AmazonPairUp agent (${config.modelId}) on ${config.mcpUrl}. Empty line to quit.`);
+console.log(`PairUp agent (${config.modelId}) on ${config.mcpUrl}. Empty line to quit.`);
 for (;;) {
   const text = (await rl.question("you> ")).trim();
   if (!text) break;

@@ -1,4 +1,4 @@
-# Deploying AmazonPairUp
+# Deploying PairUp
 
 | Path | When | Cost | URL |
 |---|---|---|---|
@@ -15,7 +15,7 @@ Browser / MCP clients (Alexa+, Claude, the web app)
    CloudFront ── adds X-Origin-Verify; the app rejects requests without it
         │
    EC2 t4g.small, Amazon Linux 2023, Node 22, systemd
-     ├─ AmazonPairUp (MCP server, web app, agent) on port 8080
+     ├─ PairUp (MCP server, web app, agent) on port 8080
      ├─ embedded Postgres + pgvector on an encrypted gp3 volume, daily snapshots (7 kept)
      ├─ IAM role → Amazon Bedrock (Titan Text Embeddings V2, Amazon Nova Lite)
      ├─ CloudWatch agent → log group /amazonpairup/app (JSON lines, 30 days)
@@ -114,8 +114,8 @@ per IP address per hour, and `0` turns registration off. Tokens are revoked at
   followed end to end. Logs Insights, slowest tool calls today:
   `fields Tool, ToolLatencyMs | filter msg = "tool" | sort ToolLatencyMs desc | limit 20`.
   On the instance: `tail -f /var/log/amazonpairup/app.log`.
-- Metrics and alarms: namespace `AmazonPairUp/Logs` (`McpLatency`, `ToolFailures`,
-  `ServerErrors`) from metric filters, and `AmazonPairUp` from the Embedded Metric
+- Metrics and alarms: namespace `PairUp/Logs` (`McpLatency`, `ToolFailures`,
+  `ServerErrors`) from metric filters, and `PairUp` from the Embedded Metric
   Format lines (per-tool `ToolLatencyMs`, `ToolErrors`) where EMF is extracted.
   Alarms: tool failures (3 in 5 min), HTTP 5xx (5 in 5 min), MCP p95 latency above
   1.5 s for 15 min, plus the instance recovery alarm.
@@ -210,7 +210,7 @@ Notes:
   access key for a least-privilege IAM user as environment variables. **Never commit it.**
 - Secrets such as `MCP_API_KEY` and AWS keys go in the deployment's environment, not in git.
 - **Dashboard:** set `DASHBOARD_TOKEN` to a long random string to use `/api/dashboard` on a deployed server, and open the page as `https://<host>/dashboard/#token=<token>`. Without it, the dashboard is off whenever `AUTH_MODE=oauth`.
-- **Web app:** served at `https://<host>/app/`. With `AUTH_MODE=oauth` and `PUBLIC_BASE_URL` set it signs people in as the built-in public client `amazonpairup-web` (PKCE, redirect `<PUBLIC_BASE_URL>/app/`); the Alexa+ client variables are only needed for Alexa account linking.
+- **Web app:** served at `https://<host>/app/`. With `AUTH_MODE=oauth` and `PUBLIC_BASE_URL` set it signs people in as the built-in public client `pairup-web` (PKCE, redirect `<PUBLIC_BASE_URL>/app/`); the Alexa+ client variables are only needed for Alexa account linking.
 - **Sign-in:** set `LWA_CLIENT_ID` and `LWA_CLIENT_SECRET` (Login with Amazon, allowed return URL `<PUBLIC_BASE_URL>/oauth/amazon/callback`), `DEMO_MODE=true` for the labelled judge demo sign-in, or both; see [Sign-in](#sign-in).
 - **Assistant:** `AI_MODE=bedrock` with `BEDROCK_AGENT_MODEL_ID` (or `BEDROCK_INTENT_MODEL_ID`) runs the web app's assistant on Bedrock; otherwise the offline planner answers.
 - **Policy:** `DEAL_HOLD_HOURS`, `POSTS_PER_HOUR`, `MAX_OPEN_REQUESTS` and `MCP_CALLS_PER_MINUTE` have production defaults; see [.env.example](../.env.example).

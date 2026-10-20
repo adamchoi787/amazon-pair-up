@@ -125,7 +125,10 @@ export async function addContext(deps: Deps, userId: string, input: SignalInput)
       `SELECT id, status, suggestion FROM context_signals WHERE user_id = $1 AND source = $2 AND external_id = $3`,
       [userId, input.source, input.external_id],
     );
-    if (rows[0]) return { signal_id: rows[0].id, suggestion: rows[0].status === "suggested" ? rows[0].suggestion : null, duplicate: true };
+    if (rows[0]) {
+      const suggestion = rows[0].status === "suggested" ? rows[0].suggestion : null;
+      return { signal_id: rows[0].id, suggestion, duplicate: true, say: suggestion?.say ?? "I already received that update." };
+    }
   }
 
   const id = shortId("ctx");

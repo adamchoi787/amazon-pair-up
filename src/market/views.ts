@@ -183,7 +183,7 @@ export function fallbackView(need: string, reason: "no_seller" | "over_budget", 
     currency: "USD" as const,
     amazon_url: amazonSearchUrl(need),
     still_waiting: true as const,
-    say: newPrice != null ? `${lead} New on Amazon it's about ${usd(newPrice)}.` : `${lead} You can also look for a new one on Amazon.`,
+    say: newPrice != null ? `${lead} New on Amazon it's about ${usd(newPrice)} (demo estimate).` : `${lead} You can also look for a new one on Amazon.`,
   };
 }
 

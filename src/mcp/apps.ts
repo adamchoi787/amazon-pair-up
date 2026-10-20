@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { RESOURCE_MIME_TYPE, registerAppResource } from "@modelcontextprotocol/ext-apps/server";
 
 // MCP Apps views (ui:// resources). Hosts that support MCP Apps (Alexa+, the
-// AmazonPairUp web app, Claude, ChatGPT, VS Code…) render them inline next to
+// PairUp web app, Claude, ChatGPT, VS Code…) render them inline next to
 // the tool result; others use the structured data and the spoken 'say'.
 // Source: src/apps/. Built single-file HTML: public/mcp-apps/ (npm run build:web).
 
@@ -11,8 +11,8 @@ import { RESOURCE_MIME_TYPE, registerAppResource } from "@modelcontextprotocol/e
 // deals list, posts list) from the shape of the result, so a host fetches it once.
 export const VIEWS = {
   market: {
-    uri: "ui://amazonpairup/market.html",
-    title: "AmazonPairUp",
+    uri: "ui://pairup/market.html",
+    title: "PairUp",
     description: "Offers with price, savings, counterpart and meet-up (Confirm / Decline), other options, the user's deals and posts.",
   },
 } as const;

@@ -49,7 +49,7 @@ const learner = setInterval(async () => {
 learner.unref();
 
 const server = app.listen(config.port, config.host, () => {
-  log("info", `amazon-pairup MCP server on http://${config.host}:${config.port}/mcp`, {
+  log("info", `pairup MCP server on http://${config.host}:${config.port}/mcp`, {
     db: config.databaseUrl ? "postgres" : `pglite (${config.pgliteDir})`, ai: ai.mode, auth: config.authMode,
   });
 });

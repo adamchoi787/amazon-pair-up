@@ -126,8 +126,8 @@ function policyError(hit: PolicyHit) {
   const what = hit.label.charAt(0).toLowerCase() + hit.label.slice(1);
   return new MarketError(
     hit.severity === "prohibited"
-      ? `I can't post that. AmazonPairUp doesn't allow ${what}.`
-      : `I can't post that. AmazonPairUp doesn't allow ${what}, since ${hit.why}.`,
+      ? `I can't post that. PairUp doesn't allow ${what}.`
+      : `I can't post that. PairUp doesn't allow ${what}, since ${hit.why}.`,
     hit.severity === "prohibited" ? "prohibited_item" : "restricted_item",
     { category: hit.category, label: hit.label, severity: hit.severity, matched_by: hit.matched_by },
   );
@@ -322,7 +322,7 @@ export async function postRequest(deps: Deps, input: PostRequestInput) {
   const fallback = !deal && !service
     ? fallbackView(need, closest ? "over_budget" : "no_seller", band?.source === "reference" ? band.newPrice ?? null : null)
     : null;
-  const amazonLine = fallback?.new_price != null ? ` If you can't wait, it's about ${fmt(fallback.new_price, "USD")} new on Amazon.` : "";
+  const amazonLine = fallback?.new_price != null ? ` If you can't wait, it's about ${fmt(fallback.new_price, "USD")} new on Amazon (demo estimate).` : "";
 
   return {
     request: requestView(intentRow, input.user_id),

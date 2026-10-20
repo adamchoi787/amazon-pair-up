@@ -7,7 +7,7 @@ import { config } from "./config.js";
 // port 8080 (the runtime contract). Each AgentCore session gets its own
 // Strands agent, so a conversation keeps its context across invocations.
 //
-// Who is speaking: the caller passes the user's AmazonPairUp access token in
+// Who is speaking: the caller passes the user's PairUp access token in
 // the X-Amzn-Bedrock-AgentCore-Runtime-Custom-PairUp-Token header (once the
 // runtime's request header allowlist includes it) or as pairup_token in the
 // payload. In local development, where the MCP server runs with
@@ -46,7 +46,7 @@ const app = new BedrockAgentCoreApp({
     process: async function* (req, context) {
       const token = Object.entries(context.headers).find(([k]) => k.toLowerCase() === TOKEN_HEADER)?.[1] ?? req.pairup_token;
       if (!token && !req.user_id) {
-        yield { event: "error", data: { text: "Please link your AmazonPairUp account first." } };
+        yield { event: "error", data: { text: "Please link your PairUp account first." } };
         return;
       }
       const agent = agentFor(context.sessionId, token, req.user_id);

@@ -110,7 +110,7 @@ starters: `sell_something` (`what`, `price`, optional private `lowest`),
 |---|---|
 | `/.well-known/mcp/server-card.json` | Server card: name, version, protocol, `/mcp` endpoint, authentication, instructions, and every tool (with input and output schemas), prompt and view, read from the live server |
 | `/llms.txt` | The same in Markdown for agents that read the web, with the rules an agent must follow |
-| `/skills/amazonpairup/SKILL.md` | The Agent Skill ([skills/amazonpairup/SKILL.md](../skills/amazonpairup/SKILL.md)) |
+| `/skills/pairup/SKILL.md` | The Agent Skill ([skills/pairup/SKILL.md](../skills/pairup/SKILL.md)) |
 | `/.well-known/oauth-protected-resource` | OAuth 2.1 protected resource metadata (RFC 9728), with `AUTH_MODE=oauth` |
 | `/.well-known/oauth-authorization-server` | Authorization server metadata (RFC 8414), with `AUTH_MODE=oauth` |
 | `/health`, `/ready` | Liveness, and readiness including the database |
@@ -133,7 +133,7 @@ protected resource metadata; from there:
 | Tokens | `POST /oauth/token` | `authorization_code` and `refresh_token`. Access tokens last an hour; each refresh returns a new refresh token and revokes the old one. |
 | Sign out | `POST /oauth/revoke` (RFC 7009) | `token` (+ optional `token_type_hint`), with the same client authentication as the token endpoint. Revoking an access token ends that token; revoking a refresh token ends every token from that sign-in. Always 200 for a token the client holds or an unknown one. |
 
-Built-in clients: the web app (`amazonpairup-web`, public, redirect
+Built-in clients: the web app (`pairup-web`, public, redirect
 `<PUBLIC_BASE_URL>/app/`) and Alexa+ account linking (confidential, from
 `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` / `OAUTH_REDIRECT_URIS`).
 
@@ -197,7 +197,7 @@ either. The check is deterministic:
    cosine similarity of at least `POLICY_MEANING_MATCH` (default 0.8) counts.
 
 A refused post returns `isError: true` with `say` ("I can't post that.
-AmazonPairUp doesn't allow alcohol, since selling it needs an age check and a
+PairUp doesn't allow alcohol, since selling it needs an age check and a
 licence."), `code`, `category`, `label`, `severity` and `matched_by`
 (`keyword|meaning`). A request is checked before its budget is asked for. Speak
 `say`; never reword the post to get around the rule. Refused posts count toward
@@ -236,8 +236,8 @@ deterministic ([amazon.ts](../src/market/amazon.ts)).
 
 | When | Result field | What it carries |
 |---|---|---|
-| `post_request` for an item ends without a deal | `fallback` | `reason` (`no_seller`, or `over_budget` when offers exist but none fits the budget), `new_price` (typical price new on Amazon.com, from `new_price` in `data/reference-prices.json`; `null` when no reference matches), `currency: "USD"`, `amazon_url` (`https://www.amazon.com/s?k=<need>`), `still_waiting: true`, `say` ("Nobody nearby has one yet. New on Amazon it's about $110.") |
-| `post_offer` for an item nobody is asking for, in a Trade-In category | `trade_in` | `category` (`electronics`, `books` or `game_consoles`, matched by whole words of the category and title; list in `data/trade-in-categories.json`), `url: "https://www.amazon.com/tradein"`, `say` |
+| `post_request` for an item ends without a deal | `fallback` | `reason` (`no_seller`, or `over_budget` when offers exist but none fits the budget), `new_price` (curated demo estimate for a new item on Amazon.com, from `new_price` in `data/reference-prices.json`; `null` when no reference matches), `currency: "USD"`, `amazon_url` (`https://www.amazon.com/s?k=<need>`), `still_waiting: true`, `say` ("Nobody nearby has one yet. New on Amazon it's about $110.") |
+| `post_offer` for an item nobody is asking for, in a Trade-In category | `trade_in` | `category` (`electronics` or `game_consoles`, matched by whole words of the category and title; list in `data/trade-in-categories.json`), `url: "https://www.amazon.com/tradein"`, `say` |
 | a deal for an item where both sides are in the same area | `deal.meetup.hub_point` | That area's Amazon Hub Locker or Counter (`name`, `type` (`locker` or `counter`), `area`, `demo`); `meetup.place` names it as the suggested hand-off place |
 
 A side's area is the post's `location`, else the person's home area. Services
@@ -298,7 +298,7 @@ All output goes through [views.ts](../src/market/views.ts); the tests fail on an
 → `{ offer, deal | null, waiting_requests, trade_in | null, say }`. The offer carries `typical_price: { low, high, source } | null`. `deal` is opened when someone was already waiting; `waiting_requests` counts the requests this offer satisfies. `trade_in`: see [Hand-offs to Amazon](#hand-offs-to-amazon).
 
 ### `post_request`
-`need` and/or `raw_request`*, `max_price` (required unless stated in `raw_request`; per hour for hourly work), `kind`, `price_unit`, `hours`, `pickup`, `location`, `schedule`, `needed_by` (ISO 8601, in the future: an item's deadline or a job's start), `min_condition` (items), `quantity` (items), `source` (`voice|bee_context`), `confirm_price` (only after a `confirm_price` error)
+`need` and/or `raw_request`*, `max_price` (required unless stated in `raw_request`; per hour for hourly work), `kind`, `price_unit`, `hours`, `pickup`, `location`, `schedule`, `needed_by` (ISO 8601, in the future: an item's deadline or a job's start), `min_condition` (items), `quantity` (items), `source` (`voice|bee_context|device_context|routine`), `confirm_price` (only after a `confirm_price` error)
 → `{ request, deal | null, alternatives: [offer + within_budget_at_ask + score] (up to 4), fallback | null, say }`. With no deal, `alternatives` and `say` also name the closest offers the budget can't reach, at their asking price, and an item request gets a `fallback` (see [Hand-offs to Amazon](#hand-offs-to-amazon)). The marketplace policy is checked before posting. Structured args win; `raw_request` is parsed to fill the gaps, including kind, unit, hours, pickup, place and time ("find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5").
 
 ### `find_matches`
@@ -341,7 +341,7 @@ All output goes through [views.ts](../src/market/views.ts); the tests fail on an
 
 ## MCP Apps view
 
-Every tool except `withdraw_post`, `report_user` and `rate_deal` declares `_meta.ui.resourceUri = "ui://amazonpairup/market.html"`
+Every tool except `withdraw_post`, `report_user` and `rate_deal` declares `_meta.ui.resourceUri = "ui://pairup/market.html"`
 in its definition (MCP Apps spec) and repeats it in each result's `_meta` (Alexa+
 client lifecycle). `resources/read` returns one self-contained HTML document
 (`text/html;profile=mcp-app`) that picks its layout from the result:
@@ -361,7 +361,7 @@ Inline lists show at most five items. Buttons call tools through the host.
 | Endpoint | Purpose |
 |---|---|
 | `GET /app/` | The web app (an MCP host); `/` redirects here |
-| `GET /api/app-config` | How to sign in: `{ auth: "none" }` or the OAuth public client (`amazonpairup-web`, PKCE, redirect `<PUBLIC_BASE_URL>/app/`) |
+| `GET /api/app-config` | How to sign in: `{ auth: "none" }` or the OAuth public client (`pairup-web`, PKCE, redirect `<PUBLIC_BASE_URL>/app/`) |
 | `GET /api/me` | The signed-in user's id and display name |
 | `POST /api/agent` | One assistant step. Body `{ messages }` in the Bedrock Converse shape; returns `{ message, stop, mode }` (`stop` is `tool_use` or `end_turn`). The app runs requested tools over `/mcp` itself and sends the results back. A `confirm_deal` call is only returned after the user's explicit yes. |
 
@@ -450,3 +450,5 @@ For an agent holding Bee MCP data: read the user's todos or daily summary, call
 add_context for a need clause with source bee and a stable external_id, then
 get_suggestions. Ask for a budget if needed and wait for yes before accepting.
 See [BEE.md](BEE.md) and [APPLE_WATCH.md](APPLE_WATCH.md).
+
+Retail reference amounts are hand-set demo estimates and are labelled in spoken results and cards. Amazon search links let the user check current prices. Trade-In links ask the user to check eligibility for their model and country.

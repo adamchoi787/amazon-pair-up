@@ -1,6 +1,6 @@
 {
-  "name": "amazon-pairup",
-  "version": "0.1.0",
+  "name": "pairup",
+  "version": "0.6.0",
   "description": "Voice-first C2C marketplace for Alexa+: an MCP server that pairs buyers and sellers of things and services from natural-language requests and negotiates the deal.",
   "license": "MIT",
   "type": "module",
@@ -17,7 +17,7 @@
     "bench": "tsx scripts/bench.ts",
     "learn": "tsx scripts/learn.ts",
     "simulate": "tsx scripts/simulate-learning.ts",
-    "test": "tsx --test test/*.test.ts",
+    "test": "tsx --test --test-concurrency=1 test/*.test.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.web.json",
     "build:web": "node scripts/build-web.mjs",
     "bee:bridge": "tsx scripts/bee-bridge.ts"

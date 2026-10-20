@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Talk to the deployed agent: agents/agentcore/invoke.sh "I need a graphing calculator, max 18 dollars"
-# PAIRUP_TOKEN is the user's AmazonPairUp access token (from signing in to the web app).
+# PAIRUP_TOKEN is the user's PairUp access token (from signing in to the web app).
 # SESSION keeps a conversation going across calls (33+ characters).
 set -euo pipefail
 export MSYS_NO_PATHCONV=1

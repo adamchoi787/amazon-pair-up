@@ -21,7 +21,7 @@ import { subscriberCount } from "./mcp/subscriptions.js";
 //                   resource subscriptions and elicitation (src/mcp/sessions.ts).
 //   /api/agent      one reasoning step for the web app's assistant (Bedrock tool use,
 //                   or the offline planner); the web app runs the tools itself over /mcp
-//   /app/           the AmazonPairUp web app
+//   /app/           the PairUp web app
 //   /dashboard/     operations view (see DASHBOARD_TOKEN)
 //   /health         liveness; /ready also checks the database (for load balancers)
 //   /.well-known/mcp/server-card.json, /llms.txt, /skills/…  discovery for agents

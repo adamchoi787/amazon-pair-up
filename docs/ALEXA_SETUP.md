@@ -1,4 +1,4 @@
-# Connecting AmazonPairUp to Alexa+
+# Connecting PairUp to Alexa+
 
 Alexa+ talks to our server through an **MCP add-on** that you create and deploy
 with the Alexa AI CLI. The steps below follow the official docs:
@@ -15,7 +15,7 @@ surprise in [FRICTION_LOG.md](FRICTION_LOG.md).
 
 **Status:** the MCP Toolkit, CLI and web simulator are in preview with select
 partners, so hackathon entrants demo through their own MCP client (Devpost FAQ).
-Our demo runs on the AmazonPairUp web client; this guide is ready for when add-on
+Our demo runs on the PairUp web client; this guide is ready for when add-on
 access opens.
 
 ## What the server already provides
@@ -67,7 +67,7 @@ Start with a tunnel; it's the fastest path ([DEPLOY.md](DEPLOY.md) section A). R
 AUTH_MODE=oauth \
 PUBLIC_BASE_URL=https://<host> \
 ALLOWED_HOSTS=<host>,127.0.0.1,localhost \
-OAUTH_CLIENT_ID=amazonpairup-alexa \
+OAUTH_CLIENT_ID=pairup-alexa \
 OAUTH_CLIENT_SECRET=<long random string> \
 OAUTH_REDIRECT_URIS=<filled in after step 4> \
 LWA_CLIENT_ID=<security profile client ID> \
@@ -99,7 +99,7 @@ A public server starts with Login with Amazon, `DEMO_MODE=true`, or both.
 
 ```bash
 mkdir -p ~/alexa-addons && cd ~/alexa-addons
-alexa-ai new mcp --name "AmazonPairUp" --locale en-US --mcp-server-url "https://<host>/mcp"
+alexa-ai new mcp --name "PairUp" --locale en-US --mcp-server-url "https://<host>/mcp"
 ```
 
 Answer **yes** when it asks whether the add-on requires account linking. Keep the
@@ -173,17 +173,17 @@ development stage is enough for the demo.
 
 ## Listing text (respect the character limits)
 
-**Name** (30 max): `AmazonPairUp`
+**Name** (30 max): `PairUp`
 
 **Short description** (123 max):
 > Buy, sell and get help from people nearby, by voice. Alexa pairs you up and settles inside your private limits.
 
 **Full description** (4000 max):
-> AmazonPairUp pairs people who need something with people who have it or can do it: a used calculator, someone to pick up your lunch, a helper for your event. You use it just by talking.
+> PairUp pairs people who need something with people who have it or can do it: a used calculator, someone to pick up your lunch, a helper for your event. You use it just by talking.
 >
 > Selling: tell Alexa what you have, your asking price and, if you like, the lowest price you'd accept. Your minimum is never shown to buyers.
 >
-> Buying: tell Alexa what you need and the most you'd pay. AmazonPairUp finds the best seller by meaning and keywords, checks condition, quantity and price, and settles a fair price inside both people's limits in the same moment. If nobody has it yet, your request waits and Alexa pairs you as soon as someone lists one.
+> Buying: tell Alexa what you need and the most you'd pay. PairUp finds the best seller by meaning and keywords, checks condition, quantity and price, and settles a fair price inside both people's limits in the same moment. If nobody has it yet, your request waits and Alexa pairs you as soon as someone lists one.
 >
 > Getting help: ask for someone to pick up your lunch, run an errand or help at your event, with a fee per job or an hourly rate. Alexa finds a person nearby who offers that kind of help, agrees the fee inside both limits, and tells you where and when.
 >
@@ -193,7 +193,7 @@ development stage is enough for the demo.
 >
 > Because it takes a single sentence, small things become worth doing: a $2 pack of tissues, a $4 lunch run.
 >
-> AmazonPairUp is a prototype built for the Amazon Developer Hackathon 2026. Payment happens in person at the meet-up.
+> PairUp is a prototype built for the Amazon Developer Hackathon 2026. Payment happens in person at the meet-up.
 
 **Example phrases** (3–4, 200 max each):
 1. `Alexa, sell my TI-84 calculator for 20 dollars, I'll take anything above 15`

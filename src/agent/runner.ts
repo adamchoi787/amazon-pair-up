@@ -45,7 +45,7 @@ export async function runVoiceTurn(deps: Deps, cfg: Config, userId: string, conv
   const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
   const server = createMcpServer(deps, { userId });
   await server.connect(serverSide);
-  const client = new Client({ name: "amazonpairup-voice", version: "1.0.0" });
+  const client = new Client({ name: "pairup-voice", version: "1.0.0" });
   await client.connect(clientSide);
   let last: VoiceReply = { say: "", result: null, tool: null };
   try {

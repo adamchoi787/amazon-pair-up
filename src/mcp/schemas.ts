@@ -75,7 +75,7 @@ const hubPoint = z.object({
 
 export const fallbackOut = z.object({
   reason: z.enum(["no_seller", "over_budget"]).describe("no_seller = nothing like it nearby; over_budget = nothing nearby within the budget"),
-  new_price: money.nullable().describe("Typical price new on Amazon.com; null when unknown"),
+  new_price: money.nullable().describe("Curated demo estimate for a new item on Amazon.com; null when unknown"),
   currency: z.literal("USD"),
   amazon_url: z.string().describe("amazon.com search for the request"),
   still_waiting: z.literal(true).describe("The request stays on the market and is paired when a seller lists one"),
@@ -150,7 +150,7 @@ const marketOutputs = {
     offer: offerOut,
     deal: dealOut.nullable().describe("Opened when someone was already waiting"),
     waiting_requests: z.number().int().describe("Open requests this offer satisfies"),
-    trade_in: tradeInOut.nullable().describe("Set when nobody is asking for this item yet and Amazon Trade-In takes it"),
+    trade_in: tradeInOut.nullable().describe("Set when nobody is asking for this item yet and the category may qualify for Amazon Trade-In"),
     say,
   },
   post_request: {

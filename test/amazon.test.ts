@@ -76,8 +76,8 @@ test("no seller nearby: the request waits, with the item new on Amazon as an opt
   assert.equal(req.fallback.still_waiting, true);
   assert.equal(req.fallback.amazon_url, "https://www.amazon.com/s?k=TI-84%20graphing%20calculator");
   assert.equal(typeof req.fallback.new_price, "number", "the new price comes from the reference prices");
-  assert.equal(req.fallback.say, `Nobody nearby has one yet. New on Amazon it's about $${req.fallback.new_price}.`);
-  assert.match(req.say, /keep looking.*If you can't wait, it's about \$\d+ new on Amazon\.$/);
+  assert.equal(req.fallback.say, `Nobody nearby has one yet. New on Amazon it's about $${req.fallback.new_price} (demo estimate).`);
+  assert.match(req.say, /keep looking.*If you can't wait, it's about \$\d+ new on Amazon \(demo estimate\)\.$/);
   await buyer.close();
 });
 

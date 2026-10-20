@@ -42,7 +42,7 @@ type FormSchema = ElicitRequestFormParams["requestedSchema"];
 const ELICIT_TIMEOUT_MS = 120_000;
 
 const DELETE_QUESTION =
-  "Delete everything AmazonPairUp keeps about you? Your offers and requests come down, deals on hold are released, " +
+  "Delete everything PairUp keeps about you? Your offers and requests come down, deals on hold are released, " +
   "your history and sign-ins are erased, and past deals stay for the other person without your name. This can't be undone.";
 
 const condition = z.enum(CONDITIONS);
@@ -71,14 +71,14 @@ const writes = { readOnlyHint: false, destructiveHint: false, idempotentHint: fa
 const reads = { readOnlyHint: true, idempotentHint: true, openWorldHint: false };
 
 /** Shown in initialize and in the server card (/.well-known/mcp/server-card.json). */
-export const SERVER_INFO = { name: "amazon-pairup", title: "AmazonPairUp", version: "0.6.0" };
+export const SERVER_INFO = { name: "pairup", title: "PairUp", version: "0.6.0" };
 
 export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
   const server = new McpServer(
     SERVER_INFO,
     {
       instructions:
-        "AmazonPairUp pairs people directly, by voice: people who need something with people who have it or can do it. " +
+        "PairUp pairs people directly, by voice: people who need something with people who have it or can do it. " +
         "That covers things (a graphing calculator) and services (someone to pick up lunch, a helper for an event at " +
         "$10 an hour). Both sides post: post_offer for what the user has or can do, post_request for what they need. " +
         "Whenever either side posts, the server pairs it with the best counterpart and settles a price inside both " +
@@ -101,7 +101,7 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
         "confirmed, declined or expires instead of polling. Hosts that support elicitation are asked directly to check a " +
         "price and to confirm a deal. delete_my_data erases the user's data after their explicit yes." +
         "When nobody " +
-        "nearby can help, results point to Amazon: post_request's 'fallback' (an amazon.com link and the new price) and " +
+        "nearby can help, results point to Amazon: post_request's 'fallback' (an amazon.com search link and a labelled demo price estimate) and " +
         "post_offer's 'trade_in' (Amazon Trade-In). Offer them as an option; the post keeps waiting either way.",
     },
   );
@@ -190,7 +190,7 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
         "the price inside both private limits in the same call, and returns the proposed deal. min_price is the user's private " +
         "lowest price (nobody sees it); with auto_accept the user pre-approves any deal at or above it. A service offer " +
         "stays open after each booked job. An item nobody is asking for yet, in a category Amazon Trade-In takes " +
-        "(electronics, books, game consoles), comes back with a 'trade_in' link.",
+        "(candidate electronics and game consoles), comes back with a 'trade_in' link.",
       inputSchema: {
         user_id: userIdArg,
         kind: kind.optional().describe("'item' to sell a thing (default), 'service' to offer to do a task"),

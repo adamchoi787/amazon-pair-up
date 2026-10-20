@@ -1,5 +1,5 @@
 // Refreshes vendor/pairing-core from a checkout of the pairing-core repo, so a
-// fresh clone of AmazonPairUp runs without a Rust toolchain.
+// fresh clone of PairUp runs without a Rust toolchain.
 // Usage: node scripts/sync-pairing-core.mjs [path/to/pairing-core]   (default ../pairing-core)
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync } from "node:fs";

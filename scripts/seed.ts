@@ -7,7 +7,10 @@ import { seedMarketplace } from "../src/db/seed.js";
 
 let db = await openDb(config);
 if (process.argv.includes("--reset")) {
-  await db.query(`DROP TABLE IF EXISTS events, failed_offers, pairing_features, ranking_models, deals, buy_intents, listings, users, reference_prices CASCADE`);
+  await db.query(`DROP TABLE IF EXISTS device_tokens, context_signals, routine_feedback,
+    oauth_pending, oauth_clients, user_passcodes, oauth_codes, oauth_tokens,
+    idempotent_calls, reports, ratings, policy_examples, events, failed_offers,
+    pairing_features, ranking_models, deals, buy_intents, listings, users, reference_prices CASCADE`);
   await db.close();
   db = await openDb(config); // re-runs migrations
   console.log("Reset all tables.");

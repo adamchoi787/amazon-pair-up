@@ -1,4 +1,4 @@
-# AmazonPairUp — a voice-first C2C marketplace for Alexa+
+# PairUp — a voice-first C2C marketplace for Alexa+
 
 > People who have something, people who can do something, and people who need
 > either just say so. Alexa+ pairs each buyer with a seller, settles the price
@@ -6,8 +6,8 @@
 > final "yes".
 
 **Track:** Alexa+ (self-hosted MCP server, spec 2025-11-25, Streamable HTTP)
-**Mini challenge:** AWS Builder (Amazon Bedrock, a Strands Agents agent on Bedrock AgentCore Runtime, CloudFront + EC2 + CloudWatch)
-**Bee:** "Proactive Context Mode" turns real-world context into requests
+**Mini challenges:** Open Source ([pairing-core](https://github.com/rairurairu/pairing-core)), AWS Builder (Amazon Bedrock, a Strands Agents agent on Bedrock AgentCore Runtime, CloudFront + EC2 + CloudWatch)
+**Bee:** need snippets become suggestions; the included replay uses labelled demo data.
 **Try it:** https://d3cxpkmhl89rw9.cloudfront.net/app/ · MCP endpoint `https://d3cxpkmhl89rw9.cloudfront.net/mcp` (OAuth 2.1)
 
 ## The idea in one minute
@@ -18,7 +18,7 @@ adds its own fees on top. That effort and cost decide what happens: a spare
 calculator rarely finds the neighbour who needs it, and nobody pays a delivery
 app to carry a $5 lunch two buildings over.
 
-AmazonPairUp pairs buyers and sellers directly and does the work in between,
+PairUp pairs buyers and sellers directly and does the work in between,
 for things and for services. Both sides post what they have, what they can do,
 or what they need:
 
@@ -100,14 +100,14 @@ See [.env.example](.env.example).
 
 ## The web app
 
-`/app/` is a complete AmazonPairUp client for phones, laptops and smart displays:
+`/app/` is a complete PairUp client for phones, laptops and smart displays:
 talk or type, see each offer as a card, and confirm or decline with a tap.
 It works the way Alexa+ works with an MCP server:
 
 - **It is an MCP host.** The browser runs a real MCP client: `tools/list` to
   discover tools, `tools/call` over Streamable HTTP with the signed-in user's
   token, `resources/read` for the view.
-- **It renders MCP Apps.** Every result names the `ui://amazonpairup/market.html`
+- **It renders MCP Apps.** Every result names the `ui://pairup/market.html`
   view; the app draws it in a sandboxed iframe through the MCP Apps bridge, and the
   card's Confirm / Decline / "Get this one" buttons call tools through the host.
 - **The reasoning step runs on the server** (`/api/agent`): Amazon Bedrock tool use
@@ -129,7 +129,7 @@ typing works everywhere.
 flowchart TB
   U[People who need, have or can do something] -- voice --> A[Alexa+<br/>interface + agent]
   A -- "MCP tools (Streamable HTTP)" --> S
-  subgraph S["AmazonPairUp MCP server"]
+  subgraph S["PairUp MCP server"]
     I[Intent extraction<br/>Bedrock LLM] --> P[Pairing engine<br/>runs on every post, both sides]
     P --> H[Hybrid search<br/>pgvector + full-text, relevance gate]
     P --> N[Settlement: pairing-core<br/>Rust → WebAssembly, private limits]
@@ -160,6 +160,9 @@ flowchart TB
 | `list_my_posts` / `withdraw_post` | Your offers and requests; take one down, releasing any deal it held |
 | `rate_deal` | 1 to 5 stars for the other side of a confirmed deal, once per side; feeds the track records the ranking learns from |
 | `report_user` | Report the other side of a deal or the owner of an offer; the two are never paired again, and enough reports put someone under review |
+| `get_suggestions` / `accept_suggestion` / `dismiss_suggestion` | Private suggestions; accept after yes, skip for now or forget a routine |
+| `add_context` / `get_my_routines` | Bring a need snippet from Bee or a device; explain what was learned from your own history |
+| `delete_my_data` | Erase data after explicit confirmation, releasing holds and anonymizing retained counterpart deal records |
 
 Weapons, drugs, alcohol and tobacco, prescription medicine, recalled and
 counterfeit goods, fake documents, cheating, adult services, live animals and
@@ -175,13 +178,13 @@ protect the market. Pairing rules, schemas, limits and privacy rules:
 
 ## Built for agents
 
-Any MCP host or agent framework can find AmazonPairUp, learn it and use it safely
+Any MCP host or agent framework can find PairUp, learn it and use it safely
 without a human wiring it up:
 
 | | |
 |---|---|
 | **Connect without setup** | Claude, ChatGPT, Cursor or a Strands agent connects to the hosted `/mcp` on its own: a Client ID Metadata Document (MCP 2025-11-25) or dynamic registration (RFC 7591), then a consent screen naming the client and Login with Amazon. Tokens refresh with rotation and revoke at `/oauth/revoke` (RFC 7009). [docs/TOOL_CONTRACT.md](docs/TOOL_CONTRACT.md#connecting-a-client) |
-| **Agent Skill** | [skills/amazonpairup/SKILL.md](skills/amazonpairup/SKILL.md), in the open SKILL.md format and served at `/skills/amazonpairup/SKILL.md`: which tool for which sentence, how to read a deal, the rules, error codes, a worked example |
+| **Agent Skill** | [skills/pairup/SKILL.md](skills/pairup/SKILL.md), in the open SKILL.md format and served at `/skills/pairup/SKILL.md`: which tool for which sentence, how to read a deal, the rules, error codes, a worked example |
 | **Server card** | `/.well-known/mcp/server-card.json`: endpoint, auth, instructions, and every tool, prompt and view with schemas, read from the live server |
 | **llms.txt** | `/llms.txt`: the same in Markdown, with the rules an agent must follow |
 | **Prompts** | `sell_something`, `find_something`, `whats_new` show up as starters in Claude, VS Code and the MCP Inspector |
@@ -208,7 +211,8 @@ without a human wiring it up:
   checked before every post, reports with a review queue on the dashboard, and
   ratings that feed each person's track record.
 - **Speed:** `npm run bench` measures real MCP tool latency and throughput. See the measured local sample below.
-- **Tests:** automated server tests (unit, end-to-end over MCP, HTTP, OAuth, schemas, privacy,
+  Local benchmark (2026-10-20, Windows, Node v24.14.1, mock AI, PGlite, real HTTP MCP, 2 workers × 5 rounds, fresh users, 40 calls, zero errors): post_offer p50/p95/p99 42/331/331 ms; post_request 84/126/126 ms; find_matches 20/68/68 ms; confirm_deal 27/36/36 ms. Throughput 25.7 calls/s. This small local sample includes cold calls; measure Bedrock and the deployed network separately with `npm run bench`.
+- **Tests:** 130 server tests (unit, end-to-end over MCP, HTTP, OAuth, schemas, privacy,
   idempotency) plus the Strands agent against a real server, on every push.
 
 ## Repo map
@@ -222,7 +226,7 @@ src/
   mcp/schemas.ts         output schemas for every tool
   mcp/prompts.ts         MCP prompts (sell_something, find_something, whats_new)
   mcp/discovery.ts       server card and llms.txt, read from the live tool list
-  mcp/apps.ts            the MCP Apps view (ui://amazonpairup/market.html)
+  mcp/apps.ts            the MCP Apps view (ui://pairup/market.html)
   agent/                 the web app's assistant step: Bedrock tool use, offline planner, confirm guard
   market/pairing.ts      pairing engine: pair on every post, atomic holds, release and re-pair
   market/matching.ts     hybrid pgvector + full-text search in both directions
@@ -247,7 +251,7 @@ data/seed-listings.json  seed market: 162 posts from 22 people, items and servic
 data/policy.json         prohibited and restricted items and services
 data/seed-listings.json  seed market: 162 posts from 22 people, items and services; demo Amazon Hub points per area
 data/trade-in-categories.json  categories Amazon Trade-In takes
-skills/amazonpairup/     the Agent Skill (SKILL.md)
+skills/pairup/     the Agent Skill (SKILL.md)
 agents/agentcore/        Strands Agents voice agent for Amazon Bedrock AgentCore Runtime
 scripts/                 seed, smoke test, latency benchmark (bench.ts), add-on assets
 docs/                    contract, award plan, Alexa+ setup, deploy, demo script, submission, friction log
@@ -263,7 +267,7 @@ See [docs/AWARD_GAPS.md](docs/AWARD_GAPS.md) for the award analysis and the day-
 
 MIT — see [LICENSE](LICENSE).
 
-Local benchmark (2026-10-20, Windows, Node v24.14.1, mock AI, PGlite, real HTTP MCP, 2 workers × 5 rounds, fresh users, 40 calls, zero errors): post_offer p50/p95/p99 49/235/235 ms; post_request 79/134/134 ms; find_matches 32/75/75 ms; confirm_deal 29/41/41 ms. Throughput 26.2 calls/s. This small local sample includes cold calls; measure Bedrock and the deployed network separately with `npm run bench`.
+
 
 ## Knows what you need
 

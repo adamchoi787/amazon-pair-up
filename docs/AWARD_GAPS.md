@@ -60,19 +60,22 @@ text, images and video alone, so the video and description carry most of the wei
 | Requirement | Status | Gap |
 |---|---|---|
 | MCP server, spec 2025-11-25, Streamable HTTP, SDK called in code | ✅ on `main` | — |
-| Surface judges can see | ✅ web app at `/app/`: MCP host, MCP Apps cards, voice, Bedrock/offline agent | Deploy it |
+| Surface judges can see | ✅ PairUp 0.6.0 at /app/ and /watch/, built and checked locally | Tony deploys this release |
 | Hosted endpoint live to Nov 20 | ✅ live since Oct 20: https://d3cxpkmhl89rw9.cloudfront.net/app/ (CloudFront + EC2, us-east-1) | Run the TI-84 demo there daily |
 | Pairing engine, one-turn deals, output schemas | ✅ on `main` | — |
 | OAuth, Origin check, container, add-on assets | ✅ on `main` | — |
 | AWS Builder "documented integrations" | ✅ Bedrock live in production (Titan Text Embeddings V2; Nova Lite for intent and agent). Strands Agents + AgentCore Runtime agent built and tested (Oct 20). CloudWatch logs, metrics and alarms in the stack. AWS section drafted in SUBMISSION.md | Run `agents/agentcore/deploy.sh` and `deploy/aws/deploy.sh` (ships the CloudWatch changes) with your credentials |
-| Agent Skill (SKILL.md) | ✅ `skills/amazonpairup/SKILL.md`, served at `/skills/amazonpairup/SKILL.md` (Oct 20) | — |
+| Agent Skill (SKILL.md) | ✅ `skills/pairup/SKILL.md`, served at `/skills/pairup/SKILL.md` (Oct 20) | — |
 | Agent friendliness | ✅ server card, llms.txt, MCP prompts, `idempotency_key` on writes, request ids (Oct 20) | — |
-| Seed market 150+ | ✅ 162 posts from 22 people, 30 services (Oct 20) | — |
+| Seed market 150+ | ✅ demo seed: 162 posts from 22 fictional people, 30 services (Oct 20) | — |
 | Open Source entry | ✅ [pairing-core](https://github.com/rairurairu/pairing-core) public (Oct 20): MIT, CI on Rust 1.82 and stable, WebAssembly + JS vectors, MCP server example | Name it in the submission form |
 | Friction log | ⚠️ 4 entries (AWS CLI under Git Bash, DLM validation, two AgentCore SDK entries) | Keep recording as they happen |
 | Product feedback per tool | ⚠️ Drafts for MCP SDK, Bedrock, Strands, AgentCore, AWS hosting in SUBMISSION.md | Check them against your own experience and edit |
 | Video under 3 min | ❌ | Record Thu |
-| Bee | ❌ no device known | Roadmap line unless you have a device |
+| Bee | ✅ bridge, replay, need suggestions and routine learning on main; replay uses demo data | Validate a real Bee device and decide track eligibility |
+| Apple Watch | ✅ /watch/, revocable device tokens and Siri Shortcut guide | Validate on a paired Watch |
+| Trust and safety | ✅ posting policy, reports, review queue and ratings | Review reports through the dashboard |
+| Agent push and privacy | ✅ resources, SSE subscriptions, form elicitation and confirmed deletion | Enable sessions on the deployed server |
 
 ## Gaps by judging criterion
 
@@ -82,7 +85,7 @@ text, images and video alone, so the video and description carry most of the wei
   results carry counterpart, meet-up place and time, savings and who still has to
   say yes; relevance gate (TI-84 0.96 vs non-graphing Casio 0.60); one hold per
   post, claimed atomically; decline re-pairs both sides.
-- Done: MCP Apps view `ui://amazonpairup/market.html` on every UI tool (definition and result `_meta`), rendered by the web app; confirm guard on the agent.
+- Done: MCP Apps view `ui://pairup/market.html` on every UI tool (definition and result `_meta`), rendered by the web app; confirm guard on the agent.
 - Done for production use: offers expire after `DEAL_HOLD_HOURS` and both posts
   re-pair (also on a background timer); users list and withdraw their posts;
   one offer below the asking price per buyer and listing (budgets can't be
@@ -118,7 +121,7 @@ text, images and video alone, so the video and description carry most of the wei
 - A market that learns: a ranking model trained nightly on which deals closed,
   promoted only when it ranks recent outcomes better, with a 10% live control
   and automatic rollback (Oct 20). `npm run simulate` shows it day by day.
-- An Agent Skill (SKILL.md) that teaches any agent host how to use AmazonPairUp.
+- An Agent Skill (SKILL.md) that teaches any agent host how to use PairUp.
 - MCP Apps as above.
 
 ## Redesign: where the pairing idea needs it

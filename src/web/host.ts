@@ -31,14 +31,14 @@ export async function renderView(
   const html = await mcp.view(uri);
   const frame = document.createElement("iframe");
   frame.className = "view";
-  frame.title = "AmazonPairUp card";
+  frame.title = "PairUp card";
   frame.setAttribute("sandbox", "allow-scripts allow-forms");
   frame.style.height = "0px";
   container.classList.add("loading");
   container.append(frame);
 
   const context = { theme: themeNow(), displayMode: "inline", platform: "web", locale: navigator.language } as const;
-  const bridge = new AppBridge(null, { name: "AmazonPairUp", version: "1.0.0" }, { serverTools: {}, logging: {}, openLinks: {} }, { hostContext: context });
+  const bridge = new AppBridge(null, { name: "PairUp", version: "1.0.0" }, { serverTools: {}, logging: {}, openLinks: {} }, { hostContext: context });
   bridge.oncalltool = async (params) => {
     const r = await mcp.call(params.name, (params.arguments ?? {}) as Record<string, unknown>);
     onToolCall(params.name, r);

@@ -1,3 +1,43 @@
+# PairUp 0.6.0 — local release handoff (October 20, 2026 HKT)
+
+All six Claude workstreams are merged into main. Authentication and revocation,
+trust policy/reports/ratings, live MCP resources and confirmations, data erasure,
+Amazon search/Trade-In options, Bee context, routines, device management and the
+watch preview are integrated. The product, client ids, view URI and Agent Skill
+are renamed PairUp. Your original documentation edits are preserved.
+
+Validation: see [VALIDATION.md](VALIDATION.md). The watch browser preview and Bee
+replay are local demonstrations; physical Bee/Watch and live Login with Amazon
+still need your accounts and hardware. Demo Hub locations are labelled in the
+spoken result, and reference retail prices are curated estimates. No live
+retail-price or Hub-locator API is connected.
+
+For your later deployment, use both LWA_CLIENT_ID and LWA_CLIENT_SECRET from a
+Login with Amazon security profile, with return URL
+<PUBLIC_BASE_URL>/oauth/amazon/callback. DEMO_MODE=true enables the labelled judge
+sign-in; DEMO_LOGIN_PASSCODE adds an optional shared access code. The deploy script
+stores supplied sign-in secrets in SSM and uses demo mode when LWA is absent.
+AWS stack names, paths, metric namespaces and AgentCore resource names are kept.
+
+Commands for you to run with your credentials when ready:
+
+```bash
+AWS_PROFILE=amazonpairup AWS_REGION=us-east-1 deploy/aws/deploy.sh
+AWS_PROFILE=amazonpairup AWS_REGION=us-east-1 agents/agentcore/deploy.sh
+```
+
+To rehearse locally, use a scratch PGLITE_DIR, AI_MODE=mock and AUTH_MODE=none.
+Run npm run seed -- --lifestyle, npm start, then the Bee replay as documented in
+[BEE.md](BEE.md). Sign in as Tony locally. The lunch suggestion is due on weekdays
+from 10:45 to 12:45 HKT; get_my_routines explains it at any time. See
+[APPLE_WATCH.md](APPLE_WATCH.md) for the Siri Shortcut and /watch/ preview.
+
+Remaining human steps: deploy, validate live identity and hardware, record the
+video, decide Bee-track eligibility, enter real poll results and submit Devpost.
+All work in this session stayed local; nothing was pushed or deployed.
+
+---
+
 # Working guide
 
 **Deadline:** Fri Oct 23, 12:00pm PDT = **Sat Oct 24, 3:00am HKT**.

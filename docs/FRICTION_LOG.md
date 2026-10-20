@@ -51,7 +51,7 @@ confusing than expected. Write it at the time it happens; you won't remember it 
 - **Task attempted:** First create of our stack (EC2, IAM, CloudFront, a daily EBS snapshot policy).
 - **Steps taken:** `aws cloudformation deploy --template-file deploy/aws/amazonpairup.yaml`.
 - **Expected:** An invalid property value to be reported before any resource is created.
-- **Actual:** The changeset was created without complaint; the DLM handler then returned `The following parameter(s) are invalid: Description {AmazonPairUp daily EBS snapshots, kept for 7 days}`. The comma is the problem (the pattern allows only letters, digits, spaces, `_` and `-`), but the message does not say which character or which pattern. The whole stack rolled back to `ROLLBACK_COMPLETE`, which cannot be updated, so it had to be deleted before trying again.
+- **Actual:** The changeset was created without complaint; the DLM handler then returned `The following parameter(s) are invalid: Description {PairUp daily EBS snapshots, kept for 7 days}`. The comma is the problem (the pattern allows only letters, digits, spaces, `_` and `-`), but the message does not say which character or which pattern. The whole stack rolled back to `ROLLBACK_COMPLETE`, which cannot be updated, so it had to be deleted before trying again.
 - **Severity:** minor
 - **Workaround:** Removed the comma, deleted the rolled-back stack, deployed again.
 - **Suggestion:** Enforce the documented pattern in the resource schema so changeset creation (and `cfn-lint`) rejects it, and include the allowed pattern in the DLM error message.

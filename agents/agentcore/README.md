@@ -1,8 +1,8 @@
-# AmazonPairUp agent on Amazon Bedrock AgentCore
+# PairUp agent on Amazon Bedrock AgentCore
 
-A voice agent for AmazonPairUp built with **Strands Agents** (TypeScript SDK)
+A voice agent for PairUp built with **Strands Agents** (TypeScript SDK)
 and hosted on **Amazon Bedrock AgentCore Runtime**. Its tools are the
-AmazonPairUp MCP server's, discovered over Streamable HTTP with the user's own
+PairUp MCP server's, discovered over Streamable HTTP with the user's own
 credentials, and its model is Amazon Nova Lite on **Amazon Bedrock**.
 
 ```mermaid
@@ -13,7 +13,7 @@ flowchart LR
     G[Guards outside the model:<br/>yes before confirm_deal,<br/>idempotency_key on writes]
     A --- G
   end
-  R -- "MCP tools/call<br/>user's bearer token" --> S[AmazonPairUp MCP server<br/>/mcp]
+  R -- "MCP tools/call<br/>user's bearer token" --> S[PairUp MCP server<br/>/mcp]
 ```
 
 What runs outside the model, in code:
@@ -68,7 +68,7 @@ limited to Bedrock model calls, ECR pulls and logs, and creates or updates the
 agent runtime. Settings: `PAIRUP_MCP_URL` (default the production server),
 `BEDROCK_MODEL_ID` (default `us.amazon.nova-lite-v1:0`), `MAX_SESSIONS`.
 
-Identity in production: pass the user's AmazonPairUp access token as
+Identity in production: pass the user's PairUp access token as
 `pairup_token` in the payload, or in the
 `X-Amzn-Bedrock-AgentCore-Runtime-Custom-PairUp-Token` header once that header
 is on the runtime's request header allowlist. The MCP server only accepts

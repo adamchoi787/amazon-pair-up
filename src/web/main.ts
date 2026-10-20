@@ -5,7 +5,7 @@ import { renderView, themeNow, type ViewHandle } from "./host.js";
 import { Mcp, resultData } from "./mcp.js";
 import { canListen, canSpeak, listen, speak, stopSpeaking } from "./voice.js";
 
-// AmazonPairUp web app. It is an MCP host, like Alexa+: it discovers the
+// PairUp web app. It is an MCP host, like Alexa+: it discovers the
 // server's tools, runs them over Streamable HTTP with the user's credentials,
 // and renders their MCP Apps views. The reasoning step (Bedrock tool use, or
 // the offline planner) runs on the server at /api/agent.
@@ -90,7 +90,7 @@ async function start() {
 
   greet();
   await refreshInbox();
-  await refreshSuggestions(mcp);
+  await refreshSuggestions(mcp, () => void refreshInbox());
   setInterval(() => { if (document.visibilityState === "visible") void refreshInbox(); }, 20_000);
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") void refreshInbox(); });
 }
@@ -227,7 +227,7 @@ function onCardAction(name: string, r: CallToolResult) {
   markSeen(r);
   const say = String(resultData(r).say ?? "");
   if (voiceOn && say) speak(say);
-  if (WRITES.has(name)) { void refreshInbox(); void refreshSuggestions(mcp); }
+  if (WRITES.has(name)) { void refreshInbox(); void refreshSuggestions(mcp, () => void refreshInbox()); }
 }
 
 // ---------- inbox: offers that arrive while you're away ----------
@@ -351,14 +351,14 @@ function updateVoiceToggle() {
 
 function readPref(k: string, d: boolean) {
   try {
-    const v = localStorage.getItem(`amazonpairup.${k}`);
+    const v = localStorage.getItem(`pairup.${k}`);
     return v == null ? d : v === "1";
   } catch {
     return d;
   }
 }
 function writePref(k: string, v: boolean) {
-  try { localStorage.setItem(`amazonpairup.${k}`, v ? "1" : "0"); } catch { /* not stored */ }
+  try { localStorage.setItem(`pairup.${k}`, v ? "1" : "0"); } catch { /* not stored */ }
 }
 
 void boot();

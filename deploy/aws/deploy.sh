@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy AmazonPairUp to AWS: CloudFormation stack (first run creates it), then
+# Deploy PairUp to AWS: CloudFormation stack (first run creates it), then
 # the committed code (git HEAD) onto the instance through Systems Manager.
 # Re-run any time to ship a new release; it is idempotent.
 #
@@ -166,7 +166,7 @@ done
 # No "-o /dev/null": with MSYS_NO_PATHCONV the Windows curl gets that path literally
 curl -fsS -w "web app: HTTP %{http_code}\n" "$BASE/app/" | tail -n 1
 echo
-echo "AmazonPairUp is live: $BASE/app/"
+echo "PairUp is live: $BASE/app/"
 echo "Sign-in: $LOGIN"
 echo "Login with Amazon allowed return URL: $BASE/oauth/amazon/callback"
 echo "Dashboard: $BASE/dashboard/#token=<value of /amazonpairup/dashboard-token>"

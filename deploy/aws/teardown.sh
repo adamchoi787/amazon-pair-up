@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Remove the AmazonPairUp stack and everything it created. Keeps the secrets in
+# Remove the PairUp stack and everything it created. Keeps the secrets in
 # Parameter Store (free) unless PURGE_SECRETS=1, and lists any EBS snapshots
 # left behind (DLM snapshots outlive the stack and are billed until deleted).
 #

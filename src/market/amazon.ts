@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-// Where the local market hands off to Amazon. AmazonPairUp covers what Amazon
+// Where the local market hands off to Amazon. PairUp covers what Amazon
 // retail doesn't serve (used items under $20, errands, an hour of help); when
 // the local market can't help, it points the person at Amazon instead:
 //   - a request nobody nearby can fill gets a search link and the new price,
@@ -45,7 +45,7 @@ let areas: { file: string; byName: Map<string, Area> } | null = null;
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 
-/** The Hub points of each area. The seed file's are demo data; production reads the Amazon Hub locator. */
+/** The Hub points of each area. The seed file contains demo locations. Configure verified real places before real meet-ups. */
 function hubAreas(file = "data/seed-listings.json") {
   if (areas?.file !== file) {
     const list = (JSON.parse(readFileSync(file, "utf8")) as { areas?: Area[] }).areas ?? [];

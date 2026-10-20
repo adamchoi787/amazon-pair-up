@@ -8,10 +8,11 @@ import { createMockAi } from "../../../src/ai/mock.js";
 import { createApp } from "../../../src/app.js";
 import { config } from "../../../src/config.js";
 import { openDb, type Db } from "../../../src/db/client.js";
-import { postOffer } from "../../../src/market/service.js";
+import { postOffer, ensureUser } from "../../../src/market/service.js";
+import { addContext } from "../../../src/market/context.js";
 import { createPairUpAgent } from "../src/agent.js";
 
-// The Strands agent against a real AmazonPairUp server (in-memory Postgres,
+// The Strands agent against a real PairUp server (in-memory Postgres,
 // Streamable HTTP on a local port). A scripted model stands in for Bedrock, so
 // the test checks what runs outside the model: tools come from MCP, writes get
 // an idempotency_key, and confirm_deal is blocked until the user says yes.
@@ -106,4 +107,30 @@ test("a Strands agent posts, waits for a yes, then confirms, over MCP", async ()
   const done = await db.query<{ status: string }>(`SELECT status FROM deals WHERE id = $1`, [rows[0].id]);
   assert.equal(done.rows[0].status, "confirmed", "confirmed after the explicit yes");
   await pairup.close();
+});
+
+test('a Strands agent waits for approval before accepting a suggestion', async()=>{
+  const deps={db,ai:createMockAi(DIM),cfg:{matchThreshold:0.35}};
+  const context=await addContext(deps,'u_suggestion_guard',{source:'bee',kind:'todo',text:'Need printer paper'});
+  const input={suggestion_id:context.suggestion!.suggestion_id,max_price:5};
+  const model=new ScriptedModel([{tool:'accept_suggestion',input},{tool:'accept_suggestion',input}]);
+  const pairup=createPairUpAgent({mcpUrl,userId:'u_suggestion_guard',modelId:'scripted',region:'us-east-1',model});
+  try{
+    await pairup.ask('Let me think');
+    assert.equal((await db.query("SELECT id FROM buy_intents WHERE buyer_id='u_suggestion_guard'")).rows.length,0);
+    await pairup.ask('yes');
+    assert.equal((await db.query("SELECT id FROM buy_intents WHERE buyer_id='u_suggestion_guard'")).rows.length,1);
+  }finally{await pairup.close();}
+});
+
+test('a Strands agent waits for approval before deleting data', async()=>{
+  await ensureUser(db,'u_delete_guard');
+  const model=new ScriptedModel([{tool:'delete_my_data',input:{confirm:true}},{tool:'delete_my_data',input:{confirm:true}}]);
+  const pairup=createPairUpAgent({mcpUrl,userId:'u_delete_guard',modelId:'scripted',region:'us-east-1',model});
+  try{
+    await pairup.ask('What do you know about me?');
+    assert.equal((await db.query("SELECT id FROM users WHERE id='u_delete_guard'")).rows.length,1);
+    await pairup.ask('yes');
+    assert.equal((await db.query("SELECT id FROM users WHERE id='u_delete_guard'")).rows.length,0);
+  }finally{await pairup.close();}
 });

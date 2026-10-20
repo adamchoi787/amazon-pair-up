@@ -4,7 +4,7 @@ import { Mcp, resultData } from './mcp.js';
 const node = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => {
   const n = document.createElement(tag); n.textContent = text; return n;
 };
-export async function refreshSuggestions(mcp: Mcp) {
+export async function refreshSuggestions(mcp: Mcp, onChange: () => void = () => undefined) {
   const strip = document.getElementById('for-you')!;
   try {
     const r = await mcp.call('get_suggestions', {});
@@ -29,7 +29,7 @@ export async function refreshSuggestions(mcp: Mcp) {
           try {
             const res=await mcp.call(tool,{suggestion_id:s.suggestion_id,...extra,...(tool==='accept_suggestion'?{max_price,idempotency_key:crypto.randomUUID()}:{})});
             status.textContent=String(resultData(res).say??'');
-            if(!res.isError){actions.remove();budget.remove();}
+            if(!res.isError){actions.remove();budget.remove();onChange();}
           }catch{status.textContent='Could not reach PairUp. Please try again.';}
           finally{buttons.forEach(x=>x.disabled=false);}
         }; actions.append(b);

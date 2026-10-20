@@ -1,5 +1,5 @@
 {
-  "_note": "Typical second-hand prices (USD, good condition) on a campus market, set by hand for the demo. The price check uses them to catch implausible prices: a $1 iPhone, or $180 heard for $18. In production this table is fed from a product catalog (new prices, adjusted for condition) and the market's own confirmed trades fill the gaps (src/market/pricing.ts). Services are per job or per hour. new_price (items only) is the typical price new on Amazon.com, said when nobody nearby has one yet (the Amazon fallback in src/market/amazon.ts).",
+  "_note": "Hand-set demo reference estimates in USD for campus items and services. new_price is a demo estimate for a new item; no live Amazon price lookup or product catalog feed is connected. Validate and replace reference data before real price guidance. Confirmed marketplace trades also inform price checks (src/market/pricing.ts).",
   "references": [
     { "id": "iphone-15", "title": "Apple iPhone 15 smartphone", "low": 350, "high": 550, "new_price": 699 },
     { "id": "iphone-14", "title": "Apple iPhone 14 smartphone", "low": 280, "high": 450, "new_price": 599 },

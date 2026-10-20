@@ -125,7 +125,7 @@ test("authorize rejects unregistered redirect URIs and missing PKCE", async () =
   const ok = await fetch(`${base}/oauth/authorize?${authorizeParams(challenge)}`);
   assert.equal(ok.status, 200);
   const html = await ok.text();
-  assert.match(html, /Link AmazonPairUp to Alexa/);
+  assert.match(html, /Link PairUp to Alexa/);
   assert.match(html, /Demo sign-in for judges/, "the name sign-in is labelled as the demo");
 });
 
@@ -236,7 +236,7 @@ test("revocation (RFC 7009): an access token alone, or a refresh token with its 
 test("the web app signs in as a public client: PKCE, its own origin, no secret", async () => {
   const cfg = await (await fetch(`${base}/api/app-config`)).json();
   assert.deepEqual(cfg, {
-    auth: "oauth", clientId: "amazonpairup-web", redirectUri: `${PUBLIC}/app/`,
+    auth: "oauth", clientId: "pairup-web", redirectUri: `${PUBLIC}/app/`,
     authorizeUrl: `${PUBLIC}/oauth/authorize`, tokenUrl: `${PUBLIC}/oauth/token`, resource: `${PUBLIC}/mcp`,
   });
 
@@ -366,7 +366,7 @@ test("Client ID Metadata Documents: an unregistered agent connects with its URL 
   const consent = await fetch(`${base2}/oauth/authorize?${new URLSearchParams(clientParams(AGENT_ID, AGENT_REDIRECT, challenge))}`);
   assert.equal(consent.status, 200);
   const html = await consent.text();
-  assert.match(html, /Allow Strands Test Agent to use AmazonPairUp\?/, "the consent screen names the client");
+  assert.match(html, /Allow Strands Test Agent to use PairUp\?/, "the consent screen names the client");
   assert.match(html, /Published by <strong>agent\.example<\/strong>/);
   assert.match(html, /Continue with Amazon/);
   assert.doesNotMatch(html, /Demo sign-in/, "no name sign-in once Login with Amazon is on");
@@ -442,7 +442,7 @@ test("dynamic client registration (RFC 7591): public clients, safe redirect URIs
   const { verifier, challenge } = pkce();
   const redirect = "http://127.0.0.1:61000/cb";
   const consent = await (await fetch(`${base2}/oauth/authorize?${new URLSearchParams(clientParams(reg.client_id, redirect, challenge))}`)).text();
-  assert.match(consent, /Allow Cursor to use AmazonPairUp\?/);
+  assert.match(consent, /Allow Cursor to use PairUp\?/);
   assert.match(consent, /not verified/);
 
   const to = await signInWithAmazon(clientParams(reg.client_id, redirect, challenge));

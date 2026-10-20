@@ -178,7 +178,7 @@ test("a spoken sale and purchase, end to end through the web app's loop", async 
   const offer = await buyer.say("I need a graphing calculator today, maximum $18");
   assert.equal(offer, "Found it: TI-84 graphing calculator for $18, $2 below asking. Meet-up: HKUST campus. Should I confirm it?");
   const card = buyer.cards.at(-1)!;
-  assert.equal(card.view, "ui://amazonpairup/market.html", "the result names its MCP Apps view");
+  assert.equal(card.view, "ui://pairup/market.html", "the result names its MCP Apps view");
   assert.equal((card.data.deal as { price: number }).price, 18);
 
   assert.match(await buyer.say("what does it cost?"), /^You can say things like: sell my TI-84 for 20 dollars/);
@@ -221,9 +221,9 @@ test("a budget below the seller's minimum hears the asking price, and a yes buys
   for (const s of [seller, buyer]) await s.close();
 });
 
-test("tools declare the AmazonPairUp MCP Apps view, and the view is served", async () => {
+test("tools declare the PairUp MCP Apps view, and the view is served", async () => {
   const s = await session("u_viewer");
-  const withUi = s.tools.filter((t) => (t._meta as { ui?: { resourceUri?: string } } | undefined)?.ui?.resourceUri === "ui://amazonpairup/market.html");
+  const withUi = s.tools.filter((t) => (t._meta as { ui?: { resourceUri?: string } } | undefined)?.ui?.resourceUri === "ui://pairup/market.html");
   assert.deepEqual(withUi.map((t) => t.name).sort(), [
     "accept_suggestion", "confirm_deal", "decline_deal", "find_matches", "get_deal_status", "get_my_routines", "get_suggestions",
     "list_my_posts", "negotiate", "post_offer", "post_request",
@@ -232,11 +232,11 @@ test("tools declare the AmazonPairUp MCP Apps view, and the view is served", asy
   await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), { requestInit: { headers: { "X-User-Id": "u_viewer" } } }));
   const { resources } = await client.listResources();
   assert.deepEqual(resources.map((r) => [r.uri, r.mimeType]), [
-    ["ui://amazonpairup/market.html", "text/html;profile=mcp-app"],
+    ["ui://pairup/market.html", "text/html;profile=mcp-app"],
     ["deals://me", "application/json"],
     ["posts://me", "application/json"],
   ]);
-  const { contents } = await client.readResource({ uri: "ui://amazonpairup/market.html" });
+  const { contents } = await client.readResource({ uri: "ui://pairup/market.html" });
   assert.match((contents[0] as { text: string }).text, /^<!doctype html>.*<script type="module">/s);
   for (const c of [client, s]) await c.close();
 });
@@ -291,4 +291,14 @@ test("a price far from the usual range is questioned by voice: a yes posts it, a
   await other.say("Sell my iPhone 13 for $1");
   assert.match(await other.say("Sorry, I meant $300"), /^Listed iPhone 13 for \$300\./);
   for (const s of [seller, other]) await s.close();
+});
+
+
+test('suggestion acceptance and data erasure require explicit user approval', () => {
+  const block = (name: string): Block[] => [{toolUse:{toolUseId:'guard-test',name,input:{confirm:true}}}];
+  for(const name of ['accept_suggestion','delete_my_data']) {
+    assert.ok('text' in requireExplicitYes(block(name),'what do you know about me?')[0]);
+    assert.ok('toolUse' in requireExplicitYes(block(name),'yes')[0]);
+  }
+  assert.ok('toolUse' in requireExplicitYes(block('accept_suggestion'),'18 dollars')[0]);
 });

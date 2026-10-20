@@ -1,4 +1,4 @@
-# AmazonPairUp agent for Amazon Bedrock AgentCore Runtime (ARM64, port 8080:
+# PairUp agent for Amazon Bedrock AgentCore Runtime (ARM64, port 8080:
 # POST /invocations, GET /ping). Build and deploy with ./deploy.sh.
 FROM --platform=linux/arm64 node:22-slim
 

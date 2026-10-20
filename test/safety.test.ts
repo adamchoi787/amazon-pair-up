@@ -96,7 +96,7 @@ test("a prohibited offer or request is refused before anything is stored, with a
   assert.equal(gun.code, "prohibited_item");
   assert.equal(gun.category, "weapons");
   assert.equal(gun.matched_by, "keyword");
-  assert.equal(gun.say, "I can't post that. AmazonPairUp doesn't allow weapons, ammunition and explosives.");
+  assert.equal(gun.say, "I can't post that. PairUp doesn't allow weapons, ammunition and explosives.");
   assert.equal(await count(m.db, `SELECT count(*)::int AS n FROM listings`), 0, "nothing listed");
 
   // A request is checked before its budget is even asked for.

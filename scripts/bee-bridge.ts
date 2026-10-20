@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 
-// Bee → AmazonPairUp. Forwards the user's own Bee to-dos, conversation
+// Bee → PairUp. Forwards the user's own Bee to-dos, conversation
 // summaries, voice notes and places to /api/context, where the ones that name a
 // need become suggestions ("Your Bee picked up: 'need a graphing calculator
 // before the exam'. Want me to find one for up to $18?"). Other people's

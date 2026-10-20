@@ -3,3 +3,5 @@
 public/app/app.js -text
 public/mcp-apps/*.html -text
 *.sh text eol=lf
+
+public/watch/watch.js -text

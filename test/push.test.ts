@@ -10,6 +10,8 @@ import { subscriberCount } from '../src/mcp/subscriptions.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createApp } from '../src/app.js';
 import { config } from '../src/config.js';
+import { createDeviceToken, deviceForToken } from '../src/auth/devices.js';
+import { addContext } from '../src/market/context.js';
 
 test('HTTP sessions stream updates, reject another user and preserve stateless POST calls', async()=>{
   const db=await openDb({databaseUrl:'',pgliteDir:'',embeddingDim:64},{inMemory:true});
@@ -38,12 +40,13 @@ test('subscriptions deliver only the signed-in user’s changes and clean up on 
   const deps = { db, ai:createMockAi(64), cfg:{ matchThreshold:0.35 } };
   const clients: Client[] = [];
   let action: 'accept' | 'decline' = 'decline';
+  let failForm = false;
   let questions = 0;
   const connect = async (userId:string, form=false) => {
     const [a,b]=InMemoryTransport.createLinkedPair();
     await createMcpServer(deps,{userId}).connect(a);
     const c=new Client({name:'push-test',version:'1'}, {capabilities: form ? {elicitation:{form:{}}} : {}});
-    if(form) c.setRequestHandler(ElicitRequestSchema,async()=>{questions++; return {action, ...(action==='accept'?{content:{confirm:true}}:{})};});
+    if(form) c.setRequestHandler(ElicitRequestSchema,async()=>{questions++; if(failForm)throw Error('Host form failed');return {action, ...(action==='accept'?{content:{confirm:true}}:{})};});
     await c.connect(b); await c.listTools(); clients.push(c); return c;
   };
   const call = async(c:Client,name:string,args:Record<string,unknown>={})=> {
@@ -65,14 +68,17 @@ test('subscriptions deliver only the signed-in user’s changes and clean up on 
     const resource=await buyer.readResource({uri:'deals://me'});
     assert.ok(!JSON.stringify(resource).includes('min_price'));
     assert.equal((await call(buyer,'confirm_deal',{deal_id:req.deal.deal_id})).isError,true);
+    failForm=true;
+    assert.equal((await call(buyer,'confirm_deal',{deal_id:req.deal.deal_id})).isError,true,'a failed host form cannot confirm a deal');
+    failForm=false;
     action='accept';
     assert.equal((await call(buyer,'confirm_deal',{deal_id:req.deal.deal_id})).deal.status,'confirmed');
-    assert.equal(questions,2);
+    assert.equal(questions,3);
     action='decline';
     assert.equal((await call(buyer,'post_offer',{title:'TI-84 graphing calculator',ask_price:1})).isError,true);
     action='accept';
     assert.ok((await call(buyer,'post_offer',{title:'TI-84 graphing calculator',ask_price:1})).offer);
-    assert.equal(questions,4);
+    assert.equal(questions,5);
     await buyer.unsubscribeResource({uri:'posts://me'});
     await buyer.close(); await stranger.close();
     assert.equal(subscriberCount(),0);
@@ -93,9 +99,21 @@ test('delete_my_data needs confirmation and erases an account with a past deal w
     await seller('post_offer',{title:'Desk lamp',ask_price:10,min_price:7});
     const r=await buyer('post_request',{need:'desk lamp',max_price:9});
     await buyer('confirm_deal',{deal_id:r.deal.deal_id});
+    await buyer('rate_deal',{deal_id:r.deal.deal_id,stars:4});
+    await buyer('report_user',{deal_id:r.deal.deal_id,reason:'other',details:'Demo report to exercise deletion.'});
+    const device=await createDeviceToken(db,'erase-seller','bee','Test Bee');
+    await addContext(deps,'erase-seller',{source:'bee',kind:'todo',text:'Need printer paper'});
+    await db.query("INSERT INTO user_passcodes (user_id,passcode_hash) VALUES ('erase-seller','test-hash')");
+    await db.query("INSERT INTO routine_feedback (user_id,routine_id,action,day) VALUES ('erase-seller','rtn_test','forget','2026-10-20')");
     assert.equal((await seller('delete_my_data')).code,'confirm_delete');
     assert.equal((await seller('delete_my_data',{confirm:true})).deleted,true);
     assert.equal((await db.query("SELECT id FROM users WHERE id='erase-seller'")).rows.length,0);
+    for(const table of ['device_tokens','context_signals','routine_feedback','user_passcodes']) {
+      assert.equal((await db.query(`SELECT user_id FROM ${table} WHERE user_id='erase-seller'`)).rows.length,0,table);
+    }
+    assert.equal(await deviceForToken(db,`Bearer ${device.token}`),null);
+    assert.equal((await db.query('SELECT id FROM reports')).rows.length,0);
+    assert.equal((await db.query('SELECT deal_id FROM ratings')).rows.length,0);
     const status=await buyer('get_deal_status');
     assert.equal(status.deals[0].counterpart,'Former member');
     assert.ok(!JSON.stringify(status).includes('min_price'));

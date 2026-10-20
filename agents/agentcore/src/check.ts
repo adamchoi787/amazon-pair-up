@@ -2,7 +2,7 @@ import { McpClient } from "@strands-agents/sdk";
 import { config } from "./config.js";
 
 // Checks the agent's wiring without calling a model (no AWS credentials needed):
-// the Strands MCP client connects to the AmazonPairUp server and lists the tools
+// the Strands MCP client connects to the PairUp server and lists the tools
 // the agent will have, and one read-only tool call goes through.
 //   PAIRUP_MCP_URL=http://127.0.0.1:3000/mcp npm run check
 

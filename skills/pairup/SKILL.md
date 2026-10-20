@@ -1,6 +1,6 @@
 ---
-name: amazonpairup
-description: Buy, sell or get small jobs done between people through the AmazonPairUp MCP server. Use when the user wants to sell an item, offer a service (errands, deliveries, event help, tutoring), find an item, get someone to do a task, or check on their deals and meet-ups, rate a deal or report someone. Covers posting, reading a proposed deal, confirming only on an explicit yes, private price limits, price checks, what can't be posted, ratings, reports and retries.
+name: pairup
+description: Buy, sell or get small jobs done between people through the PairUp MCP server. Use when the user wants to sell an item, offer a service (errands, deliveries, event help, tutoring), find an item, get someone to do a task, or check on their deals and meet-ups, rate a deal or report someone. Covers posting, reading a proposed deal, confirming only on an explicit yes, private price limits, price checks, what can't be posted, ratings, reports and retries.
 license: MIT
 metadata:
   version: "0.6.0"
@@ -8,9 +8,9 @@ metadata:
   server-card: https://d3cxpkmhl89rw9.cloudfront.net/.well-known/mcp/server-card.json
 ---
 
-# AmazonPairUp
+# PairUp
 
-AmazonPairUp pairs people directly. Someone who needs a thing or a task done is
+PairUp pairs people directly. Someone who needs a thing or a task done is
 paired with someone who has it or can do it. The server picks the pair,
 settles the price by a fixed rule inside limits each side keeps private, and
 records each side's yes. Your job as the agent is to turn what the user says
@@ -77,11 +77,11 @@ hour of help) and hands off to Amazon when it can't help. The post keeps
 waiting either way, so offer these as an option and never as a replacement:
 
 - `post_request` for an item with no deal returns `fallback`: `amazon_url`
-  (an amazon.com search), `new_price` (typical price new, or null) and a `say`
+  (an amazon.com search), `new_price` (demo estimate for a new item, or null) and a `say`
   ("Nobody nearby has one yet. New on Amazon it's about $110."). Open the link
   only if the user asks for it.
 - `post_offer` for an item nobody is asking for yet, in a category Amazon
-  Trade-In takes (electronics, books, game consoles), returns `trade_in` with
+  Trade-In takes (candidate electronics and game consoles), returns `trade_in` with
   the Amazon Trade-In `url`.
 - When both sides are in the same area, `deal.meetup.place` is that area's
   Amazon Hub Locker or Counter (`meetup.hub_point`): a public, watched place
@@ -186,4 +186,6 @@ Voice history lasts ten minutes; context need snippets expire after thirty days.
 For an agent holding Bee MCP data: read the user's todos or daily summary, call
 add_context for a need clause with source bee and a stable external_id, then
 get_suggestions. Ask for a budget if needed and wait for yes before accepting.
-See [BEE.md](BEE.md) and [APPLE_WATCH.md](APPLE_WATCH.md).
+See [Bee guide](https://github.com/adamchoi787/voice-market-mcp/blob/main/docs/BEE.md) and [Apple Watch guide](https://github.com/adamchoi787/voice-market-mcp/blob/main/docs/APPLE_WATCH.md).
+
+Retail reference amounts are hand-set demo estimates and are labelled in spoken results and cards. Amazon search links let the user check current prices. Trade-In links ask the user to check eligibility for their model and country.

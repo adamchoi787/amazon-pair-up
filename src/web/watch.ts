@@ -13,9 +13,9 @@ async function refresh(){
   const deal=deals.find(d=>d.status==='proposed'&&d.waiting_for_you);
   if(deal){action={kind:'deal',id:deal.deal_id,budget:null};say(`${deal.title} for $${deal.price}. Confirm?`);}
   else{
-    const list=resultData(await mcp.call('get_suggestions',{})).suggestions as {suggestion_id:string;say:string;request:{max_price:number|null}}[];
+    const list=resultData(await mcp.call('get_suggestions',{})).suggestions as {suggestion_id:string;say:string;from:string;request:{need:string;max_price:number|null}}[];
     const s=list[0];action=s?{kind:'suggestion',id:s.suggestion_id,budget:s.request.max_price}:null;
-    say(s?.say??'You’re all caught up. Tell me what you need.');
+    say(s ? `${s.from==='routine'?'Your usual':`From your ${s.from==='bee'?'Bee':s.from}`}: ${s.request.need}. ${s.request.max_price==null?'What’s your budget?':`Up to $${s.request.max_price}. Ask now?`}` : 'You’re all caught up. Tell me what you need.');
   }
   $('actions').hidden=!action;
   $('budget').hidden=!(action?.kind==='suggestion'&&action.budget===null);
@@ -41,7 +41,11 @@ async function answer(yes:boolean){
     const tool=a.kind==='deal'?(yes?'confirm_deal':'decline_deal'):(yes?'accept_suggestion':'dismiss_suggestion');
     const args=a.kind==='deal'?{deal_id:a.id}:{suggestion_id:a.id,...(yes?{max_price:budget}:{})};
     const r=await mcp.call(tool,{...args,idempotency_key:crypto.randomUUID()});
-    if(!r.isError){action=null;$('actions').hidden=true;$('budget').hidden=true;}
+    if(!r.isError){
+      const d=resultData(r).deal as {deal_id:string;status:string;waiting_for_you:boolean}|undefined;
+      action=d?.status==='proposed'&&d.waiting_for_you?{kind:'deal',id:d.deal_id,budget:null}:null;
+      $('actions').hidden=!action;$('budget').hidden=true;
+    }
     return String(resultData(r).say??'Done.');
   });
 }
