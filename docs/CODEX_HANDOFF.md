@@ -1,6 +1,117 @@
-> Completed locally on October 20, 2026: all six branches merged into main and renamed PairUp 0.6.0. See [HANDOFF.md](HANDOFF.md) and [VALIDATION.md](VALIDATION.md). The original instructions below are retained as a record.
+# Handoff to Codex, round 2 (2026-10-20, HKT evening)
 
-# Handoff to Codex (2026-10-20, HKT afternoon)
+`main` is at `aa5ff24` (PairUp 0.7.0 + PairUp Points with Ring + Amazon Hub
+delivery). Typecheck is clean and `npm test` passes 155/155. The job now: land
+the unmerged work, close the repo gaps, and make use of the hackathon resources
+we have not touched yet (list at
+https://amazonappdev2026.devpost.com/resources). Deadline: **Fri Oct 23 12:00
+PDT (Sat 03:00 HKT)**; our target is **Fri 21:00 HKT**.
+
+The rules in round 1 below still hold (main always green, no limit leaks, tool
+changes update server + schemas + TOOL_CONTRACT + SKILL together, prices by the
+fixed rule only, plain positive docs, no push/deploy/AWS, never edit
+`vendor/pairing-core` or `src/market/negotiation.ts`, real data only). Add one:
+**the reliable core flow and a clear video come first**; add an integration only
+when it shows up in the video or in a judged answer.
+
+Work in priority order. Commit each item on its own branch, merge into `main`
+when it passes, and tick it in the status table at the end.
+
+## A. Repo gaps
+
+1. **Merge the design pass** `claude/lucid-lichterman-f00e30` (`439d6e0`,
+   worktree `.claude/worktrees/lucid-lichterman-f00e30`). It is committed but
+   not on `main`: one token system (`src/design/tokens.json`,
+   `public/design/tokens.css`, `src/design/icons.ts`), brand, motion, a calmer
+   assistant, restyled app, dashboard, watch and MCP Apps card,
+   `docs/DESIGN.md`, `test/design.test.ts`. It branched from 0.7.0, before Ring
+   and delivery, so expect conflicts in `src/apps/view.ts`, `src/apps/view.css`,
+   `src/web/main.ts`, `public/app/index.html`. Keep both sides: the PairUp Point
+   panel, arrival chips, "I'm here" and the delivery toggle restyled with the
+   new tokens. Rebuild bundles (`npm run build:web`), commit `public/`.
+2. **Two-device demo page.** `claude/mystifying-kapitsa-908773` adds
+   `public/app/demo.html` (buyer and seller side by side), which suits the video.
+   The branch predates the rename and 0.7.0: port only `demo.html` and the
+   small `src/web/*` pieces it needs, use the PairUp name, the UW seed users and
+   the token CSS. Leave the rest of that branch.
+3. **Superseded branches.** `claude/nifty-banach-fc4da0` (first Agent Skill)
+   and `claude/unruffled-chaum-2f4a78` (idempotency, uncommitted) are covered on
+   `main` (`skills/pairup/SKILL.md`, `src/market/idempotency.ts`). Diff each
+   against `main`; port anything still missing (for example
+   `test/agent-friendly.test.ts` in the unruffled-chaum worktree), then list them
+   for Tony to remove. Leave the worktrees in place.
+4. **Browser check** of the Ring and delivery UI (open item 1 in
+   [RING_HANDOFF.md](RING_HANDOFF.md)): with `npm run ring:simulate`, walk
+   "meet at a PairUp Point" → both "I'm here" → "Both here" on the card, the web
+   app and the watch view, in light and dark, at phone width. Fix what reads
+   badly on screen.
+5. **Housekeeping.** `package-lock.json` has an uncommitted bump of
+   `vendor/pairing-core` 0.1.0 → 0.2.0: confirm it matches
+   `vendor/pairing-core/package.json` and commit it. Add `codex-*.log` to
+   `.gitignore` (the logs in the repo root are untracked).
+6. **Release check.** After all merges: the full check from round 1, bump
+   `SERVER_INFO.version` and the SKILL `metadata.version` to `0.8.0`, update
+   README test count and [VALIDATION.md](VALIDATION.md).
+
+## B. Hackathon resources still to use
+
+| # | Resource | Gap | What to do |
+|---|---|---|---|
+| B1 | **Agent Skills open standard** (Alexa+ track asks for it by name: apps.extensions.modelcontextprotocol.io/api/#build-with-agent-skills) | `skills/pairup/SKILL.md` was written by hand and never checked against the spec | Validate the skill against the Agent Skills spec (folder name = `name`, allowed frontmatter keys, description length, relative links resolve). Add a `test/skill.test.ts` that parses the frontmatter and enforces this. Serve the skill from the server too (e.g. `/.well-known/agent-skills/pairup/SKILL.md`, listed in the server card and `llms.txt`) if the spec defines a discovery path. Then use the MCP Apps Agent Skills from that page to audit `src/apps/view.ts` against MCP Apps (`ui/initialize`, host theme variables, display modes, size reporting) and fix what they flag. |
+| B2 | **Streamable HTTP transport, spec 2025-11-25** (also named by the Alexa+ track) | Used, never audited clause by clause | Write `test/transport.test.ts` against the spec page: `Origin` validation (403 on a foreign origin), `MCP-Protocol-Version` header (400 on unsupported), `Accept` requirements, `Mcp-Session-Id` lifecycle for the subscription mode (404 on unknown session, `DELETE` ends it), `GET` SSE on stateful sessions and 405 on stateless, JSON-RPC batch handling. Fix any gap. Add a "Spec conformance" bullet list to README. If the official MCP conformance suite or MCP Inspector CLI runs headless, run it and save the output to `docs/VALIDATION.md`. |
+| B3 | **Amazon Devices Builder Tools** (MCP server + Agent Skills; developer.amazon.com/docs/vega/0.24/mcp-server) | Not used | Install it in your own coding agent, use its documentation search on the Ring and Alexa questions in this repo, and record what it covers and where it helped or fell short. Add a row to the product feedback table in [SUBMISSION.md](SUBMISSION.md) and an entry to [FRICTION_LOG.md](FRICTION_LOG.md). Product feedback is a stated goal of the hackathon. |
+| B4 | **ring-api-helloworld** (canonical Ring starter) | `src/ring/client.ts` was written from the API docs | Compare our client with the starter: base URL, auth headers, pagination, error and 429 / `Retry-After` handling, token expiry. Adopt what it does better and cover it in `test/points.test.ts`. Mention the starter in README's Ring section. |
+| B5 | **Ring UX design guide** | Not applied | Read it and align the PairUp Point panel, notification wording and arrival states with its patterns. Note in `docs/DESIGN.md` which guidelines the panel follows. |
+| B6 | **Ring API reference: webhooks, rate limits, testing** | Partly used | Check `src/ring/webhook.ts` against the reference (signature header, replay window, `meta.request_id` dedupe) and add a dedupe test if missing. |
+| B7 | **bee-skill and bee-cli** (github.com/bee-computer) | Bridge calls `bee stream --json --types …` from docs; the official Bee Skill is unused | Check every CLI flag we call against the bee-cli README and fix mismatches. Add a "Use with Bee" section to `skills/pairup/SKILL.md` and [BEE.md](BEE.md) that pairs the official Bee Skill with ours: the agent reads Bee to-dos through Bee's skill or MCP, calls `add_context`, then `get_suggestions`. Frame the TI-84-before-the-exam story as education, one of Bee's priority use cases. |
+| B8 | **Open Source mini challenge** | Only pairing-core is listed | Turn the entries in [FRICTION_LOG.md](FRICTION_LOG.md) into upstream contributions Tony can submit: for each SDK doc or example gap (Strands TS stream-event example, AgentCore local-invoke headers, MCP Apps init timeout), write the issue text and, where small, the patch, under `docs/upstream/<project>.md`. Tony opens them from his account; their URLs go in the Devpost form. |
+| B9 | **AWS Builder** | Bedrock, AgentCore, Strands, CloudFront/EC2/CloudWatch are used; live evidence is missing | Add `npm run evidence` that, given a public URL, calls `/health`, `/build-info.json`, one Bedrock-backed request and (if configured) one AgentCore invocation, and writes a dated `docs/EVIDENCE.md` with the responses. Tony runs it after deploy. Leave Kiro and SageMaker out. |
+| B10 | **Fire TV** | Not our track | No work. |
+| B11 | Community forum, dev.to, YouTube, office hours, newsletter | Human channels | Draft one short dev.to post at `docs/posts/devto.md` ("Settling a deal between two private limits in an MCP server") for Tony to review and publish. Nothing else. |
+
+## C. Rules Tony must confirm
+
+Devpost returns 403 to fetches, so Tony reads the rules signed in and pastes
+the relevant parts into `docs/HACKATHON_RULES.md`. Codex then updates
+[AWARD_GAPS.md](AWARD_GAPS.md) and [SUBMISSION.md](SUBMISSION.md) to match:
+
+- Can one project enter Alexa+ and also Ring, or must the Ring work be framed
+  inside the Alexa+ entry?
+- Bee track: does it need live data from a Bee device?
+- Open Source: does a contribution to our own new repo (pairing-core) count, or
+  must it be a third-party project?
+
+## D. Human-only (Tony)
+
+Deploy (`deploy/aws/deploy.sh`, `agents/agentcore/deploy.sh`), Ring Playground
+token and footage, Login with Amazon security profile, run `npm run evidence`,
+open the upstream issues and PRs from B8, publish the dev.to post if wanted,
+record the video, real pilot numbers only, Devpost form with per-tool feedback.
+
+## Status
+
+| Item | Status |
+|---|---|
+| A1 design pass merged | open |
+| A2 demo page | open |
+| A3 superseded branches checked | open |
+| A4 Ring/delivery browser check | open |
+| A5 housekeeping | open |
+| A6 release check 0.8.0 | open |
+| B1 Agent Skills spec | open |
+| B2 Streamable HTTP conformance | open |
+| B3 Builder Tools feedback | open |
+| B4–B6 Ring starter, UX guide, webhooks | open |
+| B7 Bee CLI and Skill | open |
+| B8 upstream contributions | open |
+| B9 evidence script | open |
+| B11 dev.to draft | open |
+
+---
+
+> Round 1, completed locally on October 20, 2026: all six branches merged into main and renamed PairUp 0.6.0. See [HANDOFF.md](HANDOFF.md) and [VALIDATION.md](VALIDATION.md). The original instructions below are retained as a record.
+
+# Handoff to Codex, round 1 (2026-10-20, HKT afternoon)
 
 Claude's session limit is close. Finish every open piece below, merge it all
 into `main`, rename the product, and leave the repo ready to record the demo
