@@ -1,4 +1,5 @@
 import type { Ai, Condition } from "../ai/index.js";
+import { mockExtractIntent } from "../ai/mock.js";
 import { toVector, type Db } from "../db/client.js";
 import { logEvent, shortId } from "./events.js";
 import { findIntentsForListing, findMatchesForIntent } from "./matching.js";
@@ -273,7 +274,11 @@ export async function postRequest(deps: Deps, input: PostRequestInput) {
   if (!input.need && !input.raw_request) throw new MarketError("Tell me what you need.");
 
   // Structured fields from the voice agent win; extraction fills the gaps.
-  const extracted = input.raw_request ? await ai.extractIntent(input.raw_request) : undefined;
+  const extracted = input.raw_request
+    ? input.need && input.kind && input.max_price != null
+      ? mockExtractIntent(input.raw_request)
+      : await ai.extractIntent(input.raw_request)
+    : undefined;
   const kind = input.kind ?? extracted?.kind ?? "item";
   const unit = unitFor(kind, input.price_unit ?? extracted?.price_unit);
   const need = input.need ?? extracted?.need ?? input.raw_request!;
