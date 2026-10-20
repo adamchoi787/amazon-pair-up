@@ -1,9 +1,9 @@
 ---
 name: amazonpairup
-description: Buy, sell or get small jobs done between people through the AmazonPairUp MCP server. Use when the user wants to sell an item, offer a service (errands, deliveries, event help, tutoring), find an item, get someone to do a task, or check on their deals and meet-ups. Covers posting, reading a proposed deal, confirming only on an explicit yes, private price limits, price checks and retries.
+description: Buy, sell or get small jobs done between people through the AmazonPairUp MCP server. Use when the user wants to sell an item, offer a service (errands, deliveries, event help, tutoring), find an item, get someone to do a task, or check on their deals and meet-ups, rate a deal or report someone. Covers posting, reading a proposed deal, confirming only on an explicit yes, private price limits, price checks, what can't be posted, ratings, reports and retries.
 license: MIT
 metadata:
-  version: "0.5.0"
+  version: "0.6.0"
   mcp-endpoint: https://d3cxpkmhl89rw9.cloudfront.net/mcp
   server-card: https://d3cxpkmhl89rw9.cloudfront.net/.well-known/mcp/server-card.json
 ---
@@ -23,7 +23,7 @@ into one tool call, read back the result, and ask for a yes.
   The user comes from the token; leave `user_id` out.
 - Locally (`npm start`): `http://127.0.0.1:3000/mcp` with an `X-User-Id` header.
 
-## The five rules
+## The six rules
 
 1. **Confirm only on an explicit yes.** Call `confirm_deal` only when the user's
    latest words are a yes to the deal you just read out. Anything else: ask.
@@ -37,6 +37,10 @@ into one tool call, read back the result, and ask for a yes.
 5. **Retry with the same key.** Send a fresh `idempotency_key` (a UUID) with
    every write tool; if a call times out, send it again with the same key. The
    first result comes back and nothing is posted twice.
+6. **No workarounds.** Weapons, drugs, alcohol, tobacco, prescription medicine,
+   recalled or counterfeit goods, fake documents, cheating, adult services, live
+   animals and illegal services can't be posted. When a post is refused, speak
+   its `say`; never reword the post to get it through.
 
 ## Which tool
 
@@ -54,6 +58,8 @@ into one tool call, read back the result, and ask for a yes.
 | "Any news?" / "When is my meet-up?" | `get_deal_status` |
 | "What am I selling?" | `list_my_posts` |
 | "Take down my calculator" | `list_my_posts`, confirm which one, then `withdraw_post` |
+| "It went great" (after a confirmed deal) | `rate_deal` with that `deal_id` and `stars` 1-5 |
+| "The seller never showed up" / "This is a scam" | Confirm, then `report_user` with the `deal_id` (or the offer's `post_id`) and a `reason` |
 
 `post_offer` and `post_request` pair and settle in the same call. When the
 result has a `deal`, read it out and ask "Should I confirm it?". When `deal` is
@@ -80,9 +86,26 @@ Good: "Found it: TI-84 Plus for $18, $2 below asking, meet-up at HKUST campus. S
 - No deal after `negotiate`, with `say` naming the asking price ("It's $20.
   Want it at that price?"): a buyer gets one offer below the asking price per
   offer. On a yes, call `negotiate` again with `max_price` set to that asking price.
+- `code: "prohibited_item"` or `"restricted_item"`: the market doesn't allow
+  that item or service (`category` says which). Speak `say` and stop; don't
+  retry with other words.
+- `code: "account_under_review"` or `"account_suspended"`: other people reported
+  this user and a reviewer is looking at it. Speak `say`; nothing else can be done here.
+- `code: "not_confirmed"` or `"already_rated"` from `rate_deal`: a deal can be
+  rated once both sides confirmed it, once per side.
 - `code: "idempotency_conflict"`: you reused a key for a different action. Use a new key.
 - `code: "in_progress"`: the first copy of this call is still running. Wait a moment and retry with the same key.
 - Any other error: speak its `say`. It is written for the user.
+
+## Ratings and reports
+
+After a deal is confirmed, you may ask "How did it go, out of five?" and call
+`rate_deal`. Ratings stay private and help the market pair people who follow
+through. When the user says they were scammed, someone didn't show up, the item
+wasn't as described, or they felt unsafe, confirm and call `report_user` with
+the matching `reason`. The two are never paired again and any open deal
+between them is cancelled. For `unsafe`, the `say` starts by pointing the user
+to emergency services: always read it in full.
 
 ## Example
 

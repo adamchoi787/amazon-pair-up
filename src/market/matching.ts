@@ -8,7 +8,9 @@ import type { BuyIntentRow, ListingRow } from "./types.js";
 //                          a deal is possible (seller min <= buyer max, and the
 //                          full ask once this buyer's lower offer failed; evaluated
 //                          server-side, never exposed), request not expired, and
-//                          the pair was not declined or left to expire before
+//                          the pair was not declined or left to expire before,
+//                          both people are in good standing and neither
+//                          reported the other (src/market/trust.ts)
 //   2. semantic score    — pgvector cosine similarity of the stored embeddings
 //   3. keyword score     — Postgres full-text rank (OR of the request's words)
 //   4. price fit         — 1 if the ask is within budget, decays above it
@@ -30,6 +32,15 @@ const rank = (col: string) => CONDITION_RANK.replace("%s", col);
 const priceFits = (l: string, budget: string, buyer: string) =>
   `(${l}.min_price <= ${budget} AND (${l}.ask_price <= ${budget} OR NOT EXISTS (
      SELECT 1 FROM failed_offers f WHERE f.listing_id = ${l}.id AND f.buyer_id = ${buyer})))`;
+
+/**
+ * Seller and buyer may be paired: neither is under review or suspended, and
+ * neither has reported the other (src/market/trust.ts), unless that report was dismissed.
+ */
+const pairable = (seller: string, buyer: string) => `
+  NOT EXISTS (SELECT 1 FROM users u WHERE u.id IN (${seller}, ${buyer}) AND u.review_status <> 'active')
+  AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.status <> 'dismissed'
+                  AND ((r.reporter_id = ${seller} AND r.reported_id = ${buyer}) OR (r.reporter_id = ${buyer} AND r.reported_id = ${seller})))`;
 
 const SCORE = `(${WEIGHTS.semantic} * semantic + ${WEIGHTS.keyword} * keyword
                + ${WEIGHTS.price} * price_fit + ${WEIGHTS.location} * loc)::float8`;
@@ -92,6 +103,7 @@ export async function findMatchesForIntent(
         AND ${opts.priceBlocked ? `NOT ${fits}` : fits}
         AND (l.kind = 'service' OR ${rank("l.condition")} >= ${rank("$6")})
         AND l.embedding IS NOT NULL
+        AND ${pairable("l.seller_id", "$3")}
         AND NOT EXISTS (SELECT 1 FROM deals d
                         WHERE d.listing_id = l.id AND d.buy_intent_id = $1 AND d.status IN ('declined', 'expired'))
     )
@@ -141,6 +153,7 @@ export async function findIntentsForListing(
         AND l.embedding IS NOT NULL
         AND i.embedding IS NOT NULL
         AND (i.needed_by IS NULL OR i.needed_by > now())
+        AND ${pairable("l.seller_id", "i.buyer_id")}
         AND NOT EXISTS (SELECT 1 FROM deals d
                         WHERE d.listing_id = l.id AND d.buy_intent_id = i.id AND d.status IN ('declined', 'expired'))
     )

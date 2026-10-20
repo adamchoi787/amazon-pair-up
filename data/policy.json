@@ -1,0 +1,434 @@
+{
+  "_note": "What may not be offered or requested on AmazonPairUp, items and services alike (src/market/policy.ts). Modelled on Amazon's restricted-products policy for a person-to-person market. 'prohibited' is never allowed; 'restricted' needs ('why', spoken to the user) a licence, an age check or a vet that a person-to-person market can't provide, so it is not allowed here either. 'keywords' and 'allow' are case-insensitive regular expressions matched on whole words; 'allow' phrases are removed before the keywords are checked (a glue gun is not a gun). 'examples' are embedded and compared by meaning, to catch wording the keywords miss. Edit freely: entries are re-embedded only when they change.",
+  "categories": [
+    {
+      "id": "weapons",
+      "label": "Weapons, ammunition and explosives",
+      "severity": "prohibited",
+      "keywords": [
+        "guns?",
+        "firearms?",
+        "handguns?",
+        "shotguns?",
+        "rifles?",
+        "pistols?",
+        "revolvers?",
+        "glocks?",
+        "ar-?15s?",
+        "ammo",
+        "ammunition",
+        "bullets?",
+        "silencers?",
+        "suppressors?",
+        "gun parts?",
+        "tasers?",
+        "stun guns?",
+        "pepper spray",
+        "switchblades?",
+        "butterfly knife",
+        "butterfly knives",
+        "brass knuckles?",
+        "knuckle dusters?",
+        "crossbows?",
+        "explosives?",
+        "grenades?",
+        "gunpowder",
+        "fireworks?",
+        "firecrackers?"
+      ],
+      "allow": [
+        "(glue|heat|nerf|water|toy|staple|nail|spray|massage|caulk|caulking|grease|paint|bubble|airbrush|price|label|tattoo|soldering|foam|rivet) (guns?|pistols?)",
+        "gun ?metal",
+        "top gun",
+        "bullet (journals?|points?|list)",
+        "bullet ?proof (coffee|vest)?"
+      ],
+      "examples": [
+        "handgun for sale",
+        "hunting rifle with scope",
+        "box of 9mm ammunition",
+        "selling a pistol",
+        "homemade explosives",
+        "butterfly knife",
+        "stun gun for self defence"
+      ]
+    },
+    {
+      "id": "drugs",
+      "label": "Illegal drugs and drug paraphernalia",
+      "severity": "prohibited",
+      "keywords": [
+        "cocaine",
+        "heroin",
+        "meth",
+        "methamphetamine",
+        "crystal meth",
+        "mdma",
+        "ecstasy",
+        "lsd",
+        "acid tabs?",
+        "weed",
+        "marijuana",
+        "cannabis",
+        "thc",
+        "hash",
+        "hashish",
+        "ketamine",
+        "fentanyl",
+        "magic mushrooms?",
+        "shrooms",
+        "psilocybin",
+        "dmt",
+        "ghb",
+        "bongs?",
+        "crack cocaine",
+        "crack (pipes?|rocks?)"
+      ],
+      "allow": [
+        "weed (killer|whacker|wacker|trimmer|control|barrier|puller)",
+        "weed (the|my|your|a) (garden|yard|lawn|beds?|patio)",
+        "hash ?(browns?|tags?|map|maps|table|tables|function|functions)",
+        "acid (reflux|free)",
+        "(citric|lactic|hyaluronic|salicylic|folic) acid"
+      ],
+      "examples": [
+        "bag of weed",
+        "gram of cocaine",
+        "weed gummies",
+        "selling ecstasy pills",
+        "magic mushrooms",
+        "ketamine for a party",
+        "glass bong"
+      ]
+    },
+    {
+      "id": "prescription_medicine",
+      "label": "Prescription medicines",
+      "severity": "restricted",
+      "why": "they need a prescription and a pharmacist",
+      "keywords": [
+        "prescription",
+        "prescriptions",
+        "adderall",
+        "xanax",
+        "oxycodone",
+        "oxycontin",
+        "codeine",
+        "tramadol",
+        "valium",
+        "diazepam",
+        "ritalin",
+        "modafinil",
+        "vicodin",
+        "morphine",
+        "antibiotics?",
+        "amoxicillin",
+        "insulin",
+        "sleeping pills?",
+        "viagra",
+        "cialis",
+        "ozempic",
+        "wegovy",
+        "anabolic",
+        "testosterone",
+        "anabolic steroids?"
+      ],
+      "allow": [
+        "prescription (glasses|sunglasses|lenses|goggles|swim goggles)",
+        "non-?prescription",
+        "over[- ]the[- ]counter"
+      ],
+      "examples": [
+        "adderall pills",
+        "leftover prescription painkillers",
+        "antibiotics without a prescription",
+        "study drugs before exams",
+        "sleeping pills",
+        "insulin pens"
+      ]
+    },
+    {
+      "id": "alcohol",
+      "label": "Alcohol",
+      "severity": "restricted",
+      "why": "selling it needs an age check and a licence",
+      "keywords": [
+        "alcohol",
+        "alcoholic",
+        "beers?",
+        "wines?",
+        "vodka",
+        "whisky",
+        "whiskey",
+        "liquor",
+        "soju",
+        "champagne",
+        "prosecco",
+        "rum",
+        "gin",
+        "tequila",
+        "baijiu",
+        "brandy",
+        "cognac",
+        "cider",
+        "booze",
+        "hard seltzer",
+        "bottles? of sake",
+        "japanese sake",
+        "sake (bottles?|set)"
+      ],
+      "allow": [
+        "(beer|wine|whisky|whiskey|champagne|cocktail|sake|shot) (glass|glasses|opener|openers|rack|racks|mug|mugs|cooler|stopper|decanter|fridge|pong|stein)",
+        "alcohol[- ](wipes?|free|swabs?|pads?|ink|markers?|lamp|burner|stove)",
+        "rubbing alcohol",
+        "(apple )?cider vinegar",
+        "ginger",
+        "school spirit",
+        "team spirit",
+        "rum ?(cake|balls?) recipe",
+        "root beer",
+        "ginger beer"
+      ],
+      "examples": [
+        "bottle of vodka",
+        "case of beer",
+        "red wine for a party",
+        "case of lager",
+        "whisky collection",
+        "bottle of tequila"
+      ]
+    },
+    {
+      "id": "tobacco",
+      "label": "Tobacco and vaping products",
+      "severity": "restricted",
+      "why": "selling them needs an age check and a licence",
+      "keywords": [
+        "cigarettes?",
+        "cigs?",
+        "cigars?",
+        "tobacco",
+        "vapes?",
+        "vaping",
+        "e-?cigarettes?",
+        "e-?cigs?",
+        "juul",
+        "nicotine",
+        "shisha",
+        "hookah",
+        "snus",
+        "rolling papers?",
+        "heets",
+        "iqos"
+      ],
+      "allow": [
+        "nicotine (patch|patches|gum|lozenges?)",
+        "quit (smoking|vaping)",
+        "cigarette (lighter|socket) (charger|adapter)"
+      ],
+      "examples": [
+        "pack of cigarettes",
+        "disposable vape",
+        "e-cigarette pods",
+        "carton of cigarettes",
+        "shisha tobacco"
+      ]
+    },
+    {
+      "id": "recalled",
+      "label": "Recalled products",
+      "severity": "prohibited",
+      "keywords": [
+        "recalled",
+        "under recall",
+        "safety recall",
+        "recall notice",
+        "galaxy note ?7"
+      ],
+      "allow": [],
+      "examples": [
+        "recalled baby car seat",
+        "product under a safety recall",
+        "Samsung Galaxy Note 7",
+        "recalled hoverboard"
+      ]
+    },
+    {
+      "id": "counterfeit",
+      "label": "Counterfeit, pirated and fake goods",
+      "severity": "prohibited",
+      "keywords": [
+        "counterfeits?",
+        "knock-?offs?",
+        "bootleg",
+        "bootlegged",
+        "pirated",
+        "first copy",
+        "aaa replica",
+        "1:1 replica",
+        "(fake|replica|imitation|copy) (rolex|gucci|louis vuitton|lv|chanel|prada|hermes|dior|nike|jordans?|yeezys?|designer|brand|branded|airpods|watch|watches|handbags?|bags?|sneakers?|shoes|perfume)",
+        "cracked (software|windows|office|adobe|photoshop|games?|apps?)",
+        "(fake|forged) (money|bills?|notes|currency|banknotes?)"
+      ],
+      "allow": [],
+      "examples": [
+        "replica Rolex watch",
+        "fake designer handbag",
+        "knockoff AirPods",
+        "pirated movies on a USB stick",
+        "cracked Photoshop licence"
+      ]
+    },
+    {
+      "id": "documents",
+      "label": "Fake documents, IDs and accounts",
+      "severity": "prohibited",
+      "keywords": [
+        "(fake|forged|novelty|replica|counterfeit) (ids?|passports?|licen[cs]es?|driver'?s licen[cs]es?|student ids?|degrees?|diplomas?|certificates?|transcripts?|documents?|visas?|hkids?)",
+        "(sell|selling|buy|buying) (my |an? |your )?(passport|hkid|identity card|id card)",
+        "(netflix|spotify|disney\\+?|steam|instagram|tiktok|gmail|chatgpt|apple) accounts?",
+        "(account|login) (credentials|passwords?)",
+        "credit card (numbers?|details|dumps)",
+        "cvv",
+        "stolen (goods|items?|phones?|iphones?|bikes?|bicycles?|laptops?|property|cards?|cars?|scooters?|watches?)"
+      ],
+      "allow": [],
+      "examples": [
+        "fake ID card",
+        "forged university diploma",
+        "selling a Netflix account",
+        "stolen credit card numbers",
+        "stolen bike"
+      ]
+    },
+    {
+      "id": "academic_dishonesty",
+      "label": "Cheating services",
+      "severity": "prohibited",
+      "keywords": [
+        "(write|writes|writing|do|doing|finish) (my|your|an?|the)( [a-z]+)? (essay|essays|thesis|dissertation|assignment|assignments|paper|papers|coursework|lab report|homework|final project)",
+        "(take|taking|sit|sitting) (my|your)( [a-z]+)? (exam|exams|test|tests|quiz|quizzes|midterm|midterms|final|finals)",
+        "ghost ?writ(e|er|ers|ing)",
+        "exam (answers|leaks?|papers? leak)",
+        "leaked (exam|test|paper)",
+        "essay mill",
+        "contract cheating",
+        "impersonat(e|ion) (in|for) (an? |the )?exam",
+        "(take|taking|sit|sitting) (an? |the )?(exam|test|quiz|midterm|final) for (me|you|someone)"
+      ],
+      "allow": [],
+      "examples": [
+        "write my essay for me",
+        "take my online exam",
+        "do my assignment for money",
+        "leaked final exam answers",
+        "ghostwriter for my thesis"
+      ]
+    },
+    {
+      "id": "adult_services",
+      "label": "Adult and sexual services",
+      "severity": "prohibited",
+      "keywords": [
+        "sexual services?",
+        "sex work",
+        "prostitut(e|es|ion)",
+        "happy ending",
+        "sugar (daddy|daddies|baby|babies|mommy|mama)",
+        "(adult|erotic|sensual|nude|naked|body ?to ?body) massages?",
+        "nudes",
+        "porn",
+        "pornography",
+        "onlyfans",
+        "one night stand",
+        "girlfriend experience",
+        "used (underwear|panties|socks)",
+        "webcam (girl|model|show)s?",
+        "escort (services?|girls?|agency|agencies)",
+        "(hire|book|need|want|looking for) an? escort",
+        "escorting"
+      ],
+      "allow": [],
+      "examples": [
+        "escort for tonight",
+        "massage with a happy ending",
+        "looking for a sugar daddy",
+        "selling nude photos",
+        "adult entertainment at my hotel"
+      ]
+    },
+    {
+      "id": "animals",
+      "label": "Live animals and wildlife products",
+      "severity": "restricted",
+      "why": "they need a licensed breeder or shelter",
+      "keywords": [
+        "pupp(y|ies)",
+        "kittens?",
+        "(dog|dogs|cat|cats|rabbit|rabbits|hamster|hamsters|parrot|parrots|bird|birds|snake|snakes|turtle|turtles|tortoise|tortoises|lizard|lizards|fish|ferret|ferrets) for (sale|adoption|rehoming)",
+        "(sell|selling|buy|buying|rehome|rehoming) (my |a |an |your |some |the )?(dog|cat|puppy|kitten|rabbit|hamster|parrot|bird|snake|turtle|tortoise|lizard|pet|pets|fish|ferret|chicks?|animal|animals)",
+        "live (animals?|insects?|reptiles?|fish|crickets|mice|snakes?|birds?)",
+        "ivory",
+        "rhino horn",
+        "shark fins?",
+        "pangolin",
+        "tiger (skin|bone|parts)",
+        "endangered (species|animals?)",
+        "exotic (pets?|animals?)",
+        "taxiderm(y|ied)"
+      ],
+      "allow": [
+        "(dog|cat|puppy|kitten|pet|rabbit|hamster|bird|fish|parrot|reptile|snake|turtle)s? (sitting|sitter|sitters|walking|walker|walkers|grooming|groomer|training|trainer|food|bowls?|toys?|beds?|cages?|tanks?|carriers?|leash(es)?|collars?|litter|feeders?|treats|houses?|crates?|clothes|hair|shampoo|boarding|care|feeding|minding|pads)",
+        "ivory (white|colou?r|color|paint|soap|keys? cover)",
+        "(fish|cat|dog) shaped",
+        "goldfish crackers",
+        "fish (and chips|ball|balls|sauce|fillet|oil|tank)",
+        "kitten heels?"
+      ],
+      "examples": [
+        "puppies for sale",
+        "selling my kitten",
+        "pet snake for rehoming",
+        "ivory carving",
+        "exotic parrot for sale",
+        "box of live crickets"
+      ]
+    },
+    {
+      "id": "illegal_services",
+      "label": "Illegal and harmful services",
+      "severity": "prohibited",
+      "keywords": [
+        "hack (into|someone|my (ex|girlfriend|boyfriend)|an? (account|phone|instagram|facebook|email))",
+        "hacking services?",
+        "hacker for hire",
+        "ddos",
+        "phishing",
+        "malware",
+        "spyware",
+        "keyloggers?",
+        "fake reviews?",
+        "launder(ing)? money",
+        "money laundering",
+        "money mule",
+        "carry (a |my |this )?(package|parcel|bag|suitcase) (across|over|through) the border",
+        "smuggl(e|ing|er)",
+        "debt collector to threaten",
+        "beat (someone|him|her|them) up",
+        "track (my|someone'?s?) (ex|girlfriend|boyfriend|wife|husband|partner)",
+        "(buy|sell|selling|buying)( [a-z]+)? (followers|likes|upvotes|reviews)",
+        "stalk (my|someone|her|him|them)"
+      ],
+      "allow": [
+        "(malware|virus|spyware) (removal|clean[- ]?up|scans?|protection)"
+      ],
+      "examples": [
+        "hack into my ex's Instagram",
+        "write fake five-star reviews",
+        "smuggling goods across the border",
+        "track my girlfriend's phone",
+        "buy Instagram followers"
+      ]
+    }
+  ]
+}

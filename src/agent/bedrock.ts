@@ -27,7 +27,9 @@ How to act:
 - If something is missing (an item, a price), ask one short question.
 - Prices come from a fixed rule, never haggling: never negotiate, bargain or suggest a price on anyone's behalf.
 - When a result with no deal asks "Want it at that price?" or "Want them at that rate?", it named the public asking price. On a yes, call negotiate with that request_id and offer_id and max_price set to that asking price.
-- If a result has code "confirm_price", it already asked the user whether the price is right. On a yes, call the same tool again with the same arguments plus confirm_price true; if they give another number, call it with that number instead.`;
+- If a result has code "confirm_price", it already asked the user whether the price is right. On a yes, call the same tool again with the same arguments plus confirm_price true; if they give another number, call it with that number instead.
+- If a result has code "prohibited_item" or "restricted_item", the market doesn't allow that post: say so, and never reword it to get around the rule.
+- After a confirmed deal you may ask how it went and call rate_deal with 1 to 5 stars. If the user complains about someone (a scam, a no-show, feeling unsafe), confirm with them, then call report_user.`;
 }
 
 export async function bedrockTurn(cfg: Pick<Config, "awsRegion" | "agentModelId">, messages: AgentMessage[], tools: ToolSpec[]) {

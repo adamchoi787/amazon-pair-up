@@ -157,6 +157,14 @@ flowchart TB
 | `confirm_deal` / `decline_deal` | Each side's yes or no; a no re-pairs both posts |
 | `get_deal_status` | Deals and jobs waiting for your yes first, with counterpart, place and time |
 | `list_my_posts` / `withdraw_post` | Your offers and requests; take one down, releasing any deal it held |
+| `rate_deal` | 1 to 5 stars for the other side of a confirmed deal, once per side; feeds the track records the ranking learns from |
+| `report_user` | Report the other side of a deal or the owner of an offer; the two are never paired again, and enough reports put someone under review |
+
+Weapons, drugs, alcohol and tobacco, prescription medicine, recalled and
+counterfeit goods, fake documents, cheating, adult services, live animals and
+illegal services can't be posted, as items or as services: a keyword policy plus
+an embedding match against [data/policy.json](data/policy.json) refuses them
+before anything is stored, with a spoken `say` and an error `code`.
 
 Every tool declares an output schema and annotations, and every write takes an
 optional `idempotency_key` so a retried call never posts or confirms twice. Deals nobody answers expire (by the request's deadline at the latest)
@@ -193,7 +201,10 @@ without a human wiring it up:
 - **Safety:** OAuth 2.1 with PKCE, Origin validation, CDN-only origin, per-caller rate
   limits, per-user posting limits, bounded inputs, private limits redacted in one
   place and leak-tested.
-- **Tests:** 91 server tests (unit, end-to-end over MCP, HTTP, OAuth, schemas, privacy,
+- **Trust and safety:** a prohibited and restricted items and services policy
+  checked before every post, reports with a review queue on the dashboard, and
+  ratings that feed each person's track record.
+- **Tests:** 97 server tests (unit, end-to-end over MCP, HTTP, OAuth, schemas, privacy,
   idempotency) plus the Strands agent against a real server, on every push.
 
 ## Repo map
@@ -201,7 +212,7 @@ without a human wiring it up:
 ```
 src/
   index.ts               entry point
-  app.ts                 HTTP: /mcp (Streamable HTTP), /api/agent, /api/me, /health, /api/dashboard, OAuth routes
+  app.ts                 HTTP: /mcp (Streamable HTTP), /api/agent, /api/me, /health, /api/dashboard, /api/review, OAuth routes
   auth/oauth.ts          OAuth 2.1 account linking (PKCE, protected-resource metadata)
   mcp/server.ts          MCP tool definitions
   mcp/schemas.ts         output schemas for every tool
@@ -214,6 +225,8 @@ src/
   market/negotiation.ts  price settlement via pairing-core (Rust → WebAssembly)
   market/pricing.ts      price check: reference prices, robust trade-history range
   market/learning.ts     learning to pair better: features, model, guarded rollout
+  market/policy.ts       what may be posted: keyword rules + embedding match (data/policy.json)
+  market/trust.ts        reports, review status and the review queue
   market/service.ts      business operations behind each tool
   market/views.ts        the only place rows become output (privacy redaction)
   market/idempotency.ts  retry-safe writes (idempotency_key)
@@ -226,6 +239,7 @@ public/app/              web app shell + built bundle (npm run build:web)
 public/mcp-apps/         built single-file MCP Apps view
 public/dashboard/        operations dashboard
 data/seed-listings.json  seed market: 162 posts from 22 people, items and services
+data/policy.json         prohibited and restricted items and services
 skills/amazonpairup/     the Agent Skill (SKILL.md)
 agents/agentcore/        Strands Agents voice agent for Amazon Bedrock AgentCore Runtime
 scripts/                 seed, smoke test, add-on assets

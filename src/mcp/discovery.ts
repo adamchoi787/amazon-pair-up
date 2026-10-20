@@ -99,6 +99,8 @@ export async function llmsTxt(deps: Deps, cfg: Pick<Config, "publicBaseUrl" | "a
 - Never ask for or reveal anyone else's private limit (min_price, max_price). Prices are set by the server, never haggled.
 - Every result has a \`say\` sentence you can speak as is. An error with code \`confirm_price\` asks the user to check a price.
 - Send a fresh \`idempotency_key\` with each write and reuse it on a retry.
+- A post refused with code \`prohibited_item\` or \`restricted_item\` is not allowed on this market: speak its \`say\` and never reword it to get through.
+- Report a user only after confirming with them; rate a deal only once it is confirmed.
 
 ## Tools
 

@@ -34,8 +34,8 @@ export const FEATURES = [
   "has_availability",   // the offer says when they can meet or work
   "offers_delivery",    // the offer mentions delivering or dropping off
   "price_vs_typical",   // price against the typical range (0.5 = middle; 0.5 when unknown)
-  "seller_track",       // the seller's past deals that closed (smoothed)
-  "buyer_track",        // the buyer's past deals that closed (smoothed)
+  "seller_track",       // the seller's past deals that closed and their ratings (smoothed)
+  "buyer_track",        // the buyer's past deals that closed and their ratings (smoothed)
   "is_service",
 ] as const;
 export type FeatureName = (typeof FEATURES)[number];
@@ -56,9 +56,14 @@ export interface Tracks {
   buyer: Map<string, number>;
 }
 
-/** Smoothed share of each person's past closed-or-failed deals that closed, as seller and as buyer. */
+/**
+ * Each person's track record as seller and as buyer: their past deals that
+ * closed and the stars the other side gave them (rate_deal), in one smoothed
+ * share. A closed deal counts 1 and a failed one 0; a rating counts
+ * (stars - 1) / 4, so five stars is another success and one star a failure.
+ */
 export async function loadTracks(db: Db, sellerIds: string[], buyerIds: string[]): Promise<Tracks> {
-  const rate = async (column: "l.seller_id" | "i.buyer_id", ids: string[]) => {
+  const rate = async (column: "l.seller_id" | "i.buyer_id", role: "seller" | "buyer", ids: string[]) => {
     if (!ids.length) return new Map<string, number>();
     const { rows } = await db.query<{ id: string; won: number; n: number }>(
       `SELECT ${column} AS id,
@@ -68,10 +73,21 @@ export async function loadTracks(db: Db, sellerIds: string[], buyerIds: string[]
        WHERE ${column} = ANY($1::text[]) GROUP BY ${column}`,
       [ids],
     );
+    const stars = await db.query<{ id: string; score: number; n: number }>(
+      `SELECT ratee_id AS id, sum((stars - 1) / 4.0)::float8 AS score, count(*)::int AS n
+       FROM ratings WHERE ratee_role = $2 AND ratee_id = ANY($1::text[]) GROUP BY ratee_id`,
+      [ids, role],
+    );
+    const evidence = new Map<string, { won: number; n: number }>();
+    for (const r of rows) evidence.set(r.id, { won: Number(r.won), n: Number(r.n) });
+    for (const r of stars.rows) {
+      const e = evidence.get(r.id) ?? { won: 0, n: 0 };
+      evidence.set(r.id, { won: e.won + Number(r.score), n: e.n + Number(r.n) });
+    }
     // (won + 1) / (n + 2): a newcomer starts at 0.5 and moves with evidence.
-    return new Map(rows.map((r) => [r.id, (Number(r.won) + 1) / (Number(r.n) + 2)]));
+    return new Map([...evidence].map(([id, e]) => [id, (e.won + 1) / (e.n + 2)]));
   };
-  return { seller: await rate("l.seller_id", sellerIds), buyer: await rate("i.buyer_id", buyerIds) };
+  return { seller: await rate("l.seller_id", "seller", sellerIds), buyer: await rate("i.buyer_id", "buyer", buyerIds) };
 }
 
 export function featuresOf(c: Candidate, tracks: Tracks, now = new Date()): Features {
