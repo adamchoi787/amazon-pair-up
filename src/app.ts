@@ -8,7 +8,7 @@ import { oauthRouter, sendUnauthorized, userForAccessToken, WEB_CLIENT_ID, webRe
 import type { Config } from "./config.js";
 import { accessLog, log, requestId } from "./http/log.js";
 import { rateLimit } from "./http/rateLimit.js";
-import { dashboard, type Deps } from "./market/service.js";
+import { dashboard, MarketError, reviewUser, type Deps } from "./market/service.js";
 import { llmsTxt, serverCard } from "./mcp/discovery.js";
 import { createMcpServer, SERVER_INFO } from "./mcp/server.js";
 
@@ -175,18 +175,36 @@ export function createApp(deps: Deps, cfg: Config) {
     }
   });
 
-  // Live operations dashboard: every post and deal, without private limits.
-  // Open in local development (AUTH_MODE=none); otherwise it needs DASHBOARD_TOKEN
-  // as a Bearer token, and it is off when no token is configured.
+  // Live operations dashboard: every post and deal, without private limits, and
+  // the review queue. Open in local development (AUTH_MODE=none); otherwise it
+  // needs DASHBOARD_TOKEN as a Bearer token, and it is off when no token is configured.
+  const operator = (req: express.Request, res: express.Response) => {
+    if (cfg.authMode === "none" && !cfg.dashboardToken) return true;
+    const given = req.header("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1] ?? "";
+    if (cfg.dashboardToken && sameSecret(given, cfg.dashboardToken)) return true;
+    res.status(cfg.dashboardToken ? 401 : 404).json({ error: cfg.dashboardToken ? "unauthorized" : "not found" });
+    return false;
+  };
   app.get("/api/dashboard", async (req, res) => {
-    if (cfg.authMode !== "none" || cfg.dashboardToken) {
-      const given = req.header("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1] ?? "";
-      if (!cfg.dashboardToken || !sameSecret(given, cfg.dashboardToken)) {
-        res.status(cfg.dashboardToken ? 401 : 404).json({ error: cfg.dashboardToken ? "unauthorized" : "not found" });
-        return;
-      }
-    }
+    if (!operator(req, res)) return;
     res.set("Cache-Control", "no-store").json(await dashboard(deps.db));
+  });
+  // A reviewer's decision on someone in the review queue: { user_id, decision: "reinstate" | "suspend" }.
+  app.post("/api/review", checkOrigin, express.json({ limit: "4kb" }), async (req, res) => {
+    if (!operator(req, res)) return;
+    const { user_id: userId, decision } = (req.body ?? {}) as { user_id?: unknown; decision?: unknown };
+    if (typeof userId !== "string" || (decision !== "reinstate" && decision !== "suspend")) {
+      res.status(400).json({ error: "send { user_id, decision: 'reinstate' | 'suspend' }" });
+      return;
+    }
+    try {
+      const result = await reviewUser(deps, userId, decision);
+      log("info", "review decision", { requestId: res.locals.requestId, userId, decision });
+      res.set("Cache-Control", "no-store").json(result);
+    } catch (err) {
+      if (!(err instanceof MarketError)) throw err;
+      res.status(404).json({ error: err.message });
+    }
   });
 
   app.use("/app", (_req, res, next) => {

@@ -155,6 +155,46 @@ CREATE TABLE IF NOT EXISTS idempotent_calls (
 );
 CREATE INDEX IF NOT EXISTS idempotent_calls_age_idx ON idempotent_calls (created_at);
 
+-- Trust and safety (src/market/policy.ts, src/market/trust.ts).
+-- policy_examples: phrases per prohibited category, embedded to catch posts by
+-- meaning. reports: one open report per reporter and reported user; a reporter
+-- and the person they reported are never paired. ratings: 1-5 stars per side
+-- of a confirmed deal; they feed the track records the ranking uses.
+-- users.review_status: active | under_review (enough people reported them;
+-- not paired until a reviewer decides) | suspended.
+CREATE TABLE IF NOT EXISTS policy_examples (
+  id          TEXT PRIMARY KEY,
+  category    TEXT NOT NULL,
+  text        TEXT NOT NULL,
+  hash        TEXT NOT NULL,
+  embedding   vector(${embeddingDim})
+);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reviewed_at   TIMESTAMPTZ;
+CREATE TABLE IF NOT EXISTS reports (
+  id           TEXT PRIMARY KEY,
+  reporter_id  TEXT NOT NULL REFERENCES users(id),
+  reported_id  TEXT NOT NULL REFERENCES users(id),
+  reason       TEXT NOT NULL,
+  deal_id      TEXT REFERENCES deals(id),
+  post_id      TEXT,
+  details      TEXT,
+  status       TEXT NOT NULL DEFAULT 'open',      -- open | dismissed | upheld
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS reports_open_idx ON reports (reporter_id, reported_id) WHERE status = 'open';
+CREATE INDEX IF NOT EXISTS reports_reported_idx ON reports (reported_id, status);
+CREATE TABLE IF NOT EXISTS ratings (
+  deal_id      TEXT NOT NULL REFERENCES deals(id),
+  rater_id     TEXT NOT NULL REFERENCES users(id),
+  ratee_id     TEXT NOT NULL REFERENCES users(id),
+  ratee_role   TEXT NOT NULL,                     -- buyer | seller: the role of the person rated
+  stars        INTEGER NOT NULL CHECK (stars BETWEEN 1 AND 5),
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (deal_id, rater_id)
+);
+CREATE INDEX IF NOT EXISTS ratings_ratee_idx ON ratings (ratee_id, ratee_role);
+
 -- Append-only audit trail; powers the dashboard.
 CREATE TABLE IF NOT EXISTS events (
   id          BIGSERIAL PRIMARY KEY,

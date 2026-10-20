@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CONDITIONS } from "../ai/index.js";
+import { REPORT_REASONS } from "../market/trust.js";
 import { KINDS } from "../market/types.js";
 
 // Output schemas for every tool. They mirror src/market/views.ts exactly, so
@@ -103,6 +104,21 @@ export const dealOut = z.object({
   updated_at: z.string(),
 });
 
+export const reportOut = z.object({
+  report_id: z.string(),
+  reason: z.enum(REPORT_REASONS),
+  deal_id: z.string().nullable(),
+  post_id: z.string().nullable(),
+  status: z.enum(["received", "already_reported"]).describe("already_reported = this user already has an open report about the same person"),
+  released_deal_id: z.string().nullable().describe("A proposed deal between the two, cancelled by the report"),
+}).describe("Never says who else reported the person or whether they are under review");
+
+export const ratingOut = z.object({
+  deal_id: z.string(),
+  stars: z.number().int().min(1).max(5),
+  rated_role: z.enum(["buyer", "seller"]).describe("The role of the person rated: the other side of the deal"),
+});
+
 export const outputs = {
   post_offer: {
     offer: offerOut,
@@ -149,4 +165,6 @@ export const outputs = {
     released_deal_id: z.string().nullable().describe("The proposed deal this post was holding, now released"),
     say,
   },
+  report_user: { report: reportOut, say },
+  rate_deal: { rating: ratingOut, say },
 };

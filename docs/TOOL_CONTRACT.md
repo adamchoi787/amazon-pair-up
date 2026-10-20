@@ -7,7 +7,7 @@ Identity and auth depend on `AUTH_MODE`:
 
 Every successful result is JSON (as text **and** `structuredContent`) with a `say` field: one sentence Alexa can speak as is.
 Every tool declares an `outputSchema` ([src/mcp/schemas.ts](../src/mcp/schemas.ts)) and annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint: false`).
-Errors come back as `isError: true` with `{ "say": "..." }`: a sentence the user can act on, or a short apology when something unexpected failed (details go to the server log). An error an agent can act on also carries a `code`: `confirm_price` (see [Price check](#price-check)), `idempotency_conflict` or `in_progress` (see [Retries](#retries-idempotency_key)).
+Errors come back as `isError: true` with `{ "say": "..." }`: a sentence the user can act on, or a short apology when something unexpected failed (details go to the server log). An error an agent can act on also carries a `code`: `confirm_price` (see [Price check](#price-check)), `idempotency_conflict` or `in_progress` (see [Retries](#retries-idempotency_key)), `prohibited_item` or `restricted_item` (see [What can be posted](#what-can-be-posted)), `account_under_review` or `account_suspended` (see [Reports and review](#reports-and-review)), `not_confirmed` or `already_rated` (see [`rate_deal`](#rate_deal)).
 Inputs are bounded (text lengths, prices up to 100,000, quantities up to 1,000, hours up to 336).
 
 ## One market for things and services
@@ -37,7 +37,8 @@ call. A post with no counterpart waits and is paired when one arrives.
   rank the relevant ones. Ties go to the earlier post.
 - **Hard constraints:** same kind and price unit, enough quantity and the wanted
   condition (items), a price both limits allow, the request's deadline still ahead,
-  and the pair not declined or left to expire before.
+  the pair not declined or left to expire before, both people in good standing,
+  and neither having reported the other.
 - **One hold at a time:** an offer (`pending`) and a request (`matched`) are each
   held by at most one proposed deal. Both are claimed in one SQL statement, so
   concurrent posts can never double-book an item or a runner.
@@ -83,7 +84,7 @@ call. A post with no counterpart waits and is paired when one arrives.
 
 Voice hosts and agents retry when a response is slow or lost. Every tool that
 changes the market (`post_offer`, `post_request`, `negotiate`, `confirm_deal`,
-`decline_deal`, `withdraw_post`) takes an optional `idempotency_key` (8–64
+`decline_deal`, `withdraw_post`, `report_user`, `rate_deal`) takes an optional `idempotency_key` (8–64
 characters of `A-Z a-z 0-9 . _ : -`, e.g. a UUID):
 
 - The first call with a key runs and its result is stored for 24 hours.
@@ -163,13 +164,80 @@ deal far below the usual price hears a safety note (meet in public, pay on
 handover). The check never sets, blocks or settles a price. Thresholds:
 `PRICE_FAR_BELOW`, `PRICE_FAR_ABOVE`, `PRICE_REFERENCE_MATCH`, `PRICE_TRADE_MATCH`.
 
+## What can be posted
+
+Every offer and request, item or service, is checked against the marketplace
+policy ([data/policy.json](../data/policy.json), [policy.ts](../src/market/policy.ts))
+before anything is stored, modelled on Amazon's restricted-products policy for
+a person-to-person market:
+
+| Category | Severity | Code |
+|---|---|---|
+| Weapons, ammunition and explosives | prohibited | `prohibited_item` |
+| Illegal drugs and drug paraphernalia | prohibited | `prohibited_item` |
+| Prescription medicines | restricted | `restricted_item` |
+| Alcohol | restricted | `restricted_item` |
+| Tobacco and vaping products | restricted | `restricted_item` |
+| Recalled products | prohibited | `prohibited_item` |
+| Counterfeit, pirated and fake goods | prohibited | `prohibited_item` |
+| Fake documents, IDs and accounts | prohibited | `prohibited_item` |
+| Cheating services (essays, exams) | prohibited | `prohibited_item` |
+| Adult and sexual services | prohibited | `prohibited_item` |
+| Live animals and wildlife products | restricted | `restricted_item` |
+| Illegal and harmful services | prohibited | `prohibited_item` |
+
+Restricted means selling it needs a licence, an age check, a prescription or a
+breeder, which people trading directly can't provide, so it isn't allowed here
+either. The check is deterministic:
+
+1. **Keywords:** whole-word rules per category, after removing that category's
+   allowed phrases (a glue gun, cat sitting, wine glasses, kitten heels). The
+   text is also checked with common character swaps undone (`w33d`, `c.o.c.a.i.n.e`).
+2. **Meaning:** the post's embedding against example phrases per category; a
+   cosine similarity of at least `POLICY_MEANING_MATCH` (default 0.8) counts.
+
+A refused post returns `isError: true` with `say` ("I can't post that.
+AmazonPairUp doesn't allow alcohol, since selling it needs an age check and a
+licence."), `code`, `category`, `label`, `severity` and `matched_by`
+(`keyword|meaning`). A request is checked before its budget is asked for. Speak
+`say`; never reword the post to get around the rule. Refused posts count toward
+`POSTS_PER_HOUR` and appear on the dashboard's review queue.
+
+## Reports and review
+
+`report_user` reports the other side of a deal, or the owner of a post the user
+was shown ([trust.ts](../src/market/trust.ts)):
+
+- The reporter and the reported person are never paired again, either way, and
+  any deal still proposed between them is cancelled (both sides are re-paired
+  with others).
+- One open report per reporter and reported person. Reports from accounts under
+  review or suspended don't count.
+- When `REPORT_THRESHOLD` (default 3) different people have open reports about
+  someone, they go **under review**: their proposed deals are released and the
+  other side re-paired, their posts stop pairing and showing as options, and
+  `post_offer`, `post_request` and `negotiate` return `account_under_review`.
+- A reviewer decides on the dashboard (`POST /api/review` with
+  `{ user_id, decision: "reinstate" | "suspend" }`, same access as
+  `/api/dashboard`). Reinstating dismisses the open reports and pairs their posts
+  again; suspending upholds the reports and keeps them off the market
+  (`account_suspended`).
+- A reporter never learns who else reported the person, how many did, or
+  whether they are under review.
+
+Ratings (`rate_deal`) are private to the market: the other person never sees
+them. They feed each person's track record (see below).
+
 ## Learning to pair better
 
 Every deal the engine proposes records its features
 ([learning.ts](../src/market/learning.ts)): relevance, price fit, discount,
 budget headroom (internal only), same area, condition margin, a pre-approved
 seller, urgency, availability given, delivery offered, price against the typical
-range, both sides' track records, and item or service. Confirmed is a success;
+range, both sides' track records, and item or service. A track record is
+`(closed + 1) / (outcomes + 2)` over the person's past deals in that role,
+where each rating they received also counts as an outcome worth
+`(stars - 1) / 4`: five stars is another closed deal, one star a failed one. Confirmed is a success;
 declined or expired is a failure.
 
 Every `LEARN_INTERVAL_HOURS` (default 24; also `npm run learn`), once
@@ -199,6 +267,8 @@ the daily completion rate, both arms and the model's main drivers.
 | counterpart display name, place, pickup, time, and the task for a service | both parties of a deal |
 | no price inside both limits | nobody gets numbers ("can't meet your budget") |
 | typical price range (`typical_price`, `price_check`) | everyone: it describes similar posts, never a person's limit |
+| a report, and the stars a user gave | its author only; reviewers see reports on the dashboard |
+| who reported someone, how many did, review status | reviewers only |
 
 All output goes through [views.ts](../src/market/views.ts); the tests fail on any leak.
 
@@ -206,11 +276,11 @@ All output goes through [views.ts](../src/market/views.ts); the tests fail on an
 
 ### `post_offer`
 `title`*, `ask_price`*, `kind` (`item|service`, default `item`), `price_unit` (services: `job|hour`, default `job`), `min_price` (default `ask_price`), `description`, `category`, `auto_accept` (default true for items, false for services), `condition` (items: `new|like_new|good|fair|for_parts`, default `good`), `quantity` (items), `location`, `availability`, `confirm_price` (only after a `confirm_price` error)
-→ `{ offer, deal | null, waiting_requests, say }`. The offer carries `typical_price: { low, high, source } | null`. `deal` is opened when someone was already waiting; `waiting_requests` counts the requests this offer satisfies.
+→ `{ offer, deal | null, waiting_requests, say }`. The offer carries `typical_price: { low, high, source } | null`. `deal` is opened when someone was already waiting; `waiting_requests` counts the requests this offer satisfies. An offer the policy doesn't allow returns `prohibited_item` or `restricted_item` (see [What can be posted](#what-can-be-posted)).
 
 ### `post_request`
 `need` and/or `raw_request`*, `max_price` (required unless stated in `raw_request`; per hour for hourly work), `kind`, `price_unit`, `hours`, `pickup`, `location`, `schedule`, `needed_by` (ISO 8601, in the future: an item's deadline or a job's start), `min_condition` (items), `quantity` (items), `source` (`voice|bee_context`), `confirm_price` (only after a `confirm_price` error)
-→ `{ request, deal | null, alternatives: [offer + within_budget_at_ask + score] (up to 4), say }`. With no deal, `alternatives` and `say` also name the closest offers the budget can't reach, at their asking price. Structured args win; `raw_request` is parsed to fill the gaps, including kind, unit, hours, pickup, place and time ("find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5").
+→ `{ request, deal | null, alternatives: [offer + within_budget_at_ask + score] (up to 4), say }`. With no deal, `alternatives` and `say` also name the closest offers the budget can't reach, at their asking price. Structured args win; `raw_request` is parsed to fill the gaps, including kind, unit, hours, pickup, place and time ("find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5"). What is asked for is checked against the policy first, before the budget is asked for.
 
 ### `find_matches`
 `request_id`*, `limit` (1–10, default 3)
@@ -239,12 +309,20 @@ All output goes through [views.ts](../src/market/views.ts); the tests fail on an
 `post_id`* (an `offer_id` or `request_id`)
 → `{ post_id, kind: "offer"|"request", status: "withdrawn"|"cancelled", released_deal_id | null, say }`.
 
+### `report_user`
+`reason`* (`prohibited_item|scam|no_show|not_as_described|unsafe|harassment|other`), `deal_id` (the deal with the person) or `post_id` (an offer the user was shown), `details` (up to 500 characters, read by reviewers only). Confirm with the user first.
+→ `{ report: { report_id, reason, deal_id, post_id, status: "received"|"already_reported", released_deal_id | null }, say }`. See [Reports and review](#reports-and-review). For `unsafe`, `say` starts with "If you're in danger right now, call emergency services."
+
+### `rate_deal`
+`deal_id`*, `stars`* (integer 1–5). Only for a `confirmed` deal, once per side.
+→ `{ rating: { deal_id, stars, rated_role: "buyer"|"seller" }, say }`. Errors: `not_confirmed` before both sides said yes, `already_rated` on a second rating. A rating of 1 or 2 ends `say` with an offer to report.
+
 ### Deal object
 `deal_id`, `offer_id`, `request_id`, `kind`, `title` (the offer), `task` (services: what was asked for), `condition` (items), `your_role` (`buyer|seller`), `counterpart`, `price`, `price_unit` (`each|job|hour`), `hours`, `total`, `ask_price`, `saved_vs_ask`, `price_check` (`{ verdict: typical|below_typical|above_typical|far_below|far_above, typical_low, typical_high, source } | null`), `currency`, `status` (`proposed|confirmed|declined|replaced|expired|withdrawn`), `buyer_confirmed`, `seller_confirmed`, `waiting_for` (`["buyer"|"seller"]`), `waiting_for_you`, `meetup: { place, availability }` (for a service: where the job is and when), `pickup` (errands), `needed_by` (services), `on_hold_until` (while proposed), `created_at`, `updated_at`.
 
 ## MCP Apps view
 
-Every tool except `withdraw_post` declares `_meta.ui.resourceUri = "ui://amazonpairup/market.html"`
+Every tool except `withdraw_post`, `report_user` and `rate_deal` declares `_meta.ui.resourceUri = "ui://amazonpairup/market.html"`
 in its definition (MCP Apps spec) and repeats it in each result's `_meta` (Alexa+
 client lifecycle). `resources/read` returns one self-contained HTML document
 (`text/html;profile=mcp-app`) that picks its layout from the result:
@@ -268,6 +346,13 @@ Inline lists show at most five items. Buttons call tools through the host.
 | `POST /api/agent` | One assistant step. Body `{ messages }` in the Bedrock Converse shape; returns `{ message, stop, mode }` (`stop` is `tool_use` or `end_turn`). The app runs requested tools over `/mcp` itself and sends the results back. A `confirm_deal` call is only returned after the user's explicit yes. |
 
 Same identity, Origin and rate-limit rules as `/mcp`; same-origin browser calls are allowed.
+
+Operations, open locally (`AUTH_MODE=none`) and otherwise only with `Authorization: Bearer <DASHBOARD_TOKEN>`:
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/dashboard` | Posts, deals, events, learning, and `review_queue`: people under review first, then anyone with open reports or refused posts, with reasons and average rating. No private limits. |
+| `POST /api/review` | `{ user_id, decision: "reinstate" \| "suspend" }` → `{ user_id, review_status }` |
 
 ## Conversation flows
 

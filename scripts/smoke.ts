@@ -53,6 +53,14 @@ for (const m of alternatives) console.log(`   other option: ${m.title}, ask ${m.
 await call(buyer, "Buyer", "confirm_deal", { deal_id: deal.deal_id }, ["min_price"]);
 // Seller: "Did anyone buy my calculator?"
 await call(seller, "Seller", "get_deal_status", {}, ["max_price"]);
+// Buyer: "It went great, five stars."
+await call(buyer, "Buyer", "rate_deal", { deal_id: deal.deal_id, stars: 5 }, ["min_price"]);
+
+// Some things can't be posted at all. "Sell my vape pens, $10 each."
+const refused = await seller.callTool({ name: "post_offer", arguments: { title: "Disposable vape pens", ask_price: 10 } });
+const refusal = JSON.parse((refused.content as { text: string }[])[0].text);
+console.log(`\nSeller → post_offer (refused)\n  Alexa: "${refusal.say}"`);
+if (!refused.isError || refusal.code !== "restricted_item") throw new Error("Expected vape pens to be refused with restricted_item");
 
 // The same market pairs services. "I can do lunch runs around campus, $4 a run, at least $3."
 const runner = await connectAs("demo_runner");

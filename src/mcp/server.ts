@@ -6,6 +6,7 @@ import { log, metric } from "../http/log.js";
 import { once } from "../market/idempotency.js";
 import * as market from "../market/service.js";
 import type { Deps } from "../market/service.js";
+import { REPORT_REASONS } from "../market/trust.js";
 import { KINDS, SERVICE_UNITS } from "../market/types.js";
 import { registerViews, VIEWS, type ViewName } from "./apps.js";
 import { registerPrompts } from "./prompts.js";
@@ -47,7 +48,7 @@ const writes = { readOnlyHint: false, destructiveHint: false, idempotentHint: fa
 const reads = { readOnlyHint: true, idempotentHint: true, openWorldHint: false };
 
 /** Shown in initialize and in the server card (/.well-known/mcp/server-card.json). */
-export const SERVER_INFO = { name: "amazon-pairup", title: "AmazonPairUp", version: "0.5.0" };
+export const SERVER_INFO = { name: "amazon-pairup", title: "AmazonPairUp", version: "0.6.0" };
 
 export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
   const server = new McpServer(
@@ -66,7 +67,11 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
         "by a fixed rule, never by haggling: the asking price, or a lower budget as an offer the seller's minimum accepts. " +
         "A buyer gets one such offer per offer; after a no, the asking price stands (negotiate with max_price on a yes). " +
         "A price far from what similar things go for returns an error with code 'confirm_price': read its 'say', then " +
-        "call again with confirm_price: true if the user confirms, or with the price they meant. Every result has " +
+        "call again with confirm_price: true if the user confirms, or with the price they meant. Weapons, drugs, alcohol, " +
+        "tobacco, prescription medicine, recalled or counterfeit goods, fake documents, cheating, adult services, live " +
+        "animals and illegal services can't be posted: that returns an error with code 'prohibited_item' or " +
+        "'restricted_item'; speak its 'say' and don't rephrase the post to get around it. After a confirmed deal, offer " +
+        "rate_deal; when the user complains about someone, use report_user. Every result has " +
         "a 'say' field: one short sentence you can speak as is. Write tools take an optional idempotency_key: " +
         "send a fresh one per action and the same one on a retry, so nothing is posted or confirmed twice.",
     },
@@ -283,6 +288,52 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       annotations: { ...writes, destructiveHint: true, idempotentHint: true },
     },
     (args) => write("withdraw_post", args, (userId) => market.withdrawPost(deps, userId, args.post_id)),
+  );
+
+  server.registerTool(
+    "report_user",
+    {
+      title: "Report someone",
+      description:
+        "Report the other person in one of the user's deals (deal_id), or the owner of an offer the user was shown " +
+        "(post_id), when the user says they were scammed, didn't show up, sent something not as described, made them " +
+        "feel unsafe, harassed them, or offered something not allowed. Reviewers look at every report. The two are never " +
+        "paired again, and a deal still open between them is cancelled. Confirm with the user first.",
+      inputSchema: {
+        user_id: userIdArg,
+        reason: z.enum(REPORT_REASONS).describe(
+          "prohibited_item: offered or asked for something not allowed; scam: asked for money up front, fake payment; " +
+            "no_show; not_as_described; unsafe; harassment; other",
+        ),
+        deal_id: id.optional().describe("The deal with the person being reported"),
+        post_id: id.optional().describe("Without a deal: the offer_id of the post being reported"),
+        details: z.string().trim().max(500).optional().describe("What happened, in the user's words. Only reviewers read it"),
+        idempotency_key: idempotencyKey,
+      },
+      outputSchema: outputs.report_user,
+      annotations: writes,
+    },
+    (args) => write("report_user", args, (userId) => market.reportUser(deps, userId, args)),
+  );
+
+  server.registerTool(
+    "rate_deal",
+    {
+      title: "Rate a deal",
+      description:
+        "Record the user's 1-5 star rating of the other person in a confirmed deal: the seller or helper when the user " +
+        "paid, the buyer when the user sold. Once per side and deal. Ratings help the market pair people who follow " +
+        "through; the other person never sees them. After a confirmed deal, ask 'How did it go, out of five?'.",
+      inputSchema: {
+        user_id: userIdArg,
+        deal_id: id,
+        stars: z.number().int().min(1).max(5).describe("1 = very bad, 5 = excellent"),
+        idempotency_key: idempotencyKey,
+      },
+      outputSchema: outputs.rate_deal,
+      annotations: writes,
+    },
+    (args) => write("rate_deal", args, (userId) => market.rateDeal(deps, userId, args.deal_id, args.stars)),
   );
 
   registerPrompts(server);

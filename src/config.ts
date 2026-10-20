@@ -62,6 +62,11 @@ export const config = {
     referenceMatch: Number(env("PRICE_REFERENCE_MATCH", "0.55")),
     tradeMatch: Number(env("PRICE_TRADE_MATCH", "0.8")),
   },
+  // Trust and safety: how close in meaning a post must be to a prohibited
+  // example to be refused (src/market/policy.ts), and how many different
+  // people's reports put someone under review (src/market/trust.ts).
+  policy: { meaningMatch: Number(env("POLICY_MEANING_MATCH", "0.8")) },
+  reportThreshold: Number(env("REPORT_THRESHOLD", "3")),
 
   // /api/dashboard shows every post and deal. Open in AUTH_MODE=none (local);
   // otherwise it needs this token, and stays off when the token is unset.

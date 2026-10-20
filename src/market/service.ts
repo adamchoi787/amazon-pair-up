@@ -6,9 +6,13 @@ import {
   expireHolds, isExpired, pairIntent, pairListing, propose, recordFailedOffer, release, repairAfter, settlePair, type PairingSettings,
 } from "./pairing.js";
 import { learningReport } from "./learning.js";
+import { DEFAULT_POLICY, keywordHit, meaningHit, type PolicyHit, type PolicySettings } from "./policy.js";
 import { DEFAULT_PRICE_POLICY, priceBand, verdict, type PriceBand, type PricePolicy } from "./pricing.js";
+import {
+  decideReview, DEFAULT_REPORT_THRESHOLD, reviewIfReported, reviewQueue, reviewStatus, type ReportReason, type ReviewDecision,
+} from "./trust.js";
 import { num, type BuyIntentRow, type DealRow, type Kind, type ListingRow, type PriceUnit, type ServiceUnit } from "./types.js";
-import { dealView, offerView, requestView, type DealView, type DealWithParties } from "./views.js";
+import { dealView, offerView, ratingView, reportView, requestView, type DealView, type DealWithParties } from "./views.js";
 
 // Business operations. MCP tools (src/mcp/server.ts) are thin wrappers around
 // these, so the web app and the tests call the same functions.
@@ -26,6 +30,10 @@ export interface MarketSettings {
   maxOpenRequests?: number;
   /** When a price is far enough from the typical range to ask "did you mean…?". */
   pricePolicy?: Partial<PricePolicy>;
+  /** How close in meaning a post must be to a prohibited example to be refused (src/market/policy.ts). */
+  policy?: Partial<PolicySettings>;
+  /** Different people whose reports put someone under review (src/market/trust.ts). */
+  reportThreshold?: number;
 }
 
 export interface Deps {
@@ -66,13 +74,18 @@ export async function ensureUser(db: Db, userId: string, displayName?: string) {
   );
 }
 
-/** Per-user posting limits against floods. Budget probing is stopped by the one-offer rule (failed_offers). */
+/**
+ * Per-user posting limits against floods. Refused posts count too, so rewording
+ * a blocked post again and again runs out. Budget probing is stopped by the
+ * one-offer rule (failed_offers).
+ */
 async function checkPostingLimits(deps: Deps, userId: string, kind: "offer" | "request") {
   const { db, cfg } = deps;
   const { rows } = await db.query<{ recent: number; open_requests: number }>(
     `SELECT
        (SELECT count(*) FROM listings    WHERE seller_id = $1 AND created_at > now() - interval '1 hour')
-     + (SELECT count(*) FROM buy_intents WHERE buyer_id  = $1 AND created_at > now() - interval '1 hour') AS recent,
+     + (SELECT count(*) FROM buy_intents WHERE buyer_id  = $1 AND created_at > now() - interval '1 hour')
+     + (SELECT count(*) FROM events WHERE actor_id = $1 AND kind = 'post_blocked' AND created_at > now() - interval '1 hour') AS recent,
        (SELECT count(*) FROM buy_intents WHERE buyer_id = $1 AND status IN ('open', 'matched')) AS open_requests`,
     [userId],
   );
@@ -83,6 +96,40 @@ async function checkPostingLimits(deps: Deps, userId: string, kind: "offer" | "r
   if (kind === "request" && Number(rows[0].open_requests) >= maxOpen) {
     throw new MarketError(`You already have ${countWord(maxOpen).toLowerCase()} open requests. Cancel one first, then ask again.`);
   }
+}
+
+/** Posting and pairing need an account in good standing (src/market/trust.ts). */
+async function assertActive(db: Db, userId: string) {
+  const status = await reviewStatus(db, userId);
+  if (status === "under_review") {
+    throw new MarketError(
+      "Your account is being reviewed after reports from other people, so I can't post or pair for you until that's done.",
+      "account_under_review",
+    );
+  }
+  if (status === "suspended") throw new MarketError("Your account is suspended, so I can't post or pair for you.", "account_suspended");
+}
+
+/**
+ * Refuse a post the marketplace policy doesn't allow (data/policy.json), before
+ * anything is stored: by keyword, then by meaning.
+ */
+async function screen(deps: Deps, userId: string, as: "offer" | "request", text: string, embedding: number[]) {
+  const hit = keywordHit(text) ?? (await meaningHit(deps, embedding, { ...DEFAULT_POLICY, ...deps.cfg.policy }));
+  if (!hit) return;
+  await logEvent(deps.db, "post_blocked", userId, null, { as, category: hit.category, matched_by: hit.matched_by, text: text.slice(0, 200) });
+  throw policyError(hit);
+}
+
+function policyError(hit: PolicyHit) {
+  const what = hit.label.charAt(0).toLowerCase() + hit.label.slice(1);
+  return new MarketError(
+    hit.severity === "prohibited"
+      ? `I can't post that. AmazonPairUp doesn't allow ${what}.`
+      : `I can't post that. AmazonPairUp doesn't allow ${what}, since ${hit.why}.`,
+    hit.severity === "prohibited" ? "prohibited_item" : "restricted_item",
+    { category: hit.category, label: hit.label, severity: hit.severity, matched_by: hit.matched_by },
+  );
 }
 
 /** Items are priced each; a service is priced per job unless it says per hour. */
@@ -122,12 +169,14 @@ export async function postOffer(deps: Deps, input: PostOfferInput) {
   if (minPrice > input.ask_price) throw new MarketError("Your minimum can't be above the asking price.");
   await sweep(deps);
   await ensureUser(db, input.user_id);
+  await assertActive(db, input.user_id);
   await checkPostingLimits(deps, input.user_id, "offer");
 
   const id = shortId("ofr");
   const embedding = await ai.embed(
     [input.title, input.description, input.category, kind === "item" ? input.condition : undefined].filter(Boolean).join(". "),
   );
+  await screen(deps, input.user_id, "offer", [input.title, input.description, input.category].filter(Boolean).join(". "), embedding);
   const currency = input.currency ?? "USD";
   const band = await priceBand(deps, { kind, unit, embedding, condition: input.condition ?? "good", posterId: input.user_id });
   const flag = band && checkPrices(band, pricePolicy(cfg), kind, unit, currency, input.confirm_price, [
@@ -208,6 +257,15 @@ export async function postRequest(deps: Deps, input: PostRequestInput) {
   const kind = input.kind ?? extracted?.kind ?? "item";
   const unit = unitFor(kind, input.price_unit ?? extracted?.price_unit);
   const need = input.need ?? extracted?.need ?? input.raw_request!;
+  const category = extracted?.category ?? null;
+
+  // What is asked for is checked first, before the budget is even asked for.
+  await sweep(deps);
+  await ensureUser(db, input.user_id);
+  await assertActive(db, input.user_id);
+  const embedding = await ai.embed([need, category].filter(Boolean).join(". "));
+  await screen(deps, input.user_id, "request", [need, input.raw_request, category].filter(Boolean).join(". "), embedding);
+
   const maxPrice = input.max_price ?? extracted?.max_price;
   if (maxPrice == null) {
     throw new MarketError(
@@ -217,12 +275,8 @@ export async function postRequest(deps: Deps, input: PostRequestInput) {
   const neededBy = parseDeadline(input.needed_by ?? extracted?.needed_by);
   const service = kind === "service";
 
-  await sweep(deps);
-  await ensureUser(db, input.user_id);
   await checkPostingLimits(deps, input.user_id, "request");
   const id = shortId("req");
-  const category = extracted?.category ?? null;
-  const embedding = await ai.embed([need, category].filter(Boolean).join(". "));
   const currency = input.currency ?? "USD";
   // A budget is checked against the range for a new one: only a budget far
   // above what anything like it costs is questioned.
@@ -303,6 +357,7 @@ export async function findMatches(deps: Deps, userId: string, requestId: string,
 export async function negotiateDeal(deps: Deps, userId: string, requestId: string, offerId: string, maxPrice?: number) {
   const { db, cfg } = deps;
   await sweep(deps);
+  await assertActive(db, userId);
   let intent = await getOwnIntent(db, userId, requestId);
   if (intent.status === "fulfilled" || intent.status === "cancelled") throw new MarketError("That request is already closed.");
   if (isExpired(intent)) throw new MarketError("That request's deadline has passed. Want to post a new one?");
@@ -513,18 +568,127 @@ export async function withdrawPost(deps: Deps, userId: string, postId: string) {
   throw new MarketError("I can't find that post.");
 }
 
+// ---------- Trust and safety ----------
+
+type ReportRow = { id: string; reason: string; deal_id: string | null; post_id: string | null };
+
+export interface ReportInput {
+  reason: ReportReason;
+  deal_id?: string;
+  /** A post the user was shown, such as an offer among the options, when there is no deal. */
+  post_id?: string;
+  details?: string;
+}
+
+/**
+ * Report the other side of a deal, or the owner of a post. The two are never
+ * paired again, a deal they still have open is cancelled, and reports from
+ * enough different people put the reported person under review.
+ */
+export async function reportUser(deps: Deps, userId: string, input: ReportInput) {
+  const { db, cfg } = deps;
+  await sweep(deps);
+  await ensureUser(db, userId);
+  let reportedId: string;
+  if (input.deal_id) {
+    const d = await getDealWithParties(db, input.deal_id);
+    if (userId !== d.buyer_id && userId !== d.seller_id) throw new MarketError("You're not part of this deal.");
+    reportedId = userId === d.buyer_id ? d.seller_id : d.buyer_id;
+  } else if (input.post_id) {
+    const { rows } = await db.query<{ owner: string }>(
+      `SELECT seller_id AS owner FROM listings WHERE id = $1 UNION ALL SELECT buyer_id FROM buy_intents WHERE id = $1`,
+      [input.post_id],
+    );
+    if (!rows[0]) throw new MarketError("I can't find that post.");
+    reportedId = rows[0].owner;
+  } else {
+    throw new MarketError("Which deal or offer is this about?");
+  }
+  if (reportedId === userId) throw new MarketError("That's your own post.");
+
+  const created = await db.query<ReportRow>(
+    `INSERT INTO reports (id, reporter_id, reported_id, reason, deal_id, post_id, details) VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (reporter_id, reported_id) WHERE status = 'open' DO NOTHING RETURNING id, reason, deal_id, post_id`,
+    [shortId("rpt"), userId, reportedId, input.reason, input.deal_id ?? null, input.post_id ?? null, input.details ?? null],
+  );
+  const fresh = created.rows[0];
+  if (!fresh) {
+    const { rows } = await db.query<ReportRow>(
+      `SELECT id, reason, deal_id, post_id FROM reports WHERE reporter_id = $1 AND reported_id = $2 AND status = 'open'`,
+      [userId, reportedId],
+    );
+    return {
+      report: reportView(rows[0], false, null),
+      say: "You've already reported them. It's with our reviewers, and I won't pair you with them.",
+    };
+  }
+
+  // Whatever the two of them still have open ends here; both sides are paired with others.
+  const { rows: open } = await db.query<DealRow>(
+    `SELECT d.* FROM deals d JOIN listings l ON l.id = d.listing_id JOIN buy_intents i ON i.id = d.buy_intent_id
+     WHERE d.status = 'proposed' AND ((l.seller_id = $1 AND i.buyer_id = $2) OR (l.seller_id = $2 AND i.buyer_id = $1))`,
+    [userId, reportedId],
+  );
+  let released: string | null = null;
+  for (const d of open) {
+    if (!(await release(db, d, "declined"))) continue;
+    released ??= d.id;
+    await logEvent(db, "deal_declined", userId, d.id, { by: "report" });
+    await repairAfter(db, d, pairing(cfg));
+  }
+  await logEvent(db, "user_reported", userId, reportedId, { reason: input.reason, deal_id: input.deal_id ?? null, post_id: input.post_id ?? null });
+  await reviewIfReported(db, reportedId, cfg.reportThreshold ?? DEFAULT_REPORT_THRESHOLD, pairing(cfg));
+
+  return {
+    report: reportView(fresh, true, released),
+    say: (input.reason === "unsafe" ? "If you're in danger right now, call emergency services. " : "") +
+      "Thanks for telling me. I've passed this on for review, and I won't pair you with them again." +
+      (released ? " I've also cancelled the deal you had with them." : ""),
+  };
+}
+
+/** Rate the other side of a confirmed deal, 1 to 5 stars, once per side. Ratings feed the ranking's track records. */
+export async function rateDeal(deps: Deps, userId: string, dealId: string, stars: number) {
+  const { db } = deps;
+  const d = await getDealWithParties(db, dealId);
+  const isBuyer = userId === d.buyer_id;
+  if (!isBuyer && userId !== d.seller_id) throw new MarketError("You're not part of this deal.");
+  if (d.status !== "confirmed") throw new MarketError("You can rate a deal once both of you have confirmed it.", "not_confirmed");
+  const { rows } = await db.query<{ deal_id: string; stars: number; ratee_role: string }>(
+    `INSERT INTO ratings (deal_id, rater_id, ratee_id, ratee_role, stars) VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (deal_id, rater_id) DO NOTHING RETURNING deal_id, stars, ratee_role`,
+    [dealId, userId, isBuyer ? d.seller_id : d.buyer_id, isBuyer ? "seller" : "buyer", stars],
+  );
+  if (!rows[0]) throw new MarketError("You've already rated this deal.", "already_rated");
+  await logEvent(db, "deal_rated", userId, dealId, { stars, rated: isBuyer ? "seller" : "buyer" });
+  const name = isBuyer ? d.seller_name : d.buyer_name;
+  return {
+    rating: ratingView(rows[0]),
+    say: `Thanks! I've given ${name} ${countWord(stars).toLowerCase()} star${stars === 1 ? "" : "s"}.` +
+      (stars <= 2 ? " If something went wrong, I can report it for review." : ""),
+  };
+}
+
 // ---------- Dashboard ----------
 
 export async function dashboard(db: Db) {
-  const [listings, intents, deals, events, learning] = await Promise.all([
+  const [listings, intents, deals, events, learning, review] = await Promise.all([
     db.query(`SELECT id, seller_id, kind, price_unit, title, condition, ask_price, currency, location, status, created_at FROM listings ORDER BY created_at DESC LIMIT 50`),
     db.query(`SELECT id, buyer_id, kind, price_unit, need, source, quantity, hours, pickup, schedule, currency, status, created_at FROM buy_intents ORDER BY created_at DESC LIMIT 50`),
     db.query(`${DEAL_WITH_PARTIES} ORDER BY d.created_at DESC LIMIT 50`),
     db.query(`SELECT * FROM events ORDER BY id DESC LIMIT 100`),
     learningReport(db),
+    reviewQueue(db),
   ]);
   // Private limits are intentionally absent: the dashboard proves they stay hidden.
-  return { listings: listings.rows, intents: intents.rows, deals: deals.rows, events: events.rows, learning };
+  return { listings: listings.rows, intents: intents.rows, deals: deals.rows, events: events.rows, learning, review_queue: review };
+}
+
+/** A reviewer's decision on someone in the review queue (dashboard, POST /api/review). */
+export async function reviewUser(deps: Deps, userId: string, decision: ReviewDecision) {
+  const status = await decideReview(deps.db, userId, decision, pairing(deps.cfg));
+  if (!status) throw new MarketError("I can't find that user.");
+  return { user_id: userId, review_status: status };
 }
 
 // ---------- helpers ----------

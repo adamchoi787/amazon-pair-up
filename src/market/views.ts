@@ -135,3 +135,23 @@ function priceCheck(d: DealWithParties, price: number) {
 }
 
 export type DealView = ReturnType<typeof dealView>;
+
+/**
+ * A report as its author sees it. Never who else reported the person, how many
+ * did, or whether they are under review.
+ */
+export function reportView(r: { id: string; reason: string; deal_id: string | null; post_id: string | null }, fresh: boolean, releasedDealId: string | null) {
+  return {
+    report_id: r.id,
+    reason: r.reason,
+    deal_id: r.deal_id,
+    post_id: r.post_id,
+    status: fresh ? ("received" as const) : ("already_reported" as const),
+    released_deal_id: releasedDealId,
+  };
+}
+
+/** A rating as its author sees it; the other side's rating of them stays private. */
+export function ratingView(r: { deal_id: string; stars: number; ratee_role: string }) {
+  return { deal_id: r.deal_id, stars: Number(r.stars), rated_role: r.ratee_role as "buyer" | "seller" };
+}

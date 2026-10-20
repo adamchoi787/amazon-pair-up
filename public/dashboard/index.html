@@ -25,6 +25,8 @@
   .bars span { flex:1; min-width:4px; background:var(--accent); border-radius:3px 3px 0 0; opacity:.85; }
   .stats { display:flex; flex-wrap:wrap; gap:8px 20px; margin-bottom:8px; }
   .stats b { font-size:18px; display:block; }
+  .under_review { color:#b25e00; border-color:#b25e00; } .suspended { color:#c0392b; border-color:#c0392b; }
+  button { font:inherit; font-size:12px; padding:2px 10px; margin:6px 6px 0 0; border-radius:99px; border:1px solid var(--line); background:var(--bg); color:var(--fg); cursor:pointer; }
 </style>
 </head>
 <body>
@@ -34,6 +36,7 @@
 </header>
 <main>
   <section class="wide"><h2>Learning to pair better</h2><div id="learning" class="muted">No finished deals yet.</div></section>
+  <section class="wide"><h2>Trust and safety</h2><ul id="review"><li class="muted">No reports or refused posts.</li></ul></section>
   <section><h2>Deals</h2><ul id="deals"></ul></section>
   <section><h2>Requests</h2><ul id="intents"></ul></section>
   <section><h2>Offers</h2><ul id="listings"></ul></section>
@@ -46,11 +49,23 @@ const money = (v, c) => (c === "USD" ? "$" : c + " ") + Number(v).toFixed(Number
 const time = (t) => new Date(t).toLocaleTimeString();
 const unit = (u) => (u === "hour" ? "/hr" : u === "job" ? " per job" : "");
 const kindTag = (k) => (k === "service" ? `<span class="tag">service</span> ` : "");
+// Deployed dashboards need DASHBOARD_TOKEN: open the page as /#token=<token>.
+const auth = () => { const token = new URLSearchParams(location.hash.slice(1)).get("token"); return token ? { Authorization: `Bearer ${token}` } : {}; };
+// A reviewer's decision: reinstate (back to pairing) or suspend.
+async function review(userId, decision) {
+  if (!confirm(`${decision === "reinstate" ? "Reinstate" : "Suspend"} ${userId}?`)) return;
+  await fetch("/api/review", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ user_id: userId, decision }) });
+  refresh();
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("button[data-user]"); if (b) review(b.dataset.user, b.dataset.decision); });
 async function refresh() {
   try {
-    // Deployed dashboards need DASHBOARD_TOKEN: open the page as /#token=<token>.
-    const token = new URLSearchParams(location.hash.slice(1)).get("token");
-    const d = await (await fetch("/api/dashboard", { headers: token ? { Authorization: `Bearer ${token}` } : {} })).json();
+    const d = await (await fetch("/api/dashboard", { headers: auth() })).json();
+    if (d.review_queue?.length) {
+      $("review").innerHTML = d.review_queue.map((u) => `<li>${esc(u.display_name)} <span class="muted">${esc(u.user_id)}</span> <span class="tag ${esc(u.review_status)}">${esc(u.review_status.replace("_", " "))}</span>
+        <div class="muted">${u.reporters} reporter${u.reporters === 1 ? "" : "s"}${u.reasons.length ? " · " + esc(u.reasons.join(", ").replaceAll("_", " ")) : ""} · ${u.blocked_posts} refused post${u.blocked_posts === 1 ? "" : "s"} · ${u.rating == null ? "no ratings" : `${u.rating}★ from ${u.ratings}`}</div>
+        ${u.review_status === "active" && !u.reporters ? "" : `<button data-user="${esc(u.user_id)}" data-decision="reinstate">Reinstate</button>${u.review_status === "suspended" ? "" : `<button data-user="${esc(u.user_id)}" data-decision="suspend">Suspend</button>`}`}</li>`).join("");
+    }
     $("deals").innerHTML = d.deals.map((x) => `<li><span class="price">${money(x.price, x.currency)}${unit(x.price_unit)}</span> ${kindTag(x.kind)}${esc(x.title)}
       <span class="tag ${x.status}">${esc(x.status)}</span><div class="muted">buyer ${esc(x.buyer_id)} · seller ${esc(x.seller_id)} · ${esc([x.pickup, x.meetup].filter(Boolean).join(" → "))}</div></li>`).join("") || "<li class=muted>No deals yet</li>";
     $("intents").innerHTML = d.intents.map((x) => `<li>${kindTag(x.kind)}${esc(x.need)} <span class="tag">${esc(x.source)}</span> <span class="tag">${esc(x.status)}</span>
