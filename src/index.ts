@@ -3,6 +3,7 @@ import { createApp } from "./app.js";
 import { config } from "./config.js";
 import { openDb } from "./db/client.js";
 import { isEmpty, seedMarketplace } from "./db/seed.js";
+import { DEFAULT_LEARN_POLICY, learn } from "./market/learning.js";
 import { expireHolds } from "./market/pairing.js";
 
 const db = await openDb(config);
@@ -30,6 +31,18 @@ const sweeper = setInterval(async () => {
 }, 60_000);
 sweeper.unref();
 
+// Learning to pair better: train a candidate ranking on how deals ended, keep
+// it only if it beats the current one, roll back if the live control wins.
+const learner = setInterval(async () => {
+  try {
+    const r = await learn(db, { ...DEFAULT_LEARN_POLICY, minOutcomes: config.learnMinOutcomes });
+    console.log(`[learning] ${JSON.stringify(r)}`);
+  } catch (err) {
+    console.error("[learning] run failed", err);
+  }
+}, config.learnIntervalHours * 3600_000);
+learner.unref();
+
 app.listen(config.port, config.host, () => {
   console.log(`amazon-pairup MCP server on http://${config.host}:${config.port}/mcp`);
   console.log(`  db: ${config.databaseUrl ? "postgres" : `pglite (${config.pgliteDir})`}  ai: ${ai.mode}`);
@@ -38,6 +51,7 @@ app.listen(config.port, config.host, () => {
 
 const shutdown = async () => {
   clearInterval(sweeper);
+  clearInterval(learner);
   await db.close();
   process.exit(0);
 };

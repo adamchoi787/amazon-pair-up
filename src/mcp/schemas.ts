@@ -12,6 +12,12 @@ const priceUnit = z.enum(["each", "job", "hour"]).describe("each = an item; job 
 const money = z.number().nonnegative();
 const say = z.string().describe("One short sentence to speak back to the user");
 
+const typical = z.object({
+  low: money,
+  high: money,
+  source: z.enum(["reference", "trades"]).describe("reference = reference prices; trades = this market's confirmed deals"),
+}).describe("What similar offers usually go for, per price_unit");
+
 export const offerOut = z.object({
   offer_id: z.string(),
   kind,
@@ -27,6 +33,7 @@ export const offerOut = z.object({
   availability: z.string().nullable().describe("When the person can meet or work"),
   status: z.enum(["active", "pending", "sold", "withdrawn"])
     .describe("pending = held by a proposed deal; sold = item sold (a service offer stays active after each job)"),
+  typical_price: typical.nullable().describe("null when nothing reliable describes this offer"),
   your_min_price: money.optional().describe("Only for the owner: their private minimum"),
   auto_accept: z.boolean().optional().describe("Only for the owner"),
 });
@@ -73,6 +80,13 @@ export const dealOut = z.object({
   total: money.nullable().describe("What the buyer pays in all; null for hourly work without known hours"),
   ask_price: money,
   saved_vs_ask: z.number().describe("Asking price minus agreed price, per price_unit"),
+  price_check: z.object({
+    verdict: z.enum(["typical", "below_typical", "above_typical", "far_below", "far_above"])
+      .describe("far_below on an item: warn the buyer to meet in public and pay only on handover"),
+    typical_low: money,
+    typical_high: money,
+    source: z.enum(["reference", "trades"]),
+  }).nullable().describe("The agreed price against what similar offers usually go for; null when unknown"),
   currency: z.string(),
   status: z.enum(["proposed", "confirmed", "declined", "replaced", "expired", "withdrawn"])
     .describe("replaced = the buyer chose another option; expired = nobody answered in time; withdrawn = a post was taken down"),
@@ -98,7 +112,7 @@ export const outputs = {
   },
   post_request: {
     request: requestOut,
-    deal: dealOut.nullable().describe("The best offer, already negotiated; null while the request waits"),
+    deal: dealOut.nullable().describe("The best offer, already settled; null while the request waits"),
     alternatives: z.array(matchOut).describe("Other options, best first (3–5 for a carousel)"),
     say,
   },

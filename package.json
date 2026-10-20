@@ -14,6 +14,8 @@
     "seed": "tsx scripts/seed.ts",
     "reset": "tsx scripts/seed.ts --reset",
     "smoke": "tsx scripts/smoke.ts",
+    "learn": "tsx scripts/learn.ts",
+    "simulate": "tsx scripts/simulate-learning.ts",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.web.json",
     "build:web": "node scripts/build-web.mjs"

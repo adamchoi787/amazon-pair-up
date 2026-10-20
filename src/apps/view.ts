@@ -25,6 +25,7 @@ interface Deal {
   waiting_for: ("buyer" | "seller")[]; waiting_for_you: boolean;
   meetup: { place: string | null; availability: string | null }; pickup: string | null; needed_by: string | null;
   on_hold_until: string | null;
+  price_check: { verdict: "typical" | "below_typical" | "above_typical" | "far_below" | "far_above"; typical_low: number; typical_high: number } | null;
 }
 interface Offer {
   offer_id: string; kind: Kind; title: string; condition: string | null; ask_price: number; price_unit: Unit; currency: string;
@@ -149,6 +150,19 @@ function placeRows(d: Deal) {
   ];
 }
 
+/** The agreed price against the usual range; a warning for the buyer when it is far off. */
+function priceNote(d: Deal) {
+  const c = d.price_check;
+  if (!c) return null;
+  const usual = `Usually ${money(c.typical_low, d.currency)} to ${rate(c.typical_high, d.price_unit, d.currency)}`;
+  if (d.your_role === "buyer" && c.verdict === "far_below") {
+    return h("p", { class: "alert", role: "note" }, h("strong", {}, "Far below the usual price. "),
+      d.kind === "item" ? `${usual}. Meet somewhere public, check it works, and pay only once you have it.` : `${usual}.`);
+  }
+  if (d.your_role === "buyer" && c.verdict === "far_above") return h("p", { class: "alert", role: "note" }, h("strong", {}, "Well above the usual price. "), `${usual}.`);
+  return h("p", { class: "muted small" }, usual);
+}
+
 function dealCard(d: Deal, compact = false) {
   const buyer = d.your_role === "buyer";
   const service = d.kind === "service";
@@ -171,6 +185,7 @@ function dealCard(d: Deal, compact = false) {
       ? h("p", { class: "muted" }, `${money(d.total, d.currency)} for ${d.hours} hour${d.hours === 1 ? "" : "s"}`)
       : null,
     h("p", { class: "muted" }, savingsLine(d)),
+    priceNote(d),
     ...placeRows(d),
     d.status === "proposed" && d.on_hold_until ? h("p", { class: "muted small" }, `On hold until ${when(d.on_hold_until)}`) : null,
     actions,

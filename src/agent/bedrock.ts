@@ -24,7 +24,9 @@ How to act:
 - Call confirm_deal only when the user's latest words are an explicit yes to the offer you just read; otherwise ask.
 - On a no, call decline_deal. For "more options", call find_matches. For news, jobs or meet-up details, call get_deal_status.
 - A seller's minimum and a buyer's maximum are private. You may repeat the user's own limit back to them, never anyone else's.
-- If something is missing (an item, a price), ask one short question.`;
+- If something is missing (an item, a price), ask one short question.
+- Prices come from a fixed rule, never haggling: never negotiate, bargain or suggest a price on anyone's behalf.
+- If a result has code "confirm_price", it already asked the user whether the price is right. On a yes, call the same tool again with the same arguments plus confirm_price true; if they give another number, call it with that number instead.`;
 }
 
 export async function bedrockTurn(cfg: Pick<Config, "awsRegion" | "agentModelId">, messages: AgentMessage[], tools: ToolSpec[]) {

@@ -30,6 +30,10 @@ const userIdArg = z
   .optional()
   .describe("The speaking user's id. Omit when the connection already identifies the user.");
 
+const confirmPrice = z.boolean().optional().describe(
+  "Only after an error with code 'confirm_price': the user heard the usual range and confirmed this price anyway",
+);
+
 // Closed world: every tool acts only on this marketplace.
 const writes = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
 const reads = { readOnlyHint: true, idempotentHint: true, openWorldHint: false };
@@ -42,12 +46,15 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
         "AmazonPairUp pairs people directly, by voice: people who need something with people who have it or can do it. " +
         "That covers things (a graphing calculator) and services (someone to pick up lunch, a helper for an event at " +
         "$10 an hour). Both sides post: post_offer for what the user has or can do, post_request for what they need. " +
-        "Whenever either side posts, the server pairs it with the best counterpart and negotiates a price inside both " +
+        "Whenever either side posts, the server pairs it with the best counterpart and settles a price inside both " +
         "people's private limits in the same call, returning a proposed deal. Read the offer and ask the user; call " +
         "confirm_deal only after an explicit yes, and decline_deal on a no. A deal closes when both sides have confirmed; " +
         "an unanswered offer expires and both posts are paired again. Posts that find no counterpart wait and are paired " +
         "when one arrives, so use get_deal_status for news and list_my_posts / withdraw_post to manage posts. Private " +
-        "limits (min_price, max_price) are never shown to the other side; never ask for or reveal them. Every result has " +
+        "limits (min_price, max_price) are never shown to the other side; never ask for or reveal them. Prices are settled " +
+        "by a fixed rule, never by haggling: the asking price, or a lower budget as an offer the seller's minimum accepts. " +
+        "A price far from what similar things go for returns an error with code 'confirm_price': read its 'say', then " +
+        "call again with confirm_price: true if the user confirms, or with the price they meant. Every result has " +
         "a 'say' field: one short sentence you can speak as is.",
     },
   );
@@ -70,8 +77,8 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       title: "Offer an item or a service",
       description:
         "Post something the user has to sell (kind 'item') or can do for others (kind 'service': lunch runs, errands, " +
-        "deliveries, event help, tutoring). If someone is already waiting for it, the server pairs them and negotiates " +
-        "inside both private limits in the same call, and returns the proposed deal. min_price is the user's private " +
+        "deliveries, event help, tutoring). If someone is already waiting for it, the server pairs them and settles " +
+        "the price inside both private limits in the same call, and returns the proposed deal. min_price is the user's private " +
         "lowest price (nobody sees it); with auto_accept the user pre-approves any deal at or above it. A service offer " +
         "stays open after each booked job.",
       inputSchema: {
@@ -89,6 +96,7 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
         quantity: z.number().int().positive().max(1000).optional().describe("Items: units for sale; buyers needing more are not paired"),
         location: text(120).optional().describe("Items: meet-up area. Services: the area the user covers, e.g. 'HKUST campus'. Requests there rank higher"),
         availability: text(120).optional().describe("When the user can meet or work, e.g. 'weekdays 11am-2pm'. Shown on the deal"),
+        confirm_price: confirmPrice,
       },
       outputSchema: outputs.post_offer,
       annotations: writes,
@@ -104,7 +112,7 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       title: "Ask for an item or a service",
       description:
         "Post what the user needs: an item to buy, or someone to do a task (pick up lunch, run an errand, help at an " +
-        "event). The server pairs the request with the best offer and negotiates inside both private limits in the same " +
+        "event). The server pairs the request with the best offer and settles the price inside both private limits in the same " +
         "call: when 'deal' is returned, read the offer and ask the user to confirm. When nothing fits yet, the request " +
         "waits and is paired as soon as someone offers. Also returns up to four alternatives. Pass the fields you heard " +
         "plus the user's own words as raw_request; the server reads kind, price unit, hours, pickup and time from them " +
@@ -125,6 +133,7 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
         min_condition: condition.optional().describe("Items: worst acceptable condition"),
         quantity: z.number().int().positive().max(1000).optional().describe("Items: how many"),
         source: z.enum(["voice", "bee_context"]).optional().describe("'bee_context' when inferred from Bee ambient context"),
+        confirm_price: confirmPrice,
       },
       outputSchema: outputs.post_request,
       annotations: writes,
@@ -159,7 +168,7 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       _meta: ui("market"),
       title: "Get this one instead",
       description:
-        "Negotiate a specific offer the user picked from the options. It replaces the deal the request already " +
+        "Settle a specific offer the user picked from the options, by the same fixed rule. It replaces the deal the request already " +
         "holds and returns a proposed deal; ask the user, then call confirm_deal. Returns deal: null when no price fits both limits.",
       inputSchema: { user_id: userIdArg, request_id: id, offer_id: id },
       outputSchema: outputs.negotiate,
@@ -267,6 +276,7 @@ async function run(fn: () => Promise<object>, view?: ViewName) {
     const known = err instanceof market.MarketError;
     if (!known) console.error("[tool] unexpected error", err);
     const say = known ? err.message : "Sorry, something went wrong on my side. Please try again in a moment.";
-    return { isError: true, content: [{ type: "text" as const, text: JSON.stringify({ say }) }] };
+    const body = known && err.code ? { say, code: err.code, ...err.data } : { say };
+    return { isError: true, content: [{ type: "text" as const, text: JSON.stringify(body) }] };
   }
 }

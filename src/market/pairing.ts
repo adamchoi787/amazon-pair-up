@@ -1,13 +1,14 @@
 import type { Db } from "../db/client.js";
 import { logEvent, shortId } from "./events.js";
+import { armFor, champion, featuresOf, loadTracks, predict, recordPairing, type Arm, type Features, type Model } from "./learning.js";
 import { findIntentsForListing, findMatchesForIntent } from "./matching.js";
-import { negotiate } from "./negotiation.js";
+import { negotiate, type NegotiationResult } from "./negotiation.js";
 import { num, type BuyIntentRow, type DealRow, type ListingRow } from "./types.js";
 
 // The pairing engine. Offers (listings) and requests (buy intents) are both
 // standing posts, for an item or a service: when
 // either side posts, the engine pairs it with the best counterpart a deal is
-// possible with, negotiates inside both private limits, and opens a proposed
+// possible with, settles the price inside both private limits, and opens a proposed
 // deal. A post with no counterpart waits and is paired when one arrives.
 //
 // Invariants:
@@ -17,9 +18,45 @@ import { num, type BuyIntentRow, type DealRow, type ListingRow } from "./types.j
 //     first (a lunch run can't wait a day); an unanswered deal then expires and
 //     both posts are re-paired
 //   - a declined or expired listing/request pair is never proposed again
+//   - a buyer who walked away from a price for a listing (declined, let it
+//     expire, switched or withdrew) is never offered that listing lower, by any
+//     later request: declining and asking again with smaller budgets can't
+//     step down to the seller's minimum
 //   - expired requests (needed_by in the past) are not paired
 
-const CANDIDATES = 5;
+// Candidates that pass every hard constraint; the ranking picks among them.
+const CANDIDATES = 10;
+
+type Scored = ListingRow & { relevance: number; price_fit: number; loc: number; score: number };
+
+/** What the learning loop records about a proposal. */
+interface Learn { features: Features; arm: Arm; model: Model | null; baseline: number }
+
+/**
+ * Order candidates for the post that triggered pairing. The control arm keeps
+ * the hand-tuned score (src/market/matching.ts); the model arm orders by the
+ * learned chance that both sides say yes. Candidates with no price inside both
+ * limits are dropped here, as propose would.
+ */
+async function rank(db: Db, postId: string, candidates: { listing: Scored; intent: BuyIntentRow }[]) {
+  const model = await champion(db);
+  const arm = armFor(postId, model);
+  const settled: { listing: Scored; intent: BuyIntentRow; price: number }[] = [];
+  for (const c of candidates) {
+    const r = await settlePair(db, c.listing, c.intent);
+    if (r.ok) settled.push({ ...c, price: r.price });
+  }
+  const tracks = await loadTracks(db, [...new Set(settled.map((c) => c.listing.seller_id))], [...new Set(settled.map((c) => c.intent.buyer_id))]);
+  const ranked = settled.map((c) => ({ ...c, features: featuresOf(c, tracks) }));
+  if (arm === "model" && model) {
+    // Stable sort: equal chances keep the hand-tuned order.
+    ranked.sort((a, b) => predict(model, b.features) - predict(model, a.features));
+  }
+  return ranked.map((c) => ({
+    ...c,
+    learn: { features: c.features, arm, model: arm === "model" ? model : null, baseline: c.listing.score } satisfies Learn,
+  }));
+}
 
 export interface PairingSettings {
   /** Minimum relevance (0..1) for two posts to count as a match. */
@@ -44,9 +81,10 @@ export const isExpired = (i: Pick<BuyIntentRow, "needed_by">, now = new Date()) 
 /** Pair a buy request with the best listing that can close inside both limits. */
 export async function pairIntent(db: Db, intent: BuyIntentRow, s: PairingSettings, by: PairedBy): Promise<Pairing | null> {
   if (intent.status !== "open" || isExpired(intent)) return null;
-  for (const listing of await findMatchesForIntent(db, intent, { limit: CANDIDATES, threshold: s.threshold })) {
-    const deal = await propose(db, listing, intent, s, by, listing.score);
-    if (deal) return { deal, score: listing.score };
+  const matches = await findMatchesForIntent(db, intent, { limit: CANDIDATES, threshold: s.threshold });
+  for (const c of await rank(db, intent.id, matches.map((listing) => ({ listing, intent })))) {
+    const deal = await propose(db, c.listing, intent, s, by, c.listing.score, c.learn);
+    if (deal) return { deal, score: c.listing.score };
   }
   return null;
 }
@@ -54,9 +92,14 @@ export async function pairIntent(db: Db, intent: BuyIntentRow, s: PairingSetting
 /** Pair a listing with the best waiting buy request that can close inside both limits. */
 export async function pairListing(db: Db, listing: ListingRow, s: PairingSettings, by: PairedBy): Promise<Pairing | null> {
   if (listing.status !== "active") return null;
-  for (const intent of await findIntentsForListing(db, listing.id, { limit: CANDIDATES, threshold: s.threshold })) {
-    const deal = await propose(db, listing, intent, s, by, intent.score);
-    if (deal) return { deal, score: intent.score };
+  const intents = await findIntentsForListing(db, listing.id, { limit: CANDIDATES, threshold: s.threshold });
+  const candidates = intents.map((intent) => ({
+    listing: { ...listing, relevance: intent.relevance, price_fit: intent.price_fit, loc: intent.loc, score: intent.score },
+    intent,
+  }));
+  for (const c of await rank(db, listing.id, candidates)) {
+    const deal = await propose(db, listing, c.intent, s, by, c.listing.score, c.learn);
+    if (deal) return { deal, score: c.listing.score };
   }
   return null;
 }
@@ -66,6 +109,29 @@ export async function pairListing(db: Db, listing: ListingRow, s: PairingSetting
  * limits, hold both posts and open a proposed deal. Returns null when there is
  * no overlap or when either post was taken by a concurrent pairing.
  */
+/**
+ * The best price this buyer already walked away from for this listing, or 0.
+ * Confirmed deals don't count: booking the same helper again is a new job.
+ */
+export async function walkAwayFloor(db: Db, listingId: string, buyerId: string) {
+  const { rows } = await db.query<{ floor: string | number | null }>(
+    `SELECT max(d.price) AS floor FROM deals d JOIN buy_intents i ON i.id = d.buy_intent_id
+     WHERE d.listing_id = $1 AND i.buyer_id = $2 AND d.status IN ('declined', 'expired', 'replaced', 'withdrawn')`,
+    [listingId, buyerId],
+  );
+  return num(rows[0]?.floor) ?? 0;
+}
+
+/** Settle one listing/request pair inside both private limits and the buyer's walk-away floor. */
+export async function settlePair(db: Db, listing: ListingRow, intent: BuyIntentRow): Promise<NegotiationResult> {
+  return negotiate({
+    askPrice: num(listing.ask_price)!,
+    sellerMin: num(listing.min_price)!,
+    buyerMax: num(intent.max_price)!,
+    floor: await walkAwayFloor(db, listing.id, intent.buyer_id),
+  });
+}
+
 export async function propose(
   db: Db,
   listing: ListingRow,
@@ -73,12 +139,9 @@ export async function propose(
   s: PairingSettings,
   by: PairedBy,
   score: number | null = null,
+  learn?: Learn,
 ): Promise<DealRow | null> {
-  const result = negotiate({
-    askPrice: num(listing.ask_price)!,
-    sellerMin: num(listing.min_price)!,
-    buyerMax: num(intent.max_price)!,
-  });
+  const result = await settlePair(db, listing, intent);
   if (!result.ok) return null;
 
   // One statement, so both posts are claimed together or not at all.
@@ -101,9 +164,12 @@ export async function propose(
   );
   const deal = rows[0];
   if (!deal) return null;
+  // Pairings the engine chose are recorded for learning; a buyer's own pick (browse) is not a ranking decision.
+  if (learn) await recordPairing(db, deal.id, learn.features, learn.arm, learn.model, learn.baseline);
   await logEvent(db, "paired", null, deal.id, {
     by, listing_id: listing.id, intent_id: intent.id, price: result.price,
     rule: result.rule, saved_vs_ask: result.savedVsAsk, score: score == null ? null : +score.toFixed(3),
+    arm: learn?.arm ?? null, model: learn?.model?.version ?? null,
   });
   return deal;
 }

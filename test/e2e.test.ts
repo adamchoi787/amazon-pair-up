@@ -58,13 +58,13 @@ test("TI-84 demo: a buyer's request is paired and negotiated in one turn", async
   assert.ok(req.request.needed_by, "deadline extracted");
   assert.equal(req.request.status, "matched");
   assert.equal(req.deal.offer_id, posted.offer.offer_id, "TI-84 beats the non-graphing Casio");
-  assert.equal(req.deal.price, 17);
-  assert.equal(req.deal.saved_vs_ask, 3);
+  assert.equal(req.deal.price, 18, "a budget below the ask is the buyer's offer");
+  assert.equal(req.deal.saved_vs_ask, 2);
   assert.equal(req.deal.counterpart, "seller");
   assert.deepEqual(req.deal.meetup, { place: "HKUST campus", availability: null });
   assert.equal(req.deal.seller_confirmed, true, "seller pre-authorised via auto_accept");
   assert.equal(req.deal.waiting_for_you, true, "buyer must still say yes");
-  assert.match(req.say, /\$17, \$3 below asking.*Should I confirm it\?/);
+  assert.match(req.say, /\$18, \$2 below asking.*Should I confirm it\?/);
   assert.ok(req.alternatives.length <= 4);
   assert.ok(!req.alternatives.some((m: { title: string }) => /Nspire/.test(m.title)), "over-budget reserve filtered out");
   assert.ok(!req.alternatives.some((m: { offer_id: string }) => m.offer_id === posted.offer.offer_id), "held item isn't repeated");
@@ -100,8 +100,8 @@ test("a new listing is paired with the best waiting buyer; budgets stay private"
   });
   assert.equal(res.waiting_requests, 2, "both buyers within reach of the reserve are waiting");
   assert.equal(res.deal.counterpart, "buyer_early", "same-area buyer is paired first");
-  assert.equal(res.deal.price, 11);
-  assert.match(res.say, /A buyer was already looking for one: I agreed \$11, inside your limit, and asked them to confirm\. One more person is looking too\./);
+  assert.equal(res.deal.price, 12, "a budget above the ask pays the ask");
+  assert.match(res.say, /A buyer was already looking for one: they'll pay your asking price of \$12\. I've asked them to confirm\. One more person is looking too\./);
   for (const budget of ["16.25", "13.75", "6.5", "max_price"]) assert.ok(!res._raw.includes(budget), `${budget} hidden from the seller`);
 
   const inbox = await early.call("get_deal_status", {});
@@ -125,6 +125,32 @@ test("a new listing is paired with the best waiting buyer; budgets stay private"
   assert.ok(!again.matches.some((m: { offer_id: string }) => m.offer_id === res.offer.offer_id), "declined pair stays apart");
 
   for (const c of [early, late, cheap, seller]) await c.close();
+});
+
+test("a buyer who walks away from a price can't come back lower; the seller's minimum stays hidden", async () => {
+  const seller = await clientAs("seller_fan");
+  const buyer = await clientAs("buyer_fan");
+  const { offer } = await seller.call("post_offer", { title: "Quiet desk fan", category: "fan", ask_price: 20, min_price: 12 });
+
+  const first = await buyer.call("post_request", { need: "desk fan", max_price: 25 });
+  assert.equal(first.deal.offer_id, offer.offer_id);
+  assert.equal(first.deal.price, 20, "a budget above the ask pays the ask, whatever the minimum");
+  await buyer.call("decline_deal", { deal_id: first.deal.deal_id });
+
+  // $15 clears the seller's $12 minimum, but this buyer already turned down $20 for this fan.
+  const lower = await buyer.call("post_request", { need: "desk fan", max_price: 15 });
+  assert.equal(lower.deal, null, "no stepping down toward the minimum");
+
+  // Another buyer can make that offer, and the first buyer can come back at the price they left.
+  const other = await clientAs("buyer_fan_2");
+  const fair = await other.call("post_request", { need: "desk fan", max_price: 15 });
+  assert.equal(fair.deal?.price, 15, "another buyer's $15 offer clears the minimum");
+  await other.call("decline_deal", { deal_id: fair.deal.deal_id });
+  const back = await buyer.call("post_request", { need: "desk fan", max_price: 20 });
+  assert.equal(back.deal?.offer_id, offer.offer_id);
+  assert.equal(back.deal.price, 20);
+  await buyer.call("withdraw_post", { post_id: lower.request.request_id });
+  for (const c of [seller, buyer, other]) await c.close();
 });
 
 test("a listing is held by one deal at a time, even when buyers arrive together", async () => {
@@ -313,13 +339,13 @@ test("lunch run: a request is paired with a runner in one turn, and the runner t
   assert.equal(req.request.your_max_price, 5);
   assert.equal(req.deal.offer_id, runs.offer.offer_id, "paired with the runner, not the lunch box");
   assert.equal(req.deal.kind, "service");
-  assert.equal(req.deal.price, 3.5, "inside both limits: runner min 3, ask 4, budget 5");
-  assert.equal(req.deal.total, 3.5);
+  assert.equal(req.deal.price, 4, "a $5 budget pays the runner's $4 rate");
+  assert.equal(req.deal.total, 4);
   assert.equal(req.deal.pickup, "LG7 canteen");
   assert.deepEqual(req.deal.meetup, { place: "Hall 5", availability: "by 12:30" }, "the job happens where and when the requester needs it");
   assert.ok(new Date(req.deal.on_hold_until) <= new Date(req.request.needed_by), "a lunch offer never outlives lunch");
   assert.ok(!req.alternatives.some((m: { kind: string }) => m.kind !== "service"), "only services as alternatives");
-  assert.match(req.say, /^Found someone: runner_ken can do it for \$3\.50, \$0\.50 below their rate\. From LG7 canteen to Hall 5, by 12:30\. Should I confirm\? runner_ken gives the final yes\.$/);
+  assert.match(req.say, /^Found someone: runner_ken can do it for \$4\. From LG7 canteen to Hall 5, by 12:30\. Should I confirm\? runner_ken gives the final yes\.$/);
   assert.ok(!req._raw.includes("min_price"), "the runner's minimum stays private");
 
   const half = await hungry.call("confirm_deal", { deal_id: req.deal.deal_id });
@@ -329,12 +355,12 @@ test("lunch run: a request is paired with a runner in one turn, and the runner t
   const jobs = await runner.call("get_deal_status", {});
   assert.equal(jobs.deals[0].task, "pick up my lunch", "the runner hears the task");
   assert.equal(jobs.deals[0].waiting_for_you, true);
-  assert.match(jobs.say, /^One deal is waiting for your yes\. Pick up my lunch for hungry_mei, \$3\.50: waiting for your yes\./);
+  assert.match(jobs.say, /^One deal is waiting for your yes\. Pick up my lunch for hungry_mei, \$4: waiting for your yes\./);
   assert.ok(!jobs._raw.includes("max_price") && !jobs._raw.includes('"5"'), "the requester's budget stays private");
 
   const booked = await runner.call("confirm_deal", { deal_id: req.deal.deal_id });
   assert.equal(booked.deal.status, "confirmed");
-  assert.match(booked.say, /^Booked! Lunch runs around campus with hungry_mei, \$3\.50\. From LG7 canteen to Hall 5, by 12:30\.$/);
+  assert.match(booked.say, /^Booked! Lunch runs around campus with hungry_mei, \$4\. From LG7 canteen to Hall 5, by 12:30\.$/);
 
   // A service offer stands: the runner gets the next job.
   const { rows } = await db.query<{ status: string }>(`SELECT status FROM listings WHERE id = $1`, [runs.offer.offer_id]);
@@ -345,7 +371,7 @@ test("lunch run: a request is paired with a runner in one turn, and the runner t
   for (const c of [runner, other, hungry, second]) await c.close();
 });
 
-test("event help: an hourly rate is negotiated and the total is shown for the hours", async () => {
+test("event help: an hourly rate is settled and the total is shown for the hours", async () => {
   const helper = await clientAs("helper_priya");
   const flat = await clientAs("helper_flat");
   const organiser = await clientAs("organiser_ana");
@@ -361,16 +387,16 @@ test("event help: an hourly rate is negotiated and the total is shown for the ho
   assert.equal(req.request.hours, 4);
   assert.equal(req.request.schedule, "Saturday 2-6pm");
   assert.equal(req.deal.offer_id, offer.offer.offer_id, "an hourly request pairs with hourly work only");
-  assert.equal(req.deal.price, 9.5);
+  assert.equal(req.deal.price, 10, "the $10 budget is the offer; it clears the $9 minimum");
   assert.equal(req.deal.hours, 4);
-  assert.equal(req.deal.total, 38);
+  assert.equal(req.deal.total, 40);
   assert.equal(req.deal.meetup.availability, "Saturday 2-6pm");
   assert.equal(req.deal.seller_confirmed, true, "the helper pre-approved rates at or above their minimum");
-  assert.match(req.say, /^Found someone: helper_priya can do it for \$9\.50 an hour, \$38 for 4 hours, \$1\.50 below their rate\. .*Saturday 2-6pm\. Should I confirm it\?$/);
+  assert.match(req.say, /^Found someone: helper_priya can do it for \$10 an hour, \$40 for 4 hours, \$1 below their rate\. .*Saturday 2-6pm\. Should I confirm it\?$/);
   assert.ok(!req.alternatives.some((m: { price_unit: string }) => m.price_unit !== "hour"));
 
   const done = await organiser.call("confirm_deal", { deal_id: req.deal.deal_id });
-  assert.match(done.say, /^Booked! Event helper: setup, registration, ushering with helper_priya, \$9\.50 an hour, \$38 for 4 hours\./);
+  assert.match(done.say, /^Booked! Event helper: setup, registration, ushering with helper_priya, \$10 an hour, \$40 for 4 hours\./);
   for (const c of [helper, flat, organiser]) await c.close();
 });
 
@@ -384,7 +410,7 @@ test("an offer for a service is paired with a request that was already waiting",
   const posted = await mover.call("post_offer", { kind: "service", price_unit: "hour", title: "Moving help with a trolley", category: "moving", ask_price: 12, min_price: 10 });
   assert.equal(posted.waiting_requests, 1);
   assert.equal(posted.deal.task, "help moving boxes to Hall 9");
-  assert.equal(posted.deal.total, 22);
-  assert.match(posted.say, /New job from student_moving: help moving boxes to Hall 9, for \$11 an hour, \$22 for 2 hours\. .*Want it\?$/);
+  assert.equal(posted.deal.total, 24);
+  assert.match(posted.say, /New job from student_moving: help moving boxes to Hall 9, for \$12 an hour, \$24 for 2 hours\. .*Want it\?$/);
   for (const c of [mover, student]) await c.close();
 });

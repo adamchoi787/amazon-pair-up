@@ -30,13 +30,15 @@ budget, a flat fee or an hourly rate, the pickup and drop-off, the time window
 and the hours. One pairing engine serves both kinds. It pairs each request with
 the best-fitting offer using hybrid search (pgvector semantic similarity and
 Postgres full-text search) under hard constraints on kind, price unit,
-condition, quantity, deadline and price feasibility, then negotiates a price
-inside limits each side set privately. Alexa+ presents the deal with an MCP Apps
+condition, quantity, deadline and price feasibility, then settles the price
+with one deterministic rule inside limits each side set privately: the asking
+price, or a lower budget as an offer the seller's minimum accepts. No agent
+haggles, and the seller's minimum never shows through a deal. Alexa+ presents the deal with an MCP Apps
 card and each person confirms with one word. Private limits never leave the
 server.
 
-Because posting, pairing and negotiating take a single sentence, small things
-become worth doing: a $2 pack of tissues, a $3.50 lunch run by a student already
+Because posting, pairing and settling take a single sentence, small things
+become worth doing: a $2 pack of tissues, a $4 lunch run by a student already
 walking past the canteen, four hours of help at a club event. The fee goes to
 the person who does the work, and a runner's offer stays open to take the next
 job.

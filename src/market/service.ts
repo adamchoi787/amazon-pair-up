@@ -2,10 +2,11 @@ import type { Ai, Condition } from "../ai/index.js";
 import { toVector, type Db } from "../db/client.js";
 import { logEvent, shortId } from "./events.js";
 import { findIntentsForListing, findMatchesForIntent } from "./matching.js";
-import { negotiate } from "./negotiation.js";
 import {
-  expireHolds, isExpired, pairIntent, pairListing, propose, release, repairAfter, type PairingSettings,
+  expireHolds, isExpired, pairIntent, pairListing, propose, release, repairAfter, settlePair, type PairingSettings,
 } from "./pairing.js";
+import { learningReport } from "./learning.js";
+import { DEFAULT_PRICE_POLICY, priceBand, verdict, type PriceBand, type PricePolicy } from "./pricing.js";
 import { num, type BuyIntentRow, type DealRow, type Kind, type ListingRow, type PriceUnit, type ServiceUnit } from "./types.js";
 import { dealView, offerView, requestView, type DealView, type DealWithParties } from "./views.js";
 
@@ -15,7 +16,7 @@ import { dealView, offerView, requestView, type DealView, type DealWithParties }
 // One market for things and for services. An offer is an item to sell or a
 // service someone can do (lunch runs, event help); a request is an item someone
 // wants or a task they need done. Both kinds go through the same pairing,
-// private-limit negotiation and two-sided confirmation.
+// private-limit settlement and two-sided confirmation.
 
 /** Marketplace policy. Only the threshold is required; the rest have production defaults. */
 export interface MarketSettings {
@@ -23,6 +24,8 @@ export interface MarketSettings {
   dealHoldHours?: number;
   postsPerHour?: number;
   maxOpenRequests?: number;
+  /** When a price is far enough from the typical range to ask "did you mean…?". */
+  pricePolicy?: Partial<PricePolicy>;
 }
 
 export interface Deps {
@@ -31,7 +34,16 @@ export interface Deps {
   cfg: MarketSettings;
 }
 
-export class MarketError extends Error {}
+/**
+ * An error the user can act on. `message` is spoken as is; `code` and `data`
+ * let an agent act on it too (code "confirm_price": ask, then call again with
+ * confirm_price: true or with the price the user meant).
+ */
+export class MarketError extends Error {
+  constructor(message: string, readonly code?: string, readonly data?: Record<string, unknown>) {
+    super(message);
+  }
+}
 
 const ALTERNATIVES = 4;
 
@@ -39,6 +51,8 @@ const pairing = (cfg: MarketSettings): PairingSettings => ({
   threshold: cfg.matchThreshold,
   holdHours: cfg.dealHoldHours ?? 24,
 });
+
+const pricePolicy = (cfg: MarketSettings): PricePolicy => ({ ...DEFAULT_PRICE_POLICY, ...cfg.pricePolicy });
 
 /** Expire unanswered holds before acting, so every answer reflects the live market. */
 const sweep = (deps: Deps) => expireHolds(deps.db, pairing(deps.cfg));
@@ -89,6 +103,8 @@ export interface PostOfferInput {
   auto_accept?: boolean;
   location?: string;
   availability?: string;
+  /** The user confirmed a price the price check questioned. */
+  confirm_price?: boolean;
 }
 
 /**
@@ -110,19 +126,29 @@ export async function postOffer(deps: Deps, input: PostOfferInput) {
   const embedding = await ai.embed(
     [input.title, input.description, input.category, kind === "item" ? input.condition : undefined].filter(Boolean).join(". "),
   );
+  const currency = input.currency ?? "USD";
+  const band = await priceBand(deps, { kind, unit, embedding, condition: input.condition ?? "good", posterId: input.user_id });
+  const flag = band && checkPrices(band, pricePolicy(cfg), kind, unit, currency, input.confirm_price, [
+    ["ask_price", input.ask_price],
+    ...(input.min_price != null ? [["min_price", minPrice] as const] : []),
+  ]);
   const { rows } = await db.query<ListingRow>(
     `INSERT INTO listings (id, seller_id, kind, price_unit, title, description, category, condition, quantity, currency,
-                           ask_price, min_price, auto_accept, location, availability, embedding)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::vector) RETURNING *`,
+                           ask_price, min_price, auto_accept, location, availability, embedding,
+                           ref_low, ref_high, ref_source, price_flag)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::vector,$17,$18,$19,$20) RETURNING *`,
     [
       id, input.user_id, kind, unit, input.title, input.description ?? "", input.category ?? null,
-      input.condition ?? "good", kind === "item" ? input.quantity ?? 1 : 1, input.currency ?? "USD",
+      input.condition ?? "good", kind === "item" ? input.quantity ?? 1 : 1, currency,
       input.ask_price, minPrice, input.auto_accept ?? kind === "item", input.location ?? null,
-      input.availability ?? null, toVector(embedding),
+      input.availability ?? null, toVector(embedding), band?.low ?? null, band?.high ?? null, band?.source ?? null, flag ?? null,
     ],
   );
   const waiting = (await findIntentsForListing(db, id, { limit: 5, threshold: cfg.matchThreshold })).length;
-  await logEvent(db, "listing_created", input.user_id, id, { title: input.title, kind, unit, ask: input.ask_price, waiting_requests: waiting });
+  await logEvent(db, "listing_created", input.user_id, id, {
+    title: input.title, kind, unit, ask: input.ask_price, waiting_requests: waiting,
+    typical: band && { low: band.low, high: band.high, source: band.source }, price_flag: flag ?? null,
+  });
 
   const paired = await pairListing(db, rows[0], pairing(cfg), "seller");
   const offer = offerView(await getListing(db, id), input.user_id);
@@ -135,8 +161,8 @@ export async function postOffer(deps: Deps, input: PostOfferInput) {
     const others = waiting - 1;
     const more = others > 0 ? ` ${countWord(others)} more ${others === 1 ? "person is" : "people are"} looking too.` : "";
     say = kind === "item"
-      ? `${posted} A buyer was already looking for one: I agreed ${fmt(deal.price, deal.currency)}, inside your limit, ` +
-        (deal.seller_confirmed ? `and asked them to confirm.` : `so it's your call. Should I accept?`) + more
+      ? `${posted} A buyer was already looking for one: ${agreedLine(deal)}. I've ` +
+        (deal.seller_confirmed ? `asked them to confirm.` : `left it for you: should I accept?`) + more
       : `${posted} ${providerJobLine(deal)}` + more;
   } else {
     say = `${posted} ` +
@@ -166,6 +192,8 @@ export interface PostRequestInput {
   needed_by?: string;
   location?: string;
   source?: "voice" | "bee_context";
+  /** The user confirmed a budget the price check questioned. */
+  confirm_price?: boolean;
 }
 
 /** Ask for an item or a task. Pair it with the best offer right away, or keep it waiting for one. */
@@ -193,10 +221,16 @@ export async function postRequest(deps: Deps, input: PostRequestInput) {
   const id = shortId("req");
   const category = extracted?.category ?? null;
   const embedding = await ai.embed([need, category].filter(Boolean).join(". "));
+  const currency = input.currency ?? "USD";
+  // A budget is checked against the range for a new one: only a budget far
+  // above what anything like it costs is questioned.
+  const band = await priceBand(deps, { kind, unit, embedding, condition: "new", posterId: input.user_id });
+  const policy = pricePolicy(cfg);
+  const flag = band && checkPrices(band, policy, kind, unit, currency, input.confirm_price, [["max_price", maxPrice]]);
   const { rows } = await db.query<BuyIntentRow>(
     `INSERT INTO buy_intents (id, buyer_id, kind, price_unit, need, raw_request, source, category, min_condition, quantity,
-                              hours, pickup, schedule, currency, max_price, needed_by, location, embedding)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::vector) RETURNING *`,
+                              hours, pickup, schedule, currency, max_price, needed_by, location, embedding, price_flag)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::vector,$19) RETURNING *`,
     [
       id, input.user_id, kind, unit, need, input.raw_request ?? null, input.source ?? "voice", category,
       service ? "for_parts" : input.min_condition ?? extracted?.min_condition ?? "for_parts",
@@ -204,7 +238,7 @@ export async function postRequest(deps: Deps, input: PostRequestInput) {
       unit === "hour" ? input.hours ?? extracted?.hours ?? null : null,
       service ? input.pickup ?? extracted?.pickup ?? null : null,
       service ? input.schedule ?? extracted?.schedule ?? null : null,
-      input.currency ?? "USD", maxPrice, neededBy, input.location ?? extracted?.location ?? null, toVector(embedding),
+      currency, maxPrice, neededBy, input.location ?? extracted?.location ?? null, toVector(embedding), flag ?? null,
     ],
   );
   await logEvent(db, "intent_created", input.user_id, id, { need, kind, unit, source: input.source ?? "voice" });
@@ -214,6 +248,10 @@ export async function postRequest(deps: Deps, input: PostRequestInput) {
   const alternatives = await findMatchesForIntent(db, intentRow, { limit: ALTERNATIVES, threshold: cfg.matchThreshold });
   const deal = paired ? dealView(await getDealWithParties(db, paired.deal.id), input.user_id) : null;
   const budget = rate(maxPrice, unit, intentRow.currency);
+  // A budget far below the usual range rarely finds anyone: say so, so the user can decide.
+  const lowBudget = !deal && band && verdict(maxPrice, band, policy) === "far_below"
+    ? ` Heads up: ${service ? "jobs like this usually pay" : "these usually go for"} ${range(band, unit, intentRow.currency)}, so it may take a while.`
+    : "";
 
   return {
     request: requestView(intentRow, input.user_id),
@@ -222,8 +260,8 @@ export async function postRequest(deps: Deps, input: PostRequestInput) {
     say: deal
       ? buyerOfferLine(deal, "found")
       : service
-        ? `Got it: ${need}, up to ${budget}. Nobody's free for it yet, so I'll keep asking and pair you as soon as someone offers. Helpers won't see your budget.`
-        : `Got it: ${need}, up to ${budget}. Nothing fits yet, so I'll keep looking and pair you as soon as a seller lists one. Sellers won't see your budget.`,
+        ? `Got it: ${need}, up to ${budget}. Nobody's free for it yet, so I'll keep asking and pair you as soon as someone offers. Helpers won't see your budget.${lowBudget}`
+        : `Got it: ${need}, up to ${budget}. Nothing fits yet, so I'll keep looking and pair you as soon as a seller lists one. Sellers won't see your budget.${lowBudget}`,
   };
 }
 
@@ -239,14 +277,14 @@ export async function findMatches(deps: Deps, userId: string, requestId: string,
     request_id: requestId,
     matches: matches.map((m) => matchView(m, intent, userId)),
     say: best
-      ? `I found ${matches.length} option${matches.length > 1 ? "s" : ""}. The best is ${best.title}, asking ${rate(num(best.ask_price)!, best.price_unit, best.currency)}. Want me to negotiate it?`
+      ? `I found ${matches.length} option${matches.length > 1 ? "s" : ""}. The best is ${best.title}, asking ${rate(num(best.ask_price)!, best.price_unit, best.currency)}. Want me to get it for you?`
       : `No other options right now. I'll keep your request open.`,
   };
 }
 
 // ---------- Deal-making ----------
 
-/** The buyer picks a specific offer: negotiate it, replacing any deal the request already holds. */
+/** The buyer picks a specific offer: settle it, replacing any deal the request already holds. */
 export async function negotiateDeal(deps: Deps, userId: string, requestId: string, offerId: string) {
   const { db, cfg } = deps;
   await sweep(deps);
@@ -267,7 +305,7 @@ export async function negotiateDeal(deps: Deps, userId: string, requestId: strin
     throw new MarketError(listing.status === "pending" ? "That one is on hold for someone else right now." : "That offer is no longer available.");
   }
 
-  const preview = negotiate({ askPrice: num(listing.ask_price)!, sellerMin: num(listing.min_price)!, buyerMax: num(intent.max_price)! });
+  const preview = await settlePair(db, listing, intent);
   if (!preview.ok) {
     await logEvent(db, "negotiation_failed", userId, offerId, { intent_id: requestId });
     // Deliberately vague: never reveal how far apart the limits are.
@@ -347,7 +385,7 @@ export async function declineDeal(deps: Deps, userId: string, dealId: string) {
     say = next ? `Passed on that one. ${providerJobLine(next)}` : `Passed on that one. You're still available, and I'll bring you the next job.`;
   } else {
     say = next
-      ? `Cancelled. Another buyer was waiting: I agreed ${fmt(next.price, next.currency)}, inside your limit` +
+      ? `Cancelled. Another buyer was waiting: ${agreedLine(next)}` +
         (next.seller_confirmed ? `, and asked them to confirm.` : `. Should I accept this one?`)
       : `Cancelled. Your listing is back up, and I'll pair it with the next buyer who asks.`;
   }
@@ -451,14 +489,15 @@ export async function withdrawPost(deps: Deps, userId: string, postId: string) {
 // ---------- Dashboard ----------
 
 export async function dashboard(db: Db) {
-  const [listings, intents, deals, events] = await Promise.all([
+  const [listings, intents, deals, events, learning] = await Promise.all([
     db.query(`SELECT id, seller_id, kind, price_unit, title, condition, ask_price, currency, location, status, created_at FROM listings ORDER BY created_at DESC LIMIT 50`),
     db.query(`SELECT id, buyer_id, kind, price_unit, need, source, quantity, hours, pickup, schedule, currency, status, created_at FROM buy_intents ORDER BY created_at DESC LIMIT 50`),
     db.query(`${DEAL_WITH_PARTIES} ORDER BY d.created_at DESC LIMIT 50`),
     db.query(`SELECT * FROM events ORDER BY id DESC LIMIT 100`),
+    learningReport(db),
   ]);
   // Private limits are intentionally absent: the dashboard proves they stay hidden.
-  return { listings: listings.rows, intents: intents.rows, deals: deals.rows, events: events.rows };
+  return { listings: listings.rows, intents: intents.rows, deals: deals.rows, events: events.rows, learning };
 }
 
 // ---------- helpers ----------
@@ -466,7 +505,7 @@ export async function dashboard(db: Db) {
 // For a service, the place and time come from the request when it gives them:
 // the job happens where and when the requester needs it.
 const DEAL_WITH_PARTIES = `
-  SELECT d.*, l.kind, l.price_unit, l.title, l.condition, l.ask_price,
+  SELECT d.*, l.kind, l.price_unit, l.title, l.condition, l.ask_price, l.ref_low, l.ref_high, l.ref_source,
          CASE WHEN l.kind = 'service' THEN COALESCE(i.schedule, l.availability) ELSE l.availability END AS availability,
          i.hours, i.pickup, i.needed_by, i.need AS task, l.seller_id, i.buyer_id,
          su.display_name AS seller_name, bu.display_name AS buyer_name
@@ -526,8 +565,54 @@ function buyerOfferLine(deal: DealView, mode: "found" | "negotiated" | "next" | 
   const ask = deal.seller_confirmed
     ? " Should I confirm it?"
     : ` Should I confirm? ${deal.kind === "item" ? "The seller" : deal.counterpart} gives the final yes.`;
-  return `${lead}${saved}.${placeLine(deal)}${ask}`;
+  return `${lead}${saved}.${placeLine(deal)}${priceWarning(deal)}${ask}`;
 }
+
+/** Said to the buyer when the price is far from what similar things go for. */
+function priceWarning(deal: DealView) {
+  const c = deal.price_check;
+  if (!c) return "";
+  const usual = `the usual ${fmt(c.typical_low, deal.currency)} to ${fmt(c.typical_high, deal.currency)}`;
+  if (c.verdict === "far_below") {
+    return deal.kind === "item"
+      ? ` Heads up: that's far below ${usual}. Meet somewhere public, check it works, and only pay once you have it.`
+      : ` Heads up: that's far below ${usual} for a job like this.`;
+  }
+  if (c.verdict === "far_above") return ` Note: that's well above ${usual}.`;
+  return "";
+}
+
+/** Ask the user to confirm the first price that is far outside the band; returns the flag to store once they have. */
+function checkPrices(
+  band: PriceBand, policy: PricePolicy, kind: Kind, unit: PriceUnit, currency: string, confirmed: boolean | undefined,
+  prices: readonly (readonly ["ask_price" | "min_price" | "max_price", number])[],
+) {
+  for (const [field, price] of prices) {
+    const v = verdict(price, band, policy);
+    // A low minimum or a high budget only costs its owner; a low ask also lures buyers.
+    const far = field === "max_price" ? v === "far_above" : field === "min_price" ? v === "far_below" : v === "far_below" || v === "far_above";
+    if (!far) continue;
+    if (confirmed) return v as "far_below" | "far_above";
+    const usual = `${kind === "item" ? "Items like this usually sell for" : "Jobs like this usually pay"} ${range(band, unit, currency)}`;
+    const yours = { ask_price: "you're asking", min_price: "your lowest price is", max_price: "your budget is" }[field];
+    throw new MarketError(
+      `${usual}, and ${yours} ${rate(price, unit, currency)}. Is ${fmt(price, currency)} right? Say yes to go ahead, or tell me the price you meant.`,
+      "confirm_price",
+      { field, price, verdict: v, typical_low: band.low, typical_high: band.high, source: band.source },
+    );
+  }
+  return null;
+}
+
+/** "$220 to $380", "$8 to $20 an hour". */
+const range = (band: Pick<PriceBand, "low" | "high">, unit: PriceUnit, currency: string) =>
+  `${fmt(band.low, currency)} to ${rate(band.high, unit, currency)}`;
+
+/** What a seller hears about the price: their ask, or a lower offer their minimum accepted. */
+const agreedLine = (deal: DealView) =>
+  deal.saved_vs_ask > 0
+    ? `they offered ${fmt(deal.price, deal.currency)}, inside your limit`
+    : `they'll pay your asking price of ${fmt(deal.price, deal.currency)}`;
 
 /** What a provider hears about a job: the task, the pay and where and when. */
 function providerJobLine(deal: DealView) {

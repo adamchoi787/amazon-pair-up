@@ -43,6 +43,16 @@ export const config = {
   postsPerHour: Number(env("POSTS_PER_HOUR", "30")),
   maxOpenRequests: Number(env("MAX_OPEN_REQUESTS", "10")),
   mcpCallsPerMinute: Number(env("MCP_CALLS_PER_MINUTE", "120")),
+  // Learning to pair better (src/market/learning.ts): how often to train and judge a ranking model.
+  learnIntervalHours: Number(env("LEARN_INTERVAL_HOURS", "24")),
+  learnMinOutcomes: Number(env("LEARN_MIN_OUTCOMES", "60")),
+  // Price check (src/market/pricing.ts): when to ask "did you mean…?".
+  pricePolicy: {
+    farBelow: Number(env("PRICE_FAR_BELOW", "0.5")),
+    farAbove: Number(env("PRICE_FAR_ABOVE", "2")),
+    referenceMatch: Number(env("PRICE_REFERENCE_MATCH", "0.55")),
+    tradeMatch: Number(env("PRICE_TRADE_MATCH", "0.8")),
+  },
 
   // /api/dashboard shows every post and deal. Open in AUTH_MODE=none (local);
   // otherwise it needs this token, and stays off when the token is unset.

@@ -1,3 +1,4 @@
+import { verdict, type BandSource } from "./pricing.js";
 import { num, type BuyIntentRow, type DealRow, type Kind, type ListingRow, type PriceUnit } from "./types.js";
 
 // The ONLY place rows become tool output. Private limits are included solely
@@ -22,8 +23,15 @@ export function offerView(l: ListingRow, viewerId: string) {
     location: l.location,
     availability: l.availability,
     status: l.status,
+    typical_price: typicalPrice(l),
     ...(isOwner ? { your_min_price: num(l.min_price), auto_accept: l.auto_accept } : {}),
   };
+}
+
+/** The public typical range an offer was checked against. */
+function typicalPrice(r: { ref_low: string | number | null; ref_high: string | number | null; ref_source: string | null }) {
+  if (r.ref_low == null || r.ref_high == null) return null;
+  return { low: num(r.ref_low)!, high: num(r.ref_high)!, source: r.ref_source as BandSource };
 }
 
 export function requestView(i: BuyIntentRow, viewerId: string) {
@@ -64,6 +72,9 @@ export interface DealWithParties extends DealRow {
   buyer_id: string;
   seller_name: string;
   buyer_name: string;
+  ref_low: string | number | null;
+  ref_high: string | number | null;
+  ref_source: string | null;
 }
 
 export type Role = "buyer" | "seller" | "observer";
@@ -100,6 +111,7 @@ export function dealView(d: DealWithParties, viewerId: string) {
     total: dealTotal(price, d.price_unit, hours),
     ask_price: ask,
     saved_vs_ask: +(ask - price).toFixed(2),
+    price_check: priceCheck(d, price),
     currency: d.currency,
     status: d.status,
     buyer_confirmed: d.buyer_confirmed,
@@ -113,6 +125,13 @@ export function dealView(d: DealWithParties, viewerId: string) {
     created_at: iso(d.created_at)!,
     updated_at: iso(d.updated_at)!,
   };
+}
+
+/** How the agreed price compares with the typical range for the offer. */
+function priceCheck(d: DealWithParties, price: number) {
+  const typical = typicalPrice(d);
+  if (!typical) return null;
+  return { verdict: verdict(price, typical), typical_low: typical.low, typical_high: typical.high, source: typical.source };
 }
 
 export type DealView = ReturnType<typeof dealView>;

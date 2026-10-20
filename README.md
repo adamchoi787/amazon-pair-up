@@ -1,8 +1,9 @@
 # AmazonPairUp — a voice-first C2C marketplace for Alexa+
 
 > People who have something, people who can do something, and people who need
-> either just say so. Alexa+ pairs each buyer with a seller, negotiates inside
-> limits each side set privately, and asks both for a final "yes".
+> either just say so. Alexa+ pairs each buyer with a seller, settles the price
+> by a fixed rule inside limits each side set privately, and asks both for a
+> final "yes".
 
 **Track:** Alexa+ (self-hosted MCP server, spec 2025-11-25, Streamable HTTP)
 **Mini challenge:** AWS Builder (Amazon Bedrock embeddings + intent extraction, AWS hosting)
@@ -21,14 +22,60 @@ AmazonPairUp pairs buyers and sellers directly and does the work in between,
 for things and for services. Both sides post what they have, what they can do,
 or what they need:
 
-- **Things:** "Alexa, sell my TI-84 for $20. I'll take anything above $15." · "Alexa, I need a graphing calculator today, max $18." → "Found it: TI-84 Plus graphing calculator for $17, $3 below asking. Meet-up: HKUST campus. Should I confirm it?"
-- **Errands and delivery:** "Alexa, find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5." → a student already doing lunch runs on campus takes it for $3.50, and the fee goes to the person who walks.
-- **One-time jobs:** "Alexa, get me a helper for the event on Saturday 2-6pm, budget $10 an hour." → "Found someone: Priya can do it for $9.50 an hour, $38 for 4 hours."
+- **Things:** "Alexa, sell my TI-84 for $20. I'll take anything above $15." · "Alexa, I need a graphing calculator today, max $18." → "Found it: TI-84 Plus graphing calculator for $18, $2 below asking. Meet-up: HKUST campus. Should I confirm it?"
+- **Errands and delivery:** "Alexa, find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5." → a student already doing lunch runs on campus takes it for $4, and the fee goes to the person who walks.
+- **One-time jobs:** "Alexa, get me a helper for the event on Saturday 2-6pm, budget $10 an hour." → "Found someone: Priya can do it for $10 an hour, $40 for 4 hours."
 
 Neither side ever sees the other's limit. Our MCP server understands both
 requests, pairs each request with the best-fitting offer of the same kind,
-negotiates and records the deal; Alexa+ is the voice and the agent; each
+settles the price and records the deal; Alexa+ is the voice and the agent; each
 person just says yes or no.
+
+## How a price is set: no haggling
+
+Agents don't bargain with each other here. Turn-by-turn haggling costs model
+calls and seconds on every deal, and a model can be talked into revealing a
+limit. One deterministic rule settles every deal instead, in
+[pairing-core](vendor/pairing-core) (Rust compiled to WebAssembly):
+
+- **The asking price is public.** A budget at or above it pays the ask.
+- **A budget below it is the buyer's offer**, and the seller's private minimum
+  decides whether it is accepted, like "best offer" with automatic acceptance.
+- **The seller's minimum stays secret.** It never moves the price, so a deal
+  shows only that the minimum was at most the price. A buyer who walks away
+  from an offer never gets that listing cheaper later, so declining and asking
+  again lower can't find the minimum.
+- **The buyer's budget stays secret whenever it covers the ask.** A lower budget
+  is the buyer's offer, so the seller sees it as the price.
+
+**Price check.** A price far from what similar things go for gets a "did you
+mean…?" before it is posted: a $1 iPhone, a minimum misheard as $1, a budget
+heard as $180 for an $18 calculator. The typical range comes from reference
+prices (a product catalog in production), or from the market's own confirmed
+trades. Those trades are counted so that staged ones barely move the range: one
+vote per seller, at least three independent sellers and buyers, accounts older
+than a week, a median-based range. A buyer who is offered something far below
+the usual price hears a safety note. The check never sets or blocks a price;
+it only asks.
+
+## Getting better every day
+
+Every proposed deal records what the engine saw (relevance, same area,
+urgency, delivery offered, pre-approved seller, condition margin, price against
+the typical range, each side's track record), and its outcome is the label.
+Each night ([learning.ts](src/market/learning.ts)) a small logistic model is
+trained on older outcomes and judged on the newest ones. It replaces the
+current ranking only if it ranks them better. 10% of requests always keep the
+hand-tuned ranking as a live control, and the model rolls back automatically
+if its completion rate falls behind. The model only reorders candidates that
+already pass every hard constraint, and prices stay with the fixed rule. The
+dashboard shows the daily completion rate, both arms, and what drives
+completion in this market.
+
+`npm run simulate` runs the real engine on simulated buyers who prefer nearby,
+delivered and pre-approved offers; the engine is never told. Over 12 simulated
+days the learned ranking closed 77% of its proposals against 59% for the
+control, and it named delivery and same area as the main drivers.
 
 ## Run it (2 minutes, no database or AWS needed)
 
@@ -38,6 +85,7 @@ npm run reset        # create tables + load seed listings
 npm start            # web app on http://127.0.0.1:3000/, MCP server at /mcp, operations dashboard at /dashboard/
 npm run smoke        # (second terminal) plays the TI-84 demo over real MCP
 npm test             # unit + end-to-end tests (in-memory Postgres + pgvector)
+npm run simulate     # the learning loop on a simulated market, day by day
 ```
 
 Local dev uses **PGlite** — real Postgres + **pgvector** embedded in Node,
@@ -79,6 +127,8 @@ flowchart TB
     I[Intent extraction<br/>Bedrock LLM] --> P[Pairing engine<br/>runs on every post, both sides]
     P --> H[Hybrid search<br/>pgvector + full-text, relevance gate]
     P --> N[Settlement: pairing-core<br/>Rust → WebAssembly, private limits]
+    P --> C[Price check<br/>reference prices + robust trade history]
+    L[Learning loop<br/>ranks by what closes, guarded rollout] -.-> P
     N --> D[Proposed deal<br/>both sides confirm]
   end
   S --> DB[(Postgres + pgvector<br/>users · offers · requests · deals · events)]
@@ -88,7 +138,7 @@ flowchart TB
 | Layer | Role |
 |---|---|
 | Alexa+ | Interface and agent: conversation, confirmation |
-| MCP server (this repo) | Pairing intelligence: posts, matching, negotiation, deals |
+| MCP server (this repo) | Pairing intelligence: posts, matching, settlement, price checks, learning, deals |
 | Bee | Ambient context → proactive buy requests |
 
 ## MCP tools
@@ -96,7 +146,7 @@ flowchart TB
 | Tool | What it does |
 |---|---|
 | `post_offer` | Offer an item to sell or a service you can do (per job or per hour): public price, **private minimum**, area. Pairs with a waiting request in the same call |
-| `post_request` | Ask for an item or for help (pickup, drop-off, time, hours) + **private budget**. Pairs with the best offer and negotiates in the same call; returns alternatives |
+| `post_request` | Ask for an item or for help (pickup, drop-off, time, hours) + **private budget**. Pairs with the best offer and settles the price in the same call; returns alternatives |
 | `find_matches` | More options for a request |
 | `negotiate` | Take a different option instead; replaces the current deal |
 | `confirm_deal` / `decline_deal` | Each side's yes or no; a no re-pairs both posts |
@@ -122,6 +172,8 @@ src/
   market/pairing.ts      pairing engine: pair on every post, atomic holds, release and re-pair
   market/matching.ts     hybrid pgvector + full-text search in both directions
   market/negotiation.ts  price settlement via pairing-core (Rust → WebAssembly)
+  market/pricing.ts      price check: reference prices, robust trade-history range
+  market/learning.ts     learning to pair better: features, model, guarded rollout
   market/service.ts      business operations behind each tool
   market/views.ts        the only place rows become output (privacy redaction)
   ai/                    mock + Bedrock embeddings and intent extraction

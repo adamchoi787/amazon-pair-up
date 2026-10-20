@@ -28,6 +28,11 @@ export interface ListingRow {
   location: string | null;
   availability: string | null;
   status: string;
+  /** The typical range the price was checked against (src/market/pricing.ts). */
+  ref_low: string | number | null;
+  ref_high: string | number | null;
+  ref_source: string | null;
+  price_flag: string | null;
   created_at: string | Date;
 }
 

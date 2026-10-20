@@ -31,6 +31,7 @@ interface Scores {
   semantic: number;
   keyword: number;
   price_fit: number;
+  loc: number;
   relevance: number;
   score: number;
 }
@@ -42,6 +43,7 @@ const toScores = <T extends Scores>(r: T): T => ({
   semantic: Number(r.semantic),
   keyword: Number(r.keyword),
   price_fit: Number(r.price_fit),
+  loc: Number(r.loc),
   relevance: Number(r.relevance),
   score: Number(r.score),
 });

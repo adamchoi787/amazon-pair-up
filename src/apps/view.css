@@ -42,5 +42,6 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .carousel > .card { scroll-snap-align: start; display: flex; flex-direction: column; }
 .carousel button { margin-top: auto; }
 @media (min-width: 640px) { .carousel { grid-auto-columns: minmax(200px, 1fr); } }
+.alert { font-size: 14px; margin: 10px 0 4px; padding: 8px 12px; border-radius: 10px; border-left: 3px solid var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); }
 .note { font-size: 14px; color: var(--muted); padding: 2px 4px; }
 .more { font-size: 14px; color: var(--muted); padding: 0 4px; }

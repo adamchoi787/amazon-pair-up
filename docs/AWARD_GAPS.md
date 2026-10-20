@@ -103,12 +103,17 @@ text, images and video alone, so the video and description carry most of the wei
   how it grows (neighbourhoods, then any Alexa+ household).
 - Real evidence: a short classmate poll or interviews. Use only real numbers.
 - Trust and safety story: private limits, public meet-up spots, deal records,
-  both sides confirm.
+  both sides confirm, and a price check that questions a $1 iPhone before it is
+  posted and warns the buyer if it is confirmed anyway (Oct 20).
 
 **Quality of the Idea**
-- Two agents negotiating inside private limits, with buy requests that wait
-  across sessions until a seller appears. This matches the rules' "agentic
-  workflow" and "state across sessions" examples.
+- No agent haggling: one deterministic rule settles every deal inside private
+  limits, and the seller's minimum never shows through the price (Oct 20). Buy
+  requests wait across sessions until a seller appears, which matches the rules'
+  "agentic workflow" and "state across sessions" examples.
+- A market that learns: a ranking model trained nightly on which deals closed,
+  promoted only when it ranks recent outcomes better, with a 10% live control
+  and automatic rollback (Oct 20). `npm run simulate` shows it day by day.
 - An Agent Skill (SKILL.md) that teaches any agent host how to use AmazonPairUp.
 - MCP Apps as above.
 

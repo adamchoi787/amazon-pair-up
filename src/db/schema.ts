@@ -90,6 +90,47 @@ ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS hours      NUMERIC(5,2);
 ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS pickup     TEXT;
 ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS schedule   TEXT;
 
+-- Price check (src/market/pricing.ts). Reference prices for typical second-hand
+-- ranges; each offer keeps the range it was checked against, and price_flag
+-- records a price the person confirmed although it was far outside it.
+CREATE TABLE IF NOT EXISTS reference_prices (
+  id          TEXT PRIMARY KEY,
+  kind        TEXT NOT NULL,
+  price_unit  TEXT NOT NULL,
+  title       TEXT NOT NULL,
+  low         NUMERIC(10,2) NOT NULL,
+  high        NUMERIC(10,2) NOT NULL,
+  hash        TEXT NOT NULL,                      -- re-embed only when an entry changes
+  embedding   vector(${embeddingDim})
+);
+-- ref_source: reference | trades. price_flag: far_below | far_above.
+ALTER TABLE listings    ADD COLUMN IF NOT EXISTS ref_low    NUMERIC(10,2);
+ALTER TABLE listings    ADD COLUMN IF NOT EXISTS ref_high   NUMERIC(10,2);
+ALTER TABLE listings    ADD COLUMN IF NOT EXISTS ref_source TEXT;
+ALTER TABLE listings    ADD COLUMN IF NOT EXISTS price_flag TEXT;
+ALTER TABLE buy_intents ADD COLUMN IF NOT EXISTS price_flag TEXT;
+
+-- Learning to pair better (src/market/learning.ts). What the engine saw when it
+-- proposed each deal, and the ranking models trained on how those deals ended.
+-- ranking_models.status: champion | retired | rejected | rolled_back.
+CREATE TABLE IF NOT EXISTS pairing_features (
+  deal_id        TEXT PRIMARY KEY REFERENCES deals(id),
+  arm            TEXT NOT NULL,
+  model_version  INTEGER,
+  predicted      DOUBLE PRECISION,
+  baseline       DOUBLE PRECISION NOT NULL,
+  features       JSONB NOT NULL,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS ranking_models (
+  version     SERIAL PRIMARY KEY,
+  bias        DOUBLE PRECISION NOT NULL,
+  weights     JSONB NOT NULL,
+  metrics     JSONB NOT NULL DEFAULT '{}'::jsonb,
+  status      TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Append-only audit trail; powers the dashboard.
 CREATE TABLE IF NOT EXISTS events (
   id          BIGSERIAL PRIMARY KEY,

@@ -33,7 +33,8 @@ const amount = (re: RegExp, text: string) => {
   return m ? Number(m[1]) : undefined;
 };
 const anyAmount = (text: string) => amount(new RegExp(MONEY, "i"), text);
-const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+// "iPhone" and "eBook" keep their own casing.
+const capitalize = (s: string) => (/^[a-z][A-Z]/.test(s) ? s : s.charAt(0).toUpperCase() + s.slice(1));
 
 const CONDITIONS: [RegExp, string][] = [
   [/\bbrand[- ]new\b|\bsealed\b|\bunopened\b/i, "new"],
@@ -89,6 +90,17 @@ function onUtterance(messages: AgentMessage[], text: string): Step {
   const budgetFor = pendingBudgetRequest(messages);
   if (budgetFor && anyAmount(text) !== undefined && !SELL.test(text)) {
     return call("post_request", { raw_request: budgetFor, max_price: anyAmount(text) });
+  }
+
+  // The price check asked "is $1 right?": a yes posts it anyway, a number replaces it.
+  const check = pendingPriceCheck(messages);
+  if (check) {
+    const corrected = anyAmount(text);
+    if (corrected !== undefined) {
+      return call(check.tool, { ...check.input, [check.field]: corrected, confirm_price: undefined });
+    }
+    if (isExplicitYes(text)) return call(check.tool, { ...check.input, confirm_price: true });
+    if (DECLINE.test(text)) return reply("Okay, I've left it. Tell me the price whenever you're ready.");
   }
 
   if (DECLINE.test(text)) {
@@ -197,6 +209,24 @@ function pendingBudgetRequest(messages: AgentMessage[]) {
       }
     }
     return undefined;
+  }
+  return undefined;
+}
+
+/** If the newest result is a price check, the call it questioned and the field to correct. */
+function pendingPriceCheck(messages: AgentMessage[]) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    for (const b of messages[i].content) {
+      if (!isToolResult(b)) continue;
+      const data = resultJson(b.toolResult);
+      if (b.toolResult.status !== "error" || data.code !== "confirm_price") return undefined;
+      for (const m of messages) for (const u of m.content) {
+        if (isToolUse(u) && u.toolUse.toolUseId === b.toolResult.toolUseId) {
+          return { tool: u.toolUse.name, input: u.toolUse.input, field: String(data.field) };
+        }
+      }
+      return undefined;
+    }
   }
   return undefined;
 }

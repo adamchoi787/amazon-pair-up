@@ -176,14 +176,14 @@ test("a spoken sale and purchase, end to end through the web app's loop", async 
   assert.match(listed, /Listed TI-84 graphing calculator for \$20/);
 
   const offer = await buyer.say("I need a graphing calculator today, maximum $18");
-  assert.equal(offer, "Found it: TI-84 graphing calculator for $17, $3 below asking. Meet-up: HKUST campus. Should I confirm it?");
+  assert.equal(offer, "Found it: TI-84 graphing calculator for $18, $2 below asking. Meet-up: HKUST campus. Should I confirm it?");
   const card = buyer.cards.at(-1)!;
   assert.equal(card.view, "ui://amazonpairup/market.html", "the result names its MCP Apps view");
-  assert.equal((card.data.deal as { price: number }).price, 17);
+  assert.equal((card.data.deal as { price: number }).price, 18);
 
   assert.match(await buyer.say("what does it cost?"), /^You can say things like: sell my TI-84 for 20 dollars/);
   const done = await buyer.say("Yes, confirm it");
-  assert.match(done, /^Done! TI-84 graphing calculator for \$17 with u_mei\. Meet-up: HKUST campus\.$/);
+  assert.match(done, /^Done! TI-84 graphing calculator for \$18 with u_mei\. Meet-up: HKUST campus\.$/);
   assert.match(await seller.say("Any news on my deals?"), /confirmed with u_ken/);
 
   for (const s of [seller, buyer]) await s.close();
@@ -195,12 +195,12 @@ test("a spoken lunch run, end to end: the requester and the runner each say yes"
 
   assert.match(await runner.say("I can do lunch runs around campus for $4 a run, at least $3"), /^You're on the market: Lunch runs around campus, \$4 a job\./);
   const offer = await hungry.say("Find someone to pick up my lunch from LG7 canteen to Hall 5 by 12:30, $5");
-  assert.equal(offer, "Found someone: u_runner can do it for $3.50, $0.50 below their rate. From LG7 canteen to Hall 5, by 12:30. Should I confirm? u_runner gives the final yes.");
+  assert.equal(offer, "Found someone: u_runner can do it for $4. From LG7 canteen to Hall 5, by 12:30. Should I confirm? u_runner gives the final yes.");
   assert.equal((hungry.cards.at(-1)!.data.deal as { kind: string }).kind, "service");
   assert.equal(await hungry.say("Yes"), "Confirmed on your side. I'll let you know when u_runner says yes.");
 
-  assert.match(await runner.say("Any jobs for me?"), /^One deal is waiting for your yes\. Pick up my lunch for u_hungry, \$3\.50/);
-  assert.equal(await runner.say("Yes, I'll take it"), "Booked! Lunch runs around campus with u_hungry, $3.50. From LG7 canteen to Hall 5, by 12:30.");
+  assert.match(await runner.say("Any jobs for me?"), /^One deal is waiting for your yes\. Pick up my lunch for u_hungry, \$4:/);
+  assert.equal(await runner.say("Yes, I'll take it"), "Booked! Lunch runs around campus with u_hungry, $4. From LG7 canteen to Hall 5, by 12:30.");
   for (const s of [runner, hungry]) await s.close();
 });
 
@@ -262,4 +262,16 @@ test("tool results that carry a spoken sentence become the reply directly", asyn
     { role: "user", content: [{ toolResult: { toolUseId: "b", content: [{ json: { say: "You have one item for sale." } }] } }] },
   ];
   assert.equal(sayFromResults(takeDown), null, "the model continues to withdraw_post");
+});
+
+test("a price far from the usual range is questioned by voice: a yes posts it, a number corrects it", async () => {
+  const seller = await session("u_phone_seller");
+  const asked = await seller.say("Sell my iPhone 13 for $1");
+  assert.match(asked, /^Items like this usually sell for \$\d+ to \$\d+, and you're asking \$1\. Is \$1 right\?/);
+  assert.match(await seller.say("Yes"), /^Listed iPhone 13 for \$1\./);
+
+  const other = await session("u_phone_seller_2");
+  await other.say("Sell my iPhone 13 for $1");
+  assert.match(await other.say("Sorry, I meant $300"), /^Listed iPhone 13 for \$300\./);
+  for (const s of [seller, other]) await s.close();
 });
