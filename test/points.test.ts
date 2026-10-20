@@ -4,9 +4,9 @@ import { createMockAi } from "../src/ai/mock.js";
 import { createApp } from "../src/app.js";
 import { config } from "../src/config.js";
 import { openDb, type Db } from "../src/db/client.js";
-import { checkInAtPoint, chooseMeetupPoint, isPresence, listMeetupPoints } from "../src/market/points.js";
+import { checkInAtPoint, chooseMeetupPoint, isPresence, listMeetupPoints, recordRingNotification } from "../src/market/points.js";
 import { confirmDeal, getDealStatus, postOffer, postRequest, type Deps } from "../src/market/service.js";
-import { RingClient } from "../src/ring/client.js";
+import { RingClient, RingApiError } from "../src/ring/client.js";
 import { parseRingNotification, ringSignature, verifyRingSignature } from "../src/ring/webhook.js";
 
 // PairUp Points: a deal's two people meet at a point watched by a Ring device,
@@ -130,4 +130,36 @@ test("both people check in at the HUB point and Ring confirms the hand-off", asy
 
 test("check-in needs a confirmed deal at a point", async () => {
   await assert.rejects(checkInAtPoint(deps, "u_nobody", {}), /PairUp Point/);
+});
+
+test("Ring client follows same-origin pagination and keeps missing event ends null", async () => {
+  let calls = 0;
+  const ring = new RingClient("token", { fetch: async (input) => {
+    calls++;
+    return Response.json({ data: [{ id: String(calls), type: "devices", attributes: { name: `Door ${calls}` } }], links: { next: calls === 1 ? "?page=2" : null } });
+  } });
+  assert.equal((await ring.devices()).length, 2); assert.equal(calls, 2);
+  const history = new RingClient("token", { fetch: async () => Response.json({ data: [{ id: "e", type: "events", attributes: { event_type: "ding", start: 123, end: null } }] }) });
+  assert.equal((await history.history("d"))[0].end, null);
+  const foreign = new RingClient("token", { fetch: async () => Response.json({ data: [], links: { next: "https://foreign.example/devices" } }) });
+  await assert.rejects(foreign.devices(), /another host/);
+});
+test("Ring throttling honors short Retry-After, reports long waits and explains expired tokens", async () => {
+  let calls = 0;
+  const ring = new RingClient("token", { fetch: async () => ++calls === 1 ? new Response("", { status: 429, headers: { "Retry-After": "1" } }) : Response.json({ data: [] }) });
+  const start = Date.now(); await ring.devices();
+  assert.equal(calls, 2); assert.ok(Date.now() - start >= 950);
+  const limited = new RingClient("token", { fetch: async () => new Response("", { status: 429, headers: { "Retry-After": "60" } }) });
+  await assert.rejects(limited.devices(), (e: RingApiError) => e.status === 429 && e.retryAfterSeconds === 60);
+  const expired = new RingClient("token", { fetch: async () => new Response("", { status: 401 }) });
+  await assert.rejects(expired.devices(), /renew the Playground token/);
+});
+test("Ring delivery dedupes request_id across event ids and ignores stale or future arrival evidence", async () => {
+  const base = { request_id: "request-dedupe", event_id: "dedupe-1", event_type: "button_press", sub_type: null, device_id: DEVICE, at: Date.now() };
+  assert.equal((await recordRingNotification(deps, base)).stored, true);
+  assert.deepEqual(await recordRingNotification(deps, { ...base, event_id: "dedupe-2" }), { stored: false, confirmed: 0 });
+  assert.equal((await db.query("SELECT id FROM ring_events WHERE request_id = $1", [base.request_id])).rows.length, 1);
+  for (const at of [Date.now() - 86_400_000, Date.now() + 3_600_000]) {
+    assert.equal((await recordRingNotification(deps, { ...base, request_id: `old-${at}`, event_id: `old-${at}`, at })).stored, false);
+  }
 });

@@ -194,11 +194,12 @@ export async function checkInAtPoint(deps: Deps, userId: string, input: { deal_i
 interface StoredEvent { id: string; device_id: string; point_id: string; event_type: string; sub_type: string | null; at: number; source: "webhook" | "history"; request_id?: string | null }
 
 async function storeRingEvent(db: Db, e: StoredEvent) {
-  await db.query(
+  const { rows } = await db.query(
     `INSERT INTO ring_events (id, device_id, point_id, event_type, sub_type, occurred_at, source, request_id)
-     VALUES ($1, $2, $3, $4, $5, to_timestamp($6 / 1000.0), $7, $8) ON CONFLICT (id) DO NOTHING`,
+     VALUES ($1, $2, $3, $4, $5, to_timestamp($6 / 1000.0), $7, $8) ON CONFLICT DO NOTHING RETURNING id`,
     [e.id, e.device_id, e.point_id, e.event_type, e.sub_type, e.at, e.source, e.request_id ?? null],
   );
+  return rows.length > 0;
 }
 
 /**
@@ -208,7 +209,11 @@ async function storeRingEvent(db: Db, e: StoredEvent) {
 export async function recordRingNotification(deps: Deps, n: RingNotification) {
   const point = [...pointDevices(deps.cfg.ring)].find(([, device]) => device === n.device_id)?.[0];
   if (!point || !isPresence(n.event_type, n.sub_type, deps.cfg.ring?.sandbox)) return { stored: false, confirmed: 0 };
-  await storeRingEvent(deps.db, { id: n.event_id, device_id: n.device_id, point_id: point, event_type: n.event_type, sub_type: n.sub_type, at: n.at, source: "webhook", request_id: n.request_id });
+  // Local acceptance policy for arrival evidence, independent of Ring's
+  // delivery retries: an old event cannot confirm somebody arriving now.
+  if (n.at < Date.now() - HISTORY_MINUTES * 60_000 || n.at > Date.now() + 60_000) return { stored: false, confirmed: 0 };
+  const stored = await storeRingEvent(deps.db, { id: n.event_id, device_id: n.device_id, point_id: point, event_type: n.event_type, sub_type: n.sub_type, at: n.at, source: "webhook", request_id: n.request_id });
+  if (!stored) return { stored: false, confirmed: 0 };
   return { stored: true, confirmed: await matchArrivals(deps.db, point) };
 }
 
