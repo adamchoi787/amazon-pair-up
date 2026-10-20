@@ -74,4 +74,8 @@ export interface DealRow {
   expires_at: string | Date | null;
 }
 
+/** Where a request came from: the user's own words, Bee, a watch or phone, or a learned routine. */
+export const REQUEST_SOURCES = ["voice", "bee_context", "device_context", "routine"] as const;
+export type RequestSource = (typeof REQUEST_SOURCES)[number];
+
 export const num = (v: string | number | null | undefined) => (v == null ? null : Number(v));

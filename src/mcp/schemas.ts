@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { CONDITIONS } from "../ai/index.js";
-import { KINDS } from "../market/types.js";
+import { KINDS, REQUEST_SOURCES } from "../market/types.js";
 
 // Output schemas for every tool. They mirror src/market/views.ts exactly, so
 // clients (and Alexa+) can rely on structuredContent. test/schema.test.ts
@@ -47,7 +47,8 @@ export const requestOut = z.object({
   request_id: z.string(),
   kind,
   need: z.string().describe("The item, or the task"),
-  source: z.enum(["voice", "bee_context"]),
+  source: z.enum(REQUEST_SOURCES)
+    .describe("voice = the user said it; bee_context = from Bee; device_context = from a watch or phone; routine = a learned routine the user accepted"),
   category: z.string().nullable(),
   min_condition: condition.nullable().describe("Items only"),
   quantity: z.number().int(),
@@ -103,7 +104,7 @@ export const dealOut = z.object({
   updated_at: z.string(),
 });
 
-export const outputs = {
+const marketOutputs = {
   post_offer: {
     offer: offerOut,
     deal: dealOut.nullable().describe("Opened when someone was already waiting"),
@@ -147,6 +148,61 @@ export const outputs = {
     kind: z.enum(["offer", "request"]),
     status: z.enum(["withdrawn", "cancelled"]),
     released_deal_id: z.string().nullable().describe("The proposed deal this post was holding, now released"),
+    say,
+  },
+};
+
+export const suggestionOut = z.object({
+  suggestion_id: z.string(),
+  from: z.enum(["routine", "bee", "watch", "phone"]).describe("routine = learned from the user's own past requests"),
+  reason: z.string().describe("Why it is suggested, e.g. 'From your Bee: \"…\"' or 'You've asked for this 6 times, usually on weekdays around 12:15pm.'"),
+  heard: z.string().nullable().describe("The user's own words or to-do that led here (device suggestions)"),
+  request: z.object({
+    need: z.string(),
+    kind,
+    price_unit: priceUnit,
+    max_price: money.nullable().describe("The user's own usual budget (private to them); null: ask before accepting"),
+    hours: z.number().nullable(),
+    pickup: z.string().nullable(),
+    location: z.string().nullable(),
+    schedule: z.string().nullable(),
+    needed_by: z.string().nullable(),
+  }).describe("The request accept_suggestion posts"),
+  confidence: z.number().nullable().describe("Routines: 0-1, how regular the routine is"),
+  say,
+});
+
+const routineOut = z.object({
+  routine_id: z.string(),
+  need: z.string(),
+  kind,
+  when: z.string().describe("e.g. 'on weekdays around 12:15pm'"),
+  usual_budget: money.describe("Median of the user's own budgets for it (private to them)"),
+  price_unit: priceUnit,
+  pickup: z.string().nullable(),
+  location: z.string().nullable(),
+  times: z.number().int().describe("How often the user asked for it in the last 90 days"),
+  next_at: z.string().describe("ISO 8601: when it is next due"),
+  confidence: z.number(),
+  paused: z.boolean().describe("Dismissed repeatedly: not suggested until accepted again"),
+});
+
+export const outputs = {
+  ...marketOutputs,
+  add_context: {
+    signal_id: z.string(),
+    suggestion: suggestionOut.nullable().describe("When the signal names a need"),
+    duplicate: z.boolean().describe("The same external_id was sent before; nothing new was recorded"),
+    say,
+  },
+  get_suggestions: { suggestions: z.array(suggestionOut), say },
+  accept_suggestion: { suggestion_id: z.string(), ...marketOutputs.post_request },
+  dismiss_suggestion: { suggestion_id: z.string(), forgotten: z.boolean(), say },
+  get_my_routines: {
+    time_zone: z.string(),
+    routines: z.array(routineOut),
+    devices: z.array(z.object({ source: z.string(), last_seen: z.string(), signals: z.number().int() }))
+      .describe("Devices that have sent context, and when"),
     say,
   },
 };

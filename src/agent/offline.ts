@@ -20,6 +20,12 @@ const call = (name: string, input: Json, text?: string): Step => ({
   stop: "tool_use",
 });
 
+/** Several read-only tools in one step; their spoken lines are joined. */
+const callAll = (names: string[]): Step => ({
+  content: names.map((name) => ({ toolUse: { toolUseId: `t_${randomUUID().slice(0, 12)}`, name, input: {} } })),
+  stop: "tool_use",
+});
+
 const HELP =
   "You can say things like: sell my TI-84 for 20 dollars, I'll take anything above 15. Or: I need a graphing calculator, maximum 18 dollars. " +
   "Or: find someone to pick up my lunch from LG7 to Hall 5 by 12:30, 5 dollars. Or: I can do lunch runs on campus for 4 dollars a run.";
@@ -63,7 +69,15 @@ function afterTools(messages: AgentMessage[], results: ToolResultBlock[]): Step 
     if (post) return call("withdraw_post", { post_id: post.id });
     return reply(`Which one should I take down? ${String(data.say ?? "")}`);
   }
+  if (results.length > 1) return reply(spokenLines(messages, results) || "Done.");
   return reply(String(data.say ?? "Done."));
+}
+
+/** Each result's 'say', leaving out "nothing to suggest" when something else was said. */
+export function spokenLines(messages: AgentMessage[], results: ToolResultBlock[]) {
+  const lines = results.map((b) => ({ tool: toolNameFor(messages, b.toolResult.toolUseId), data: resultJson(b.toolResult) }));
+  const said = lines.filter((l) => !(l.tool === "get_suggestions" && Array.isArray(l.data.suggestions) && !l.data.suggestions.length));
+  return (said.length ? said : lines).map((l) => String(l.data.say ?? "")).filter(Boolean).join(" ");
 }
 
 // ---------- on the user's words ----------
@@ -72,6 +86,9 @@ const DECLINE = /^\s*(no|nope|nah|decline|pass|not (that|this)( one)?|cancel (it
 export const WITHDRAW = /\b(take down|remove|withdraw|delete|cancel)\b.*\b(listing|offer|request|post|my|the)\b/i;
 const MY_POSTS = /\b(what am i (selling|offering|looking for)|my (listings|offers|posts|requests|items)|what (have|did) i (list|post|offer)(ed)?)\b/i;
 const STATUS = /\b(news|status|my (deals?|jobs?)|any (offers|deals|buyers|sellers|jobs|updates)|meet-?up|did (anyone|someone|anybody)|has (anyone|anybody)|who (bought|is buying)|inbox|what'?s new)\b/i;
+const SUGGEST = /\b(anything i (need|should get)|what do you suggest|any (suggestions|ideas)|suggest something|what might i need|for me today)\b/i;
+const ROUTINES = /\b(what do you know about me|my (routines|habits)|what have you (learned|noticed))\b/i;
+const FORGET = /\b(forget (it|that|this)|don'?t (suggest|ask) (that|this|it) again|never suggest|stop suggesting)\b/i;
 const MORE = /\b((more|other) (options|ones|choices)|what else|anything else|show me (more|others|alternatives)|alternatives)\b/i;
 const SELL = /\b(sell|selling|list my|get rid of)\b/i;
 // "I can do lunch runs on campus", "I'm free on Saturday to help at events"
@@ -108,6 +125,20 @@ function onUtterance(messages: AgentMessage[], text: string): Step {
   if (atAsk && isExplicitYes(text)) return call("negotiate", atAsk);
   if (atAsk && DECLINE.test(text)) return reply("Okay. I'll keep looking.");
 
+  // "Want me to ask now?" after a suggestion: yes posts it, a number sets the budget, no or forget skips it.
+  const suggestion = pendingSuggestion(messages);
+  if (suggestion) {
+    const budget = anyAmount(text);
+    if (FORGET.test(text)) return call("dismiss_suggestion", { suggestion_id: suggestion.id, forget: true });
+    if (DECLINE.test(text)) return call("dismiss_suggestion", { suggestion_id: suggestion.id });
+    if (budget !== undefined && !SELL.test(text)) return call("accept_suggestion", { suggestion_id: suggestion.id, max_price: budget });
+    if (isExplicitYes(text)) {
+      return suggestion.needsBudget ? reply("Sure. What's the most you'd pay? I keep that private.") : call("accept_suggestion", { suggestion_id: suggestion.id });
+    }
+  }
+  if (ROUTINES.test(text)) return call("get_my_routines", {});
+  if (SUGGEST.test(text)) return call("get_suggestions", {});
+
   if (DECLINE.test(text)) {
     const deal = latestOpenDeal(messages, false);
     return deal ? call("decline_deal", { deal_id: deal }) : reply("Okay. What would you like to do instead?");
@@ -117,7 +148,8 @@ function onUtterance(messages: AgentMessage[], text: string): Step {
     return deal ? call("confirm_deal", { deal_id: deal }) : call("get_deal_status", {});
   }
   if (WITHDRAW.test(text) || MY_POSTS.test(text)) return call("list_my_posts", {});
-  if (STATUS.test(text)) return call("get_deal_status", {});
+  // "Any news?" also checks what the user may need.
+  if (STATUS.test(text)) return callAll(["get_deal_status", "get_suggestions"]);
   if (MORE.test(text)) {
     const request = latestRequest(messages);
     return request ? call("find_matches", { request_id: request, limit: 4 }) : reply("What are you looking for?");
@@ -254,7 +286,24 @@ function pendingAskingPrice(messages: AgentMessage[]) {
   return undefined;
 }
 
-interface DealLike { deal_id?: string; status?: string; waiting_for_you?: boolean }
+interface Sug { suggestion_id: string; request?: { max_price?: number | null } }
+
+/** The suggestion the assistant just offered, when the newest result is one. */
+function pendingSuggestion(messages: AgentMessage[]) {
+  for (const r of resultsNewestFirst(messages)) {
+    if (r.tool === "get_deal_status") continue;
+    if (r.status === "error") {
+      const d = r.data as { code?: string; suggestion_id?: string };
+      return d.code === "need_budget" && d.suggestion_id ? { id: d.suggestion_id, needsBudget: true } : undefined;
+    }
+    const d = r.data as { suggestions?: Sug[]; suggestion?: Sug | null };
+    const s = d.suggestion ?? (r.tool === "get_suggestions" ? d.suggestions?.[0] : undefined);
+    return s ? { id: s.suggestion_id, needsBudget: s.request?.max_price == null } : undefined;
+  }
+  return undefined;
+}
+
+interface DealLike {deal_id?: string; status?: string; waiting_for_you?: boolean }
 
 function latestOpenDeal(messages: AgentMessage[], mustAwaitUser: boolean) {
   for (const r of resultsNewestFirst(messages)) {

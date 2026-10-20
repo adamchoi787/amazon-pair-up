@@ -4,9 +4,10 @@ import { z } from "zod";
 import { CONDITIONS } from "../ai/index.js";
 import { log, metric } from "../http/log.js";
 import { once } from "../market/idempotency.js";
+import * as suggestions from "../market/context.js";
 import * as market from "../market/service.js";
 import type { Deps } from "../market/service.js";
-import { KINDS, SERVICE_UNITS } from "../market/types.js";
+import { KINDS, REQUEST_SOURCES, SERVICE_UNITS } from "../market/types.js";
 import { registerViews, VIEWS, type ViewName } from "./apps.js";
 import { registerPrompts } from "./prompts.js";
 import { outputs } from "./schemas.js";
@@ -155,7 +156,7 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
           .describe("ISO 8601: an item's deadline or a job's start time; the request stops pairing after it and offers expire by then"),
         min_condition: condition.optional().describe("Items: worst acceptable condition"),
         quantity: z.number().int().positive().max(1000).optional().describe("Items: how many"),
-        source: z.enum(["voice", "bee_context"]).optional().describe("'bee_context' when inferred from Bee ambient context"),
+        source: z.enum(REQUEST_SOURCES).optional().describe("'bee_context' when inferred from Bee, 'device_context' from a watch or phone"),
         confirm_price: confirmPrice,
         idempotency_key: idempotencyKey,
       },
@@ -283,6 +284,113 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       annotations: { ...writes, destructiveHint: true, idempotentHint: true },
     },
     (args) => write("withdraw_post", args, (userId) => market.withdrawPost(deps, userId, args.post_id)),
+  );
+
+  // ---------- knowing what the user needs (src/market/context.ts) ----------
+
+  registerAppTool(
+    server,
+    "get_suggestions",
+    {
+      _meta: ui("market"),
+      title: "What I might need",
+      description:
+        "Requests the user will probably want now, ready to post with one yes: needs picked up by their Bee, watch or " +
+        "phone ('my calculator broke', a to-do 'buy printer paper'), and routines learned from their own past requests " +
+        "that are due soon ('lunch run on weekdays around 12:15'). Call when the user opens the app, asks 'anything I " +
+        "need?' or 'what do you suggest?', and after add_context. Read one suggestion's 'say'; on a yes call " +
+        "accept_suggestion, on a no dismiss_suggestion.",
+      inputSchema: { user_id: userIdArg },
+      outputSchema: outputs.get_suggestions,
+      annotations: reads,
+    },
+    (args) => run("get_suggestions", () => suggestions.getSuggestions(deps, who(args.user_id)), "market"),
+  );
+
+  registerAppTool(
+    server,
+    "accept_suggestion",
+    {
+      _meta: ui("market"),
+      title: "Yes to a suggestion",
+      description:
+        "Post a suggested request after the user's explicit yes. It is paired and settled like post_request, and returns " +
+        "the same result (a proposed deal to confirm, or a waiting request). Pass max_price when the suggestion has none " +
+        "or the user names a different budget.",
+      inputSchema: {
+        user_id: userIdArg,
+        suggestion_id: id,
+        max_price: price.optional().describe("PRIVATE budget, when the user gives one"),
+        idempotency_key: idempotencyKey,
+      },
+      outputSchema: outputs.accept_suggestion,
+      annotations: writes,
+    },
+    (args) => write("accept_suggestion", args, (userId) => suggestions.acceptSuggestion(deps, userId, args.suggestion_id, args.max_price), "market"),
+  );
+
+  server.registerTool(
+    "dismiss_suggestion",
+    {
+      title: "No to a suggestion",
+      description:
+        "The user doesn't want a suggestion now. With forget: true (\"don't suggest that again\") a routine is never " +
+        "suggested again; a routine dismissed twice in two weeks pauses by itself.",
+      inputSchema: {
+        user_id: userIdArg,
+        suggestion_id: id,
+        forget: z.boolean().optional().describe("Stop suggesting this routine"),
+        idempotency_key: idempotencyKey,
+      },
+      outputSchema: outputs.dismiss_suggestion,
+      annotations: { ...writes, idempotentHint: true },
+    },
+    (args) => write("dismiss_suggestion", args, (userId) => suggestions.dismissSuggestion(deps, userId, args.suggestion_id, args.forget)),
+  );
+
+  server.registerTool(
+    "add_context",
+    {
+      title: "Share context from a device",
+      description:
+        "Pass on something from the user's Bee, watch or phone that may show a need: a to-do, a conversation summary, a " +
+        "voice note, or a place they arrived at. For agents that also hold the user's Bee data (Bee MCP: bee_list_todos, " +
+        "bee_get_today): send the user's own items that mention needing, buying, fixing or getting help, one call each, " +
+        "never other people's words. Returns a suggestion when the text names a need; nothing is posted until the user " +
+        "says yes. Snippets that name no need are not kept.",
+      inputSchema: {
+        user_id: userIdArg,
+        source: z.enum(suggestions.SIGNAL_SOURCES),
+        kind: z.enum(suggestions.SIGNAL_KINDS),
+        text: z.string().trim().max(500).optional().describe("The to-do, summary or note, as written"),
+        place: text(120).optional().describe("location: the place the user arrived at, e.g. 'Hall 5'"),
+        observed_at: z.string().max(40).optional().describe("ISO 8601; defaults to now"),
+        external_id: z.string().max(128).optional().describe("The device's id for this item, so a resend is ignored"),
+        time_zone: z.string().max(64).optional().describe("IANA zone, e.g. 'Asia/Hong_Kong'"),
+      },
+      outputSchema: outputs.add_context,
+      annotations: { ...writes, idempotentHint: true },
+    },
+    (args) => run("add_context", async () => {
+      const r = await suggestions.addContext(deps, who(args.user_id), args);
+      return { ...r, say: r.suggestion?.say ?? (r.duplicate ? "Already noted." : "Noted.") };
+    }),
+  );
+
+  registerAppTool(
+    server,
+    "get_my_routines",
+    {
+      _meta: ui("market"),
+      title: "What you've learned about me",
+      description:
+        "The routines learned from the user's own requests (what, when, usual budget and place) and which devices send " +
+        "context. Use for 'what do you know about me?' or 'what are my routines?'. Only the user sees this.",
+      inputSchema: { user_id: userIdArg },
+      outputSchema: outputs.get_my_routines,
+      annotations: reads,
+    },
+    (args) => run("get_my_routines", () => suggestions.getMyRoutines(deps, who(args.user_id)), "market"),
   );
 
   registerPrompts(server);

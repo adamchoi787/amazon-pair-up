@@ -187,4 +187,50 @@ CREATE TABLE IF NOT EXISTS oauth_tokens (
   expires_at      TIMESTAMPTZ NOT NULL,
   revoked         BOOLEAN NOT NULL DEFAULT FALSE
 );
+
+-- Knowing what people need (src/market/lifestyle.ts, src/market/context.ts).
+-- Each user's time zone places their routines in their own day. Context
+-- signals are short snippets from Bee, a watch or a phone (a to-do, a
+-- conversation summary, "arrived at Hall 5"); one that names a need becomes a
+-- suggestion the user accepts with a yes. Snippets are deleted after 30 days.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS time_zone TEXT;
+CREATE TABLE IF NOT EXISTS context_signals (
+  id           TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL REFERENCES users(id),
+  source       TEXT NOT NULL,                   -- bee | watch | phone | agent
+  kind         TEXT NOT NULL,                   -- todo | conversation | journal | fact | location | note
+  external_id  TEXT,
+  text         TEXT,
+  place        TEXT,
+  observed_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  status       TEXT NOT NULL DEFAULT 'new',     -- new | suggested | accepted | dismissed | ignored
+  suggestion   JSONB,
+  request_id   TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS context_signals_ext_idx ON context_signals (user_id, source, external_id);
+CREATE INDEX IF NOT EXISTS context_signals_user_idx ON context_signals (user_id, status, observed_at);
+
+-- What the user did with a routine suggestion: accepted, dismissed, or forget (never suggest it again).
+CREATE TABLE IF NOT EXISTS routine_feedback (
+  user_id     TEXT NOT NULL REFERENCES users(id),
+  routine_id  TEXT NOT NULL,
+  action      TEXT NOT NULL,
+  day         TEXT NOT NULL,                     -- the user's local date the suggestion was for
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, routine_id, day, action)
+);
+
+-- Long-lived, revocable tokens for a watch Shortcut or the Bee bridge. They
+-- reach only /api/voice and /api/context; only SHA-256 hashes are stored.
+CREATE TABLE IF NOT EXISTS device_tokens (
+  id            TEXT PRIMARY KEY,
+  token_hash    TEXT NOT NULL UNIQUE,
+  user_id       TEXT NOT NULL REFERENCES users(id),
+  label         TEXT NOT NULL,
+  kind          TEXT NOT NULL,                   -- watch | bee | phone
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_used_at  TIMESTAMPTZ,
+  revoked       BOOLEAN NOT NULL DEFAULT FALSE
+);
 `;

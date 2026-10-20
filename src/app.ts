@@ -6,6 +6,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { agentMode, handleAgentTurn } from "./agent/index.js";
 import { oauthRouter, sendUnauthorized, userForAccessToken, WEB_CLIENT_ID, webRedirectUri } from "./auth/oauth.js";
 import type { Config } from "./config.js";
+import { deviceRouter } from "./http/devices.js";
 import { accessLog, log, requestId } from "./http/log.js";
 import { rateLimit } from "./http/rateLimit.js";
 import { dashboard, type Deps } from "./market/service.js";
@@ -112,6 +113,9 @@ export function createApp(deps: Deps, cfg: Config) {
 
   app.use("/mcp", accessLog("mcp"), checkOrigin, rateLimit(cfg.mcpCallsPerMinute));
   app.use("/api/agent", accessLog("agent"), checkOrigin, rateLimit(cfg.mcpCallsPerMinute));
+  // Apple Watch, Bee and phone: words and context in, suggestions out (src/http/devices.ts).
+  app.use(["/api/voice", "/api/context", "/api/devices"], accessLog("devices"), checkOrigin);
+  app.use(deviceRouter(deps, cfg, caller));
 
   app.post("/mcp", async (req, res) => {
     const who = await caller(req);
