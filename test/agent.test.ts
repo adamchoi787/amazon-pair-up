@@ -228,7 +228,11 @@ test("tools declare the AmazonPairUp MCP Apps view, and the view is served", asy
   const client = new Client({ name: "res", version: "0" });
   await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), { requestInit: { headers: { "X-User-Id": "u_viewer" } } }));
   const { resources } = await client.listResources();
-  assert.deepEqual(resources.map((r) => [r.uri, r.mimeType]), [["ui://amazonpairup/market.html", "text/html;profile=mcp-app"]]);
+  assert.deepEqual(resources.map((r) => [r.uri, r.mimeType]), [
+    ["ui://amazonpairup/market.html", "text/html;profile=mcp-app"],
+    ["deals://me", "application/json"],
+    ["posts://me", "application/json"],
+  ]);
   const { contents } = await client.readResource({ uri: "ui://amazonpairup/market.html" });
   assert.match((contents[0] as { text: string }).text, /^<!doctype html>.*<script type="module">/s);
   for (const c of [client, s]) await c.close();

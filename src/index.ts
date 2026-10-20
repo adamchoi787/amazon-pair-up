@@ -7,6 +7,7 @@ import { log } from "./http/log.js";
 import { purgeIdempotentCalls } from "./market/idempotency.js";
 import { DEFAULT_LEARN_POLICY, learn } from "./market/learning.js";
 import { expireHolds } from "./market/pairing.js";
+import type { McpSessions } from "./mcp/sessions.js";
 
 const db = await openDb(config);
 const ai = createAi(config);
@@ -63,6 +64,8 @@ const shutdown = (signal: string) => {
   log("info", "shutting down", { signal });
   clearInterval(sweeper);
   clearInterval(learner);
+  // Open session streams would hold server.close() until the force timeout.
+  void (app.locals.mcpSessions as McpSessions).closeAll();
   const force = setTimeout(() => {
     log("warn", "calls still running after 10 s; closing them");
     server.closeAllConnections();

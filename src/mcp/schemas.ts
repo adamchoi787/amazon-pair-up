@@ -167,4 +167,16 @@ export const outputs = {
   },
   report_user: { report: reportOut, say },
   rate_deal: { rating: ratingOut, say },
+  delete_my_data: {
+    deleted: z.literal(true),
+    posts_taken_down: z.number().int().describe("Live offers and requests withdrawn first"),
+    released_deals: z.number().int().describe("Deals on hold that were released; the other person is paired again"),
+    posts_deleted: z.number().int().describe("Posts that never reached a deal, deleted"),
+    posts_anonymised: z.number().int().describe("Posts kept for a past deal, moved to an anonymous 'Former member'"),
+    deals_kept_anonymised: z.number().int().describe("Past deals the other person still sees, without the user's name"),
+    events_deleted: z.number().int().describe("Activity-log entries about the user and their posts"),
+    learning_rows_deleted: z.number().int().describe("Pairing-model training rows from the user's deals"),
+    tokens_revoked: z.number().int().describe("Sign-in tokens deleted; the user is signed out everywhere"),
+    say,
+  },
 };

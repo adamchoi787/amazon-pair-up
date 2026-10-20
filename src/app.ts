@@ -2,7 +2,6 @@ import { timingSafeEqual } from "node:crypto";
 import compression from "compression";
 import express from "express";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { agentMode, handleAgentTurn } from "./agent/index.js";
 import { oauthRouter, sendUnauthorized, userForAccessToken, WEB_CLIENT_ID, webRedirectUri } from "./auth/oauth.js";
 import type { Config } from "./config.js";
@@ -11,17 +10,21 @@ import { rateLimit } from "./http/rateLimit.js";
 import { dashboard, MarketError, reviewUser, type Deps } from "./market/service.js";
 import { llmsTxt, serverCard } from "./mcp/discovery.js";
 import { createMcpServer, SERVER_INFO } from "./mcp/server.js";
+import { McpSessions } from "./mcp/sessions.js";
+import { subscriberCount } from "./mcp/subscriptions.js";
 
 // HTTP surface:
-//   /mcp            Streamable HTTP, stateless (a fresh McpServer + transport per
-//                   request), protocol 2025-11-25. Alexa+ and the web app both call it.
+//   /mcp            Streamable HTTP, protocol 2025-11-25. Alexa+ and the web app both call it.
+//                   Without Mcp-Session-Id a request is stateless (a fresh McpServer +
+//                   transport); an initialize opens a session for the GET SSE stream,
+//                   resource subscriptions and elicitation (src/mcp/sessions.ts).
 //   /api/agent      one reasoning step for the web app's assistant (Bedrock tool use,
 //                   or the offline planner); the web app runs the tools itself over /mcp
 //   /app/           the AmazonPairUp web app
 //   /dashboard/     operations view (see DASHBOARD_TOKEN)
 //   /health         liveness; /ready also checks the database (for load balancers)
 //   /.well-known/mcp/server-card.json, /llms.txt, /skills/…  discovery for agents
-// Stateless suits Lambda / AgentCore / App Runner and needs no sticky sessions.
+// Tool calls never need a session, so stateless clients need no sticky sessions.
 
 /** Authenticated (with a user unless it's an anonymous local-dev call), or rejected. */
 type Caller = { ok: true; userId?: string } | { ok: false };
@@ -34,7 +37,11 @@ export function createApp(deps: Deps, cfg: Config) {
 
   // Stateless MCP responses end once the result is written, so compressing them
   // only shrinks the transfer (the MCP Apps view is ~0.5 MB of HTML, ~4× smaller gzipped).
-  app.use(compression({ threshold: 1024 }));
+  // Session streams stay open (notifications, elicitation mid-call), so they are never buffered.
+  app.use(compression({
+    threshold: 1024,
+    filter: (req, res) => !req.headers["mcp-session-id"] && compression.filter(req, res),
+  }));
   app.use(requestId);
   app.use((_req, res, next) => {
     res.set("X-Content-Type-Options", "nosniff");
@@ -48,11 +55,17 @@ export function createApp(deps: Deps, cfg: Config) {
     });
   }
 
+  const sessions = new McpSessions((ctx) => createMcpServer(deps, ctx), {
+    enabled: cfg.mcpSessions, idleMinutes: cfg.mcpSessionIdleMinutes, max: cfg.mcpMaxSessions,
+  });
+  // For a graceful shutdown (src/index.ts).
+  app.locals.mcpSessions = sessions;
+
   const started = Date.now();
   app.get("/health", (_req, res) => {
     res.json({
       ok: true, version: SERVER_INFO.version, ai: deps.ai.mode, auth: cfg.authMode, agent: agentMode(cfg),
-      uptime_s: Math.round((Date.now() - started) / 1000),
+      uptime_s: Math.round((Date.now() - started) / 1000), mcp_sessions: sessions.size, subscriptions: subscriberCount(),
     });
   });
 
@@ -117,15 +130,8 @@ export function createApp(deps: Deps, cfg: Config) {
     const who = await caller(req);
     if (!who.ok) return unauthorized(res);
     // In local development a call without X-User-Id is allowed; tools then ask for user_id.
-    const server = createMcpServer(deps, { userId: who.userId });
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-    res.on("close", () => {
-      void transport.close();
-      void server.close();
-    });
     try {
-      await server.connect(transport);
-      await transport.handleRequest(req, res, req.body);
+      await sessions.post(req, res, who.userId);
     } catch (err) {
       log("error", "MCP request failed", { requestId: res.locals.requestId, err });
       if (!res.headersSent) {
@@ -139,12 +145,20 @@ export function createApp(deps: Deps, cfg: Config) {
     res.status(401).json({ jsonrpc: "2.0", error: { code: -32001, message: "Unauthorized" }, id: null });
   }
 
-  // Stateless server: no standalone SSE stream or session teardown.
-  const notAllowed: express.RequestHandler = (_req, res) => {
-    res.status(405).set("Allow", "POST").json({ jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed" }, id: null });
+  // GET opens a session's SSE stream (resource updates); DELETE ends a session.
+  // Without a session id both return 405: a stateless call has nothing to stream or end.
+  const inSession: express.RequestHandler = async (req, res) => {
+    const who = await caller(req);
+    if (!who.ok) return unauthorized(res);
+    try {
+      await sessions.session(req, res, who.userId);
+    } catch (err) {
+      log("error", "MCP session request failed", { requestId: res.locals.requestId, err });
+      if (!res.headersSent) res.status(500).json({ jsonrpc: "2.0", error: { code: -32603, message: "Internal error" }, id: null });
+    }
   };
-  app.get("/mcp", notAllowed);
-  app.delete("/mcp", notAllowed);
+  app.get("/mcp", inSession);
+  app.delete("/mcp", inSession);
 
   // Who the web app is signed in as.
   app.get("/api/me", checkOrigin, async (req, res) => {

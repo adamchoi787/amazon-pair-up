@@ -1,9 +1,15 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
+import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
+import {
+  ElicitResultSchema, ErrorCode, McpError, SubscribeRequestSchema, UnsubscribeRequestSchema,
+  type ElicitRequestFormParams, type ElicitResult, type ServerNotification, type ServerRequest,
+} from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { CONDITIONS } from "../ai/index.js";
 import { log, metric } from "../http/log.js";
 import { once } from "../market/idempotency.js";
+import { deleteMyData } from "../market/privacy.js";
 import * as market from "../market/service.js";
 import type { Deps } from "../market/service.js";
 import { REPORT_REASONS } from "../market/trust.js";
@@ -11,6 +17,7 @@ import { KINDS, SERVICE_UNITS } from "../market/types.js";
 import { registerViews, VIEWS, type ViewName } from "./apps.js";
 import { registerPrompts } from "./prompts.js";
 import { outputs } from "./schemas.js";
+import { MY_DEALS, MY_POSTS, SUBSCRIBABLE, subscribe, unsubscribe, type Subscriber } from "./subscriptions.js";
 
 // The tool surface Alexa+ (or any MCP host) sees. Descriptions say when to
 // call each tool and what it returns; the agent reads them to pick a tool.
@@ -20,7 +27,22 @@ import { outputs } from "./schemas.js";
 export interface RequestContext {
   /** Caller identity from the transport (OAuth subject, or X-User-Id in local dev). */
   userId?: string;
+  /**
+   * One request on a fresh server (stateless Streamable HTTP): nothing can be
+   * pushed or asked later, so subscriptions and elicitation are off.
+   */
+  stateless?: boolean;
 }
+
+type Extra = RequestHandlerExtra<ServerRequest, ServerNotification>;
+type FormSchema = ElicitRequestFormParams["requestedSchema"];
+
+/** How long a host has to bring back the user's answer to a question (elicitation). */
+const ELICIT_TIMEOUT_MS = 120_000;
+
+const DELETE_QUESTION =
+  "Delete everything AmazonPairUp keeps about you? Your offers and requests come down, deals on hold are released, " +
+  "your history and sign-ins are erased, and past deals stay for the other person without your name. This can't be undone.";
 
 const condition = z.enum(CONDITIONS);
 const kind = z.enum(KINDS);
@@ -73,10 +95,14 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
         "'restricted_item'; speak its 'say' and don't rephrase the post to get around it. After a confirmed deal, offer " +
         "rate_deal; when the user complains about someone, use report_user. Every result has " +
         "a 'say' field: one short sentence you can speak as is. Write tools take an optional idempotency_key: " +
-        "send a fresh one per action and the same one on a retry, so nothing is posted or confirmed twice.",
+        "send a fresh one per action and the same one on a retry, so nothing is posted or confirmed twice. " +
+        "With a session, subscribe to deals://me and posts://me (resources/subscribe) to hear when a deal is proposed, " +
+        "confirmed, declined or expires instead of polling. Hosts that support elicitation are asked directly to check a " +
+        "price and to confirm a deal. delete_my_data erases the user's data after their explicit yes.",
     },
   );
 
+  if (!ctx.stateless) server.server.registerCapabilities({ resources: { subscribe: true, listChanged: true } });
   registerViews(server);
   /** Tool metadata that points MCP Apps hosts (and Alexa+) at the tool's view. */
   const ui = (view: ViewName) => ({ ui: { resourceUri: VIEWS[view].uri } });
@@ -85,6 +111,58 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
     const userId = ctx.userId ?? arg;
     if (!userId) throw new market.MarketError("I don't know who's speaking. Please link your account.");
     return userId;
+  };
+
+  /**
+   * Ask the user through the host (elicitation/create, form mode) while a tool
+   * call is open. null when the host can't ask: no elicitation capability, a
+   * stateless request, or the host failed; callers then answer as they would
+   * without it. A timeout (the user never answered) is thrown.
+   */
+  const elicit = async (extra: Extra, message: string, requestedSchema: FormSchema): Promise<ElicitResult | null> => {
+    const can = server.server.getClientCapabilities()?.elicitation;
+    if (ctx.stateless || !can || (!can.form && can.url)) return null;
+    try {
+      return await server.server.request(
+        { method: "elicitation/create", params: { mode: "form", message, requestedSchema } },
+        ElicitResultSchema,
+        { relatedRequestId: extra.requestId, timeout: ELICIT_TIMEOUT_MS },
+      );
+    } catch (err) {
+      if (err instanceof McpError && err.code === ErrorCode.RequestTimeout) throw err;
+      log("warn", "elicitation failed; answering without it", { err });
+      return null;
+    }
+  };
+
+  /** elicit, where a user who never answers counts as a host that can't ask. */
+  const elicitOrNull = (extra: Extra, message: string, schema: FormSchema) =>
+    elicit(extra, message, schema).catch(() => null);
+
+  /** "Did you mean…?" asked through the host: on a confirm_price error, ask, then post with the user's answer. */
+  const checkingPrice = async <A extends { confirm_price?: boolean }>(extra: Extra, input: A, post: (a: A) => Promise<object>) => {
+    let args = input;
+    for (let round = 0; ; round++) {
+      try {
+        return await post(args);
+      } catch (err) {
+        if (!(err instanceof market.MarketError) || err.code !== "confirm_price" || round >= 2) throw err;
+        const field = err.data?.field as "ask_price" | "min_price" | "max_price";
+        const price = err.data?.price as number;
+        const answer = await elicitOrNull(extra, err.message, {
+          type: "object",
+          properties: {
+            confirm: { type: "boolean", title: `Keep ${price}`, description: "Post at this price" },
+            price: { type: "number", title: "Or the price you meant", minimum: 0.01, maximum: 100_000 },
+          },
+        });
+        if (!answer) throw err;
+        const meant = answer.action === "accept" ? answer.content?.price : undefined;
+        if (typeof meant === "number" && meant > 0 && meant !== price) args = { ...args, [field]: meant };
+        else if (answer.action === "accept" && answer.content?.confirm === true) args = { ...args, confirm_price: true };
+        else throw new market.MarketError("Okay, I haven't posted it. Tell me the price you meant.", "not_confirmed");
+      }
+    }
   };
 
   /** A tool that changes the market: identified, and retry-safe with an idempotency_key. */
@@ -129,7 +207,8 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       outputSchema: outputs.post_offer,
       annotations: writes,
     },
-    (args) => write("post_offer", args, (userId) => market.postOffer(deps, { ...args, user_id: userId }), "market"),
+    (args, extra) =>
+      write("post_offer", args, (userId) => checkingPrice(extra, args, (a) => market.postOffer(deps, { ...a, user_id: userId })), "market"),
   );
 
   registerAppTool(
@@ -167,7 +246,8 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       outputSchema: outputs.post_request,
       annotations: writes,
     },
-    (args) => write("post_request", args, (userId) => market.postRequest(deps, { ...args, user_id: userId }), "market"),
+    (args, extra) =>
+      write("post_request", args, (userId) => checkingPrice(extra, args, (a) => market.postRequest(deps, { ...a, user_id: userId })), "market"),
   );
 
   registerAppTool(
@@ -220,12 +300,32 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
       title: "Say yes to a deal",
       description:
         "Record the user's yes to a proposed deal. ONLY call after the user explicitly says yes. The deal closes, " +
-        "with where and when to meet, once both sides have confirmed.",
+        "with where and when to meet, once both sides have confirmed. Hosts that support elicitation also show the " +
+        "user the deal and record the yes only if they confirm it there.",
       inputSchema: { user_id: userIdArg, deal_id: id, idempotency_key: idempotencyKey },
       outputSchema: outputs.confirm_deal,
       annotations: writes,
     },
-    (args) => write("confirm_deal", args, (userId) => market.confirmDeal(deps, userId, args.deal_id), "market"),
+    (args, extra) =>
+      write("confirm_deal", args, async (userId) => {
+        const question = await market.confirmQuestion(deps, userId, args.deal_id);
+        if (question) {
+          let answer: ElicitResult | null;
+          try {
+            answer = await elicit(extra, question, {
+              type: "object",
+              properties: { confirm: { type: "boolean", title: "Yes, confirm this deal" } },
+              required: ["confirm"],
+            });
+          } catch {
+            throw new market.MarketError("I didn't hear back, so I haven't confirmed it. It's still on hold for you.", "not_confirmed");
+          }
+          if (answer && !(answer.action === "accept" && answer.content?.confirm === true)) {
+            throw new market.MarketError("Okay, I haven't confirmed it. It's still on hold for you.", "not_confirmed");
+          }
+        }
+        return market.confirmDeal(deps, userId, args.deal_id);
+      }, "market"),
   );
 
   registerAppTool(
@@ -335,6 +435,75 @@ export function createMcpServer(deps: Deps, ctx: RequestContext = {}) {
     },
     (args) => write("rate_deal", args, (userId) => market.rateDeal(deps, userId, args.deal_id, args.stars)),
   );
+
+  server.registerTool(
+    "delete_my_data",
+    {
+      title: "Delete my data",
+      description:
+        "Erase everything stored about the user: their offers and requests come down (deals on hold are released and the " +
+        "other person is paired again), their history, learning data and sign-ins are deleted, and past deals the other " +
+        "person still needs stay without the user's name. Cannot be undone. Read the user what it does, and call with " +
+        "confirm: true only after their explicit yes; hosts that support elicitation are asked directly. Safe to repeat.",
+      inputSchema: {
+        user_id: userIdArg,
+        confirm: z.boolean().optional().describe("true only after the user explicitly agreed to delete their data"),
+      },
+      outputSchema: outputs.delete_my_data,
+      annotations: { ...writes, destructiveHint: true, idempotentHint: true },
+    },
+    (args, extra) =>
+      run("delete_my_data", async () => {
+        const userId = who(args.user_id);
+        if (args.confirm !== true) {
+          const answer = await elicitOrNull(extra, DELETE_QUESTION, {
+            type: "object",
+            properties: { confirm: { type: "boolean", title: "Yes, delete my data" } },
+            required: ["confirm"],
+          });
+          if (!answer) throw new market.MarketError(`${DELETE_QUESTION} Say yes and I'll do it.`, "confirm_delete");
+          if (!(answer.action === "accept" && answer.content?.confirm === true)) {
+            throw new market.MarketError("Okay, I haven't deleted anything.", "not_confirmed");
+          }
+        }
+        return deleteMyData(deps, userId);
+      }),
+  );
+
+  // The user's deals and posts as resources. With a session, resources/subscribe
+  // on either URI brings notifications/resources/updated whenever they change.
+  const json = (uri: string, body: object) => ({ contents: [{ uri, mimeType: "application/json", text: JSON.stringify(body) }] });
+  server.registerResource(
+    "my_deals", MY_DEALS,
+    { title: "My deals", description: "The user's deals and booked jobs, as get_deal_status returns them. Subscribe for changes.", mimeType: "application/json" },
+    async (uri) => json(uri.href, await market.getDealStatus(deps, who())),
+  );
+  server.registerResource(
+    "my_posts", MY_POSTS,
+    { title: "My offers and requests", description: "The user's own posts, as list_my_posts returns them. Subscribe for changes.", mimeType: "application/json" },
+    async (uri) => json(uri.href, await market.listMyPosts(deps, who())),
+  );
+
+  if (!ctx.stateless) {
+    let sub: Subscriber | undefined;
+    server.server.setRequestHandler(SubscribeRequestSchema, async (req) => {
+      const { uri } = req.params;
+      if (!SUBSCRIBABLE.includes(uri)) throw new McpError(ErrorCode.InvalidParams, `Subscribe to ${SUBSCRIBABLE.join(" or ")}`);
+      if (!ctx.userId) throw new McpError(ErrorCode.InvalidRequest, "Subscriptions need a signed-in user (or an X-User-Id header locally).");
+      sub ??= { userId: ctx.userId, uris: new Set(), send: (u) => server.server.sendResourceUpdated({ uri: u }) };
+      subscribe(sub, uri);
+      return {};
+    });
+    server.server.setRequestHandler(UnsubscribeRequestSchema, async (req) => {
+      if (sub) unsubscribe(sub, req.params.uri);
+      return {};
+    });
+    const closed = server.server.onclose;
+    server.server.onclose = () => {
+      closed?.();
+      if (sub) unsubscribe(sub);
+    };
+  }
 
   registerPrompts(server);
   return server;
