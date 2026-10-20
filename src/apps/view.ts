@@ -25,9 +25,14 @@ interface Deal {
   waiting_for: ("buyer" | "seller")[]; waiting_for_you: boolean;
   seller_confirmed: boolean;
   meetup: { place: string | null; availability: string | null; point?: MeetPoint | null }; pickup: string | null; needed_by: string | null;
+  handoff?: "meetup" | "delivery" | null; delivery?: Delivery | null;
   on_hold_until: string | null;
   price_check: { verdict: "typical" | "below_typical" | "above_typical" | "far_below" | "far_above"; typical_low: number; typical_high: number } | null;
   scheduling?: { status: "verified" | "needs_confirmation" | "conflict"; starts_at: string | null; ends_at: string | null; time_zone: string; provider_availability: string | null } | null;
+}
+interface Delivery {
+  selected: boolean; provider: string; fee: number; eta: string; reference: string | null;
+  drop_off: { name: string; area: string }; pick_up: { name: string; area: string };
 }
 type Arrival = "not_here" | "checked_in" | "confirmed";
 interface MeetPoint { point_id: string; name: string; status: "chosen" | "one_here" | "both_here"; you: Arrival; them: Arrival }
@@ -166,6 +171,16 @@ function placeRows(d: Deal) {
   const time = schedule?.starts_at
     ? `${format(schedule.starts_at)}${schedule.ends_at ? ` – ${format(schedule.ends_at, schedule.starts_at.slice(0, 10) === schedule.ends_at.slice(0, 10))}` : ""}`
     : d.needed_by ? `By ${format(d.needed_by)}` : d.meetup.availability;
+  if (d.kind === "item" && d.delivery?.selected) {
+    const v = d.delivery;
+    return [
+      h("p", { class: "meet" }, h("span", { class: "label" }, "Drop off"), v.drop_off.name),
+      h("p", { class: "meet" }, h("span", { class: "label" }, "Pick up"), `${v.pick_up.name}, ${v.eta}`),
+      d.total != null ? h("p", { class: "meet" }, h("span", { class: "label" }, "Total"), `${money(d.total, d.currency)} with ${money(v.fee, d.currency)} delivery`) : null,
+      v.reference ? h("p", { class: "meet" }, h("span", { class: "label" }, "Reference"), v.reference) : null,
+      h("p", { class: "muted small" }, `${v.provider} · demo locations`),
+    ];
+  }
   if (d.kind === "item") {
     const meet = [d.meetup.place, d.meetup.availability].filter(Boolean).join(" · ");
     return meet ? [h("p", { class: "meet" }, h("span", { class: "label" }, "Meet-up"), meet)] : [];
@@ -230,7 +245,7 @@ function priceNote(d: Deal) {
 function dealCard(d: Deal, compact = false) {
   const buyer = d.your_role === "buyer";
   const service = d.kind === "service";
-  const confirmLabel = service && !buyer ? "Confirm I can do this job" : service ? `Confirm ${money(d.total ?? d.price, d.currency)}${d.total == null && d.price_unit === "hour" ? "/hr" : " booking"}` : `Confirm ${money(d.price, d.currency)}`;
+  const confirmLabel = service && !buyer ? "Confirm I can do this job" : service ? `Confirm ${money(d.total ?? d.price, d.currency)}${d.total == null && d.price_unit === "hour" ? "/hr" : " booking"}` : `Confirm ${money(buyer ? d.total ?? d.price : d.price, d.currency)}`;
   const actions = d.status === "proposed" && d.waiting_for_you
     ? h("div", { class: "actions" },
         button(confirmLabel, "primary", () => act("confirm_deal", { deal_id: d.deal_id }, (r) => { if (r.deal) replaceDeal(r.deal); })),
@@ -240,6 +255,12 @@ function dealCard(d: Deal, compact = false) {
         })))
     : null;
   const title = service && !buyer && d.task ? d.task : d.title;
+  // The buyer can switch a proposed item deal between a meet-up and Amazon Hub delivery.
+  const handoff = buyer && d.delivery && d.status === "proposed"
+    ? h("div", { class: "actions" }, button(
+        d.delivery.selected ? "Meet up instead" : `Deliver to my locker · +${money(d.delivery.fee, d.currency)}`, "secondary",
+        () => act("choose_handoff", { deal_id: d.deal_id, method: d.delivery!.selected ? "meetup" : "delivery" }, (r) => { if (r.deal) replaceDeal(r.deal); })))
+    : null;
   return h("article", { class: compact ? "card compact" : "card" },
     h("div", { class: "row" }, statusChip(d), d.counterpart ? h("span", { class: "muted" }, `${buyer ? (service ? "By" : "From") : "For"} ${d.counterpart}`) : null),
     h("h2", {}, title),
@@ -252,9 +273,10 @@ function dealCard(d: Deal, compact = false) {
         h("p", { class: "muted small" }, savingsLine(d)), priceNote(d)),
       h("div", { class: "deal-place" }, ...placeRows(d))),
     scheduleNote(d),
-    pointPanel(d),
-    d.status === "confirmed" ? h("p", { class: "muted small" }, service ? "Booking agreed. Pay the helper directly after the job." : "Both sides agreed. Check the item and pay directly at handover.") : null,
+    d.delivery?.selected ? null : pointPanel(d),
+    d.status === "confirmed" ? h("p", { class: "muted small" }, service ? "Booking agreed. Pay the helper directly after the job." : d.delivery?.selected ? "Both sides agreed. The seller drops it off and you get a pickup code." : "Both sides agreed. Check the item and pay directly at handover.") : null,
     actions,
+    handoff,
     d.status === "proposed" && d.on_hold_until ? h("p", { class: "muted small expiry" }, `On hold until ${when(d.on_hold_until)}`) : null,
   );
 }

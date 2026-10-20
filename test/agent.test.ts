@@ -90,6 +90,27 @@ test("yes confirms the offer waiting for the user; no declines it", () => {
   assert.equal(toolUse(planOffline([user("yes")]))?.name, "get_deal_status", "a yes with nothing pending checks the inbox");
 });
 
+test("after an item deal is read, the buyer picks Amazon Hub delivery or a meet-up by voice", () => {
+  const delivery = { selected: false, provider: "Amazon Hub", fee: 3.99, eta: "next day", reference: null };
+  const history: AgentMessage[] = [
+    user("I need a graphing calculator, max $18"),
+    { role: "assistant", content: [{ toolUse: { toolUseId: "t1", name: "post_request", input: { raw_request: "I need a graphing calculator, max $18" } } }] },
+    { role: "user", content: [{ toolResult: { toolUseId: "t1", status: "success", content: [{ json: {
+      request: { request_id: "req_1" },
+      deal: { deal_id: "deal_7", kind: "item", your_role: "buyer", status: "proposed", waiting_for_you: true, handoff: "meetup", delivery },
+      say: "Found one…",
+    } }] } }] },
+    { role: "assistant", content: [{ text: "Found one…" }] },
+  ];
+  for (const said of ["Deliver it", "Can they ship it?", "Send it to my locker", "Yes, but deliver it"]) {
+    const use = toolUse(planOffline([...history, user(said)]));
+    assert.deepEqual(use && { name: use.name, input: use.input }, { name: "choose_handoff", input: { deal_id: "deal_7", method: "delivery" } }, said);
+  }
+  const meet = toolUse(planOffline([...history, user("I'll meet up")]));
+  assert.deepEqual(meet && { name: meet.name, input: meet.input }, { name: "choose_handoff", input: { deal_id: "deal_7", method: "meetup" } });
+  assert.notEqual(toolUse(planOffline([user("Deliver it")]))?.name, "choose_handoff", "with no item deal read, nothing switches");
+});
+
 test("after a tool runs, the reply is the tool's spoken sentence", () => {
   const step = planOffline([
     user("any news?"),

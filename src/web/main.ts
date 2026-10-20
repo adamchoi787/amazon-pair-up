@@ -16,7 +16,7 @@ type Block =
   | { toolResult: { toolUseId: string; content: { json: Record<string, unknown> }[]; status: "success" | "error" } };
 interface Message { role: "user" | "assistant"; content: Block[] }
 interface Turn { message: { role: "assistant"; content: Block[] }; stop: "tool_use" | "end_turn"; mode: "bedrock" | "offline" }
-interface DealLite { deal_id: string; title: string; price: number; currency: string; status: string; waiting_for_you: boolean }
+interface DealLite { deal_id: string; title: string; price: number; total: number | null; currency: string; status: string; waiting_for_you: boolean }
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) => {
@@ -26,7 +26,7 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
   return e;
 };
 
-const WRITES = new Set(["post_offer", "post_request", "negotiate", "confirm_deal", "decline_deal", "withdraw_post", "accept_suggestion", "dismiss_suggestion", "report_user", "rate_deal"]);
+const WRITES = new Set(["post_offer", "post_request", "negotiate", "confirm_deal", "decline_deal", "withdraw_post", "choose_handoff", "accept_suggestion", "dismiss_suggestion", "report_user", "rate_deal"]);
 const MAX_STEPS = 6;
 
 let auth: Auth;
@@ -256,7 +256,8 @@ async function refreshInbox() {
 function announce(fresh: DealLite[], arrivedNow: boolean) {
   if (busy) return;
   const d = fresh[0];
-  const price = new Intl.NumberFormat(undefined, { style: "currency", currency: d.currency, maximumFractionDigits: Number.isInteger(d.price) ? 0 : 2 }).format(d.price);
+  const amount = d.total ?? d.price;
+  const price = new Intl.NumberFormat(undefined, { style: "currency", currency: d.currency, maximumFractionDigits: Number.isInteger(amount) ? 0 : 2 }).format(amount);
   const text = fresh.length === 1
     ? `${arrivedNow ? "New offer" : "Waiting for your yes"}: ${d.title} for ${price}.`
     : `${fresh.length} offers are waiting for your yes.`;
