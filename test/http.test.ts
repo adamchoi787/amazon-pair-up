@@ -91,7 +91,7 @@ test("llms.txt and the Agent Skill are served for agents", async () => {
   assert.match(text, /`post_request`/);
   const skill = await fetch(`${base}/skills/amazonpairup/SKILL.md`);
   assert.equal(skill.status, 200);
-  assert.match(await skill.text(), /^---\nname: amazonpairup\n/);
+  assert.match(await skill.text(), /^---\r?\nname: amazonpairup\r?\n/);
 });
 
 test("GET and DELETE on /mcp return 405 (stateless server)", async () => {
