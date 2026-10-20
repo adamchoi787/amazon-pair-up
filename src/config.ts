@@ -23,7 +23,16 @@ export const config = {
   oauthClientId: env("OAUTH_CLIENT_ID"),
   oauthClientSecret: env("OAUTH_CLIENT_SECRET"),
   oauthRedirectUris: env("OAUTH_REDIRECT_URIS").split(",").map((s) => s.trim()).filter(Boolean),
+  // Who the user is (src/auth/oauth.ts): Login with Amazon when both are set.
+  lwaClientId: env("LWA_CLIENT_ID"),
+  lwaClientSecret: env("LWA_CLIENT_SECRET"),
+  // Name + passcode sign-in, labelled as a demo, for judges. Always on when
+  // PUBLIC_BASE_URL is a loopback address (local development).
+  demoMode: env("DEMO_MODE") === "true",
+  // Optional event code every demo sign-in must also enter.
   demoLoginPasscode: env("DEMO_LOGIN_PASSCODE"),
+  // RFC 7591 dynamic client registrations per IP per hour. 0 turns registration off.
+  dcrPerHour: Number(env("DCR_PER_HOUR", "20")),
 
   databaseUrl: env("DATABASE_URL"),
   pgliteDir: env("PGLITE_DIR", ".data/pglite"),
@@ -65,6 +74,25 @@ export const config = {
 
 export type Config = typeof config;
 
+type LoginConfig = Pick<Config, "publicBaseUrl" | "lwaClientId" | "lwaClientSecret" | "demoMode">;
+
+/** True when PUBLIC_BASE_URL points at this machine (local development). */
+export function isLocalBaseUrl(publicBaseUrl: string) {
+  try {
+    return ["localhost", "127.0.0.1", "[::1]"].includes(new URL(publicBaseUrl).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** The sign-in methods the OAuth server offers, in the order shown. */
+export function loginMethods(cfg: LoginConfig) {
+  const methods: ("amazon" | "demo")[] = [];
+  if (cfg.lwaClientId && cfg.lwaClientSecret) methods.push("amazon");
+  if (cfg.demoMode || isLocalBaseUrl(cfg.publicBaseUrl)) methods.push("demo");
+  return methods;
+}
+
 if (config.authMode === "oauth") {
   if (!config.publicBaseUrl) throw new Error("AUTH_MODE=oauth requires PUBLIC_BASE_URL");
   // The web app's client is built in; the Alexa+ client is all-or-nothing.
@@ -76,5 +104,13 @@ if (config.authMode === "oauth") {
   const missing = alexa.filter(([, v]) => !v).map(([k]) => k);
   if (missing.length && missing.length < alexa.length) {
     throw new Error(`Alexa+ account linking needs all of: ${missing.join(", ")}`);
+  }
+  if (!!config.lwaClientId !== !!config.lwaClientSecret) {
+    throw new Error("Login with Amazon needs both LWA_CLIENT_ID and LWA_CLIENT_SECRET");
+  }
+  if (!loginMethods(config).length) {
+    throw new Error(
+      "AUTH_MODE=oauth on a public host needs LWA_CLIENT_ID and LWA_CLIENT_SECRET (Login with Amazon), or DEMO_MODE=true for the labelled judge demo sign-in",
+    );
   }
 }

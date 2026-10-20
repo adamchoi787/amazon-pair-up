@@ -187,4 +187,29 @@ CREATE TABLE IF NOT EXISTS oauth_tokens (
   expires_at      TIMESTAMPTZ NOT NULL,
   revoked         BOOLEAN NOT NULL DEFAULT FALSE
 );
+-- One grant per authorization: the tokens from one code and all their refreshes.
+-- Revoking a refresh token (RFC 7009) revokes the whole grant.
+ALTER TABLE oauth_tokens ADD COLUMN IF NOT EXISTS grant_id TEXT;
+CREATE INDEX IF NOT EXISTS oauth_tokens_grant ON oauth_tokens (grant_id);
+
+-- Clients registered through RFC 7591 dynamic registration (public, PKCE only).
+CREATE TABLE IF NOT EXISTS oauth_clients (
+  client_id       TEXT PRIMARY KEY,
+  client_name     TEXT,
+  redirect_uris   JSONB NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Authorization requests waiting for Login with Amazon to come back.
+CREATE TABLE IF NOT EXISTS oauth_pending (
+  state_hash      TEXT PRIMARY KEY,
+  request         JSONB NOT NULL,
+  expires_at      TIMESTAMPTZ NOT NULL
+);
+
+-- Name + passcode sign-in (local development and the judge demo only).
+CREATE TABLE IF NOT EXISTS user_passcodes (
+  user_id         TEXT PRIMARY KEY REFERENCES users(id),
+  passcode_hash   TEXT NOT NULL
+);
 `;

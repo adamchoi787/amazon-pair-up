@@ -2,7 +2,7 @@
 
 Endpoint: `POST /mcp`, Streamable HTTP, stateless, MCP protocol `2025-11-25`.
 Identity and auth depend on `AUTH_MODE`:
-- `oauth` (Alexa+): every call carries the linked account's `Authorization: Bearer <token>`. The user is taken **only** from the token, and `user_id` arguments are ignored. No token or a bad token returns 401 with `WWW-Authenticate: Bearer resource_metadata=...`.
+- `oauth` (Alexa+ and any MCP client): every call carries the linked account's `Authorization: Bearer <token>`. The user is taken **only** from the token, and `user_id` arguments are ignored. No token or a bad token returns 401 with `WWW-Authenticate: Bearer resource_metadata=...`. See [Connecting a client](#connecting-a-client).
 - `none` (local dev and tests): `X-User-Id` header or a `user_id` argument. `MCP_API_KEY` adds an optional shared Bearer secret.
 
 Every successful result is JSON (as text **and** `structuredContent`) with a `say` field: one sentence Alexa can speak as is.
@@ -110,11 +110,31 @@ starters: `sell_something` (`what`, `price`, optional private `lowest`),
 | `/.well-known/mcp/server-card.json` | Server card: name, version, protocol, `/mcp` endpoint, authentication, instructions, and every tool (with input and output schemas), prompt and view, read from the live server |
 | `/llms.txt` | The same in Markdown for agents that read the web, with the rules an agent must follow |
 | `/skills/amazonpairup/SKILL.md` | The Agent Skill ([skills/amazonpairup/SKILL.md](../skills/amazonpairup/SKILL.md)) |
-| `/.well-known/oauth-protected-resource` | OAuth 2.1 metadata (RFC 9728), with `AUTH_MODE=oauth` |
+| `/.well-known/oauth-protected-resource` | OAuth 2.1 protected resource metadata (RFC 9728), with `AUTH_MODE=oauth` |
+| `/.well-known/oauth-authorization-server` | Authorization server metadata (RFC 8414), with `AUTH_MODE=oauth` |
 | `/health`, `/ready` | Liveness, and readiness including the database |
 
 Every response carries `X-Request-Id` (the caller's own, when it sends a valid
 one), and every log line for that request has the same id.
+
+## Connecting a client
+
+Any MCP client that follows the MCP 2025-11-25 authorization spec connects to
+the hosted `/mcp` on its own. The first call gets a 401 pointing at the
+protected resource metadata; from there:
+
+| Step | Endpoint | Rules |
+|---|---|---|
+| Identify the client | Client ID Metadata Document (preferred) | `client_id` is an https URL with a path that serves the client's metadata as JSON. The server fetches it (5 s timeout, 5 KB cap, public addresses only, cached per `Cache-Control`), checks that its `client_id` equals the URL, and allows only its `redirect_uris`. Public clients only (`token_endpoint_auth_method: none`). Advertised as `client_id_metadata_document_supported: true`. |
+| | `POST /oauth/register` (RFC 7591, fallback) | JSON with `redirect_uris` (1 to 10, https or `http://127.0.0.1` / `[::1]` / `localhost`) and optional `client_name`. Every client is registered as public (`token_endpoint_auth_method: none`, PKCE). Limited to `DCR_PER_HOUR` per address. |
+| Authorize | `GET /oauth/authorize` | `response_type=code`, PKCE `S256`, `scope=marketplace`, optional `resource=<base>/mcp`. Redirect URIs match exactly; a loopback redirect may use any port. A third-party client gets a consent screen naming it, its publisher (the client_id's host) or "not verified" for a self-registered name, and where the user goes back to. The redirect carries `code`, `state` and `iss`. |
+| Sign in | Login with Amazon | The user signs in with their Amazon account; the user id is its `user_id`. Local development and the labelled judge demo (`DEMO_MODE=true`) also offer a name + passcode sign-in in which the first sign-in with a name sets its passcode. |
+| Tokens | `POST /oauth/token` | `authorization_code` and `refresh_token`. Access tokens last an hour; each refresh returns a new refresh token and revokes the old one. |
+| Sign out | `POST /oauth/revoke` (RFC 7009) | `token` (+ optional `token_type_hint`), with the same client authentication as the token endpoint. Revoking an access token ends that token; revoking a refresh token ends every token from that sign-in. Always 200 for a token the client holds or an unknown one. |
+
+Built-in clients: the web app (`amazonpairup-web`, public, redirect
+`<PUBLIC_BASE_URL>/app/`) and Alexa+ account linking (confidential, from
+`OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` / `OAUTH_REDIRECT_URIS`).
 
 ## Price check
 

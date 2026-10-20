@@ -114,8 +114,9 @@ It works the way Alexa+ works with an MCP server:
   when `AI_MODE=bedrock` and a model is set, otherwise an offline planner that
   covers the whole voice flow. Either way a deal is only confirmed after the
   user's explicit yes.
-- **Sign-in** is OAuth 2.1 with PKCE as a public client (`AUTH_MODE=oauth`), or a
-  name-only sign-in in local development.
+- **Sign-in** is OAuth 2.1 with PKCE as a public client (`AUTH_MODE=oauth`) with
+  Login with Amazon. Local development and the labelled judge demo use a name and
+  a passcode that the first sign-in with that name sets.
 - **Offers that arrive while you're away** show up as a badge and a card, and are
   read out when voice is on.
 
@@ -171,6 +172,7 @@ without a human wiring it up:
 
 | | |
 |---|---|
+| **Connect without setup** | Claude, ChatGPT, Cursor or a Strands agent connects to the hosted `/mcp` on its own: a Client ID Metadata Document (MCP 2025-11-25) or dynamic registration (RFC 7591), then a consent screen naming the client and Login with Amazon. Tokens refresh with rotation and revoke at `/oauth/revoke` (RFC 7009). [docs/TOOL_CONTRACT.md](docs/TOOL_CONTRACT.md#connecting-a-client) |
 | **Agent Skill** | [skills/amazonpairup/SKILL.md](skills/amazonpairup/SKILL.md), in the open SKILL.md format and served at `/skills/amazonpairup/SKILL.md`: which tool for which sentence, how to read a deal, the rules, error codes, a worked example |
 | **Server card** | `/.well-known/mcp/server-card.json`: endpoint, auth, instructions, and every tool, prompt and view with schemas, read from the live server |
 | **llms.txt** | `/llms.txt`: the same in Markdown, with the rules an agent must follow |
@@ -190,10 +192,11 @@ without a human wiring it up:
 - **Reliability:** `/ready` checks the database before traffic switches; graceful
   shutdown drains calls in flight; holds expire and re-pair on a timer; Bedrock
   failures fall back to local parsing and the offline planner.
-- **Safety:** OAuth 2.1 with PKCE, Origin validation, CDN-only origin, per-caller rate
+- **Safety:** OAuth 2.1 with PKCE, Login with Amazon as the identity provider,
+  token revocation, SSRF-guarded client metadata fetches, Origin validation, CDN-only origin, per-caller rate
   limits, per-user posting limits, bounded inputs, private limits redacted in one
   place and leak-tested.
-- **Tests:** 91 server tests (unit, end-to-end over MCP, HTTP, OAuth, schemas, privacy,
+- **Tests:** 97 server tests (unit, end-to-end over MCP, HTTP, OAuth, schemas, privacy,
   idempotency) plus the Strands agent against a real server, on every push.
 
 ## Repo map
