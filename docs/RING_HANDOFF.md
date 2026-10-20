@@ -20,11 +20,11 @@ PairUp Points are small unstaffed hand-off spots, each watched by one Ring doorb
 - `delete_my_data` deletes the user's arrivals. `test/points.test.ts` covers client, presence rule, signature, the full two-person flow over the webhook.
 
 ## Left to do
-1. Run `npm run typecheck && npm test`; fix the existing e2e assertion that deep-equals `deal.meetup` (it now has `point: null`).
+1. `test/points.test.ts` passes (5/5) and typecheck is clean. Run the full `npm test` once more after the merge.
 2. Merge with main: another session ("Delivery and robotic fulfillment support") is adding Amazon Hub delivery in the same files (views.ts `handoff`/`delivery`, service.ts, server.ts, schemas.ts). When delivery is chosen, `meetup` is empty, so `meetup.point` must be null for delivery deals too.
 3. Done: `npm run ring:probe` (real Playground call: devices + history, prints the RING_POINT_DEVICES line) and `npm run ring:simulate` (signed Ring v1.1 webhook to the local server, labelled demo).
 4. Card UI in `src/apps/view.ts`: "Meet at a PairUp Point" button on proposed/confirmed item deals, the point row with two arrival chips, an "I'm here" button; `npm run build:web` and commit the bundles.
-5. Offline planner (`src/agent/offline.ts`): "I'm here" / "I've arrived" → `check_in_at_point`; "meet at a PairUp Point" / "somewhere safe" → `choose_meetup_point`. Server instructions in server.ts: one sentence about points.
+5. Done: offline planner phrases ("I'm here" → check_in_at_point, "meet at a PairUp Point" → choose_meetup_point). Still to do: one sentence about points in the server instructions (server.ts).
 6. Docs: TOOL_CONTRACT.md (3 tools, webhook, retention), skills/pairup/SKILL.md, README, `public/privacy.html` (Ring: type and time only, 24 h; arrivals 30 days), DEMO_SCRIPT.md Ring beat, SUBMISSION.md Ring track text + Ring product feedback, AWARD_GAPS.md.
 7. Part 1 of the task (Devpost rules into docs/HACKATHON_RULES.md) is not done: Claude in Chrome was not connected and devpost.com returns 403 to fetches. Needs the user's Chrome. Also fix the Bee wording: the Bee track needs live data recorded through a Bee device or an Apple Watch running Bee software; the replay file and the iOS Shortcut path don't qualify.
 

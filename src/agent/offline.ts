@@ -89,6 +89,9 @@ const STATUS = /\b(news|status|my (deals?|jobs?)|any (offers|deals|buyers|seller
 const SUGGEST = /\b(anything i (need|should get)|what do you suggest|any (suggestions|ideas)|suggest something|what might i need|for me today)\b/i;
 const ROUTINES = /\b(what do you know about me|my (routines|habits)|what have you (learned|noticed))\b/i;
 const FORGET = /\b(forget (it|that|this)|don'?t (suggest|ask) (that|this|it) again|never suggest|stop suggesting)\b/i;
+// PairUp Points: "meet at a PairUp Point", "somewhere safe"; then "I'm here" at the point.
+const MEET_POINT = /(pairup point|meet(?:-?up)? point|somewhere safe|safe (?:place|spot)|ring (?:doorbell|point))/i;
+const ARRIVED = /(i'?m here|i am here|i'?ve arrived|i have arrived|i'?m at the (?:point|pairup point|hub))/i;
 const MORE = /\b((more|other) (options|ones|choices)|what else|anything else|show me (more|others|alternatives)|alternatives)\b/i;
 const SELL = /\b(sell|selling|list my|get rid of)\b/i;
 // "I can do lunch runs on campus", "I'm free on Saturday to help at events"
@@ -136,6 +139,8 @@ function onUtterance(messages: AgentMessage[], text: string): Step {
       return suggestion.needsBudget ? reply("Sure. What's the most you'd pay? I keep that private.") : call("accept_suggestion", { suggestion_id: suggestion.id });
     }
   }
+  if (ARRIVED.test(text)) return call("check_in_at_point", {});
+  if (MEET_POINT.test(text)) return call("choose_meetup_point", {});
   if (ROUTINES.test(text)) return call("get_my_routines", {});
   if (SUGGEST.test(text)) return call("get_suggestions", {});
 
