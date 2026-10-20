@@ -1,3 +1,4 @@
+import { refreshSuggestions, showDevices } from "./lifestyle-ui.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { Auth, type AppConfig } from "./auth.js";
 import { renderView, themeNow, type ViewHandle } from "./host.js";
@@ -89,6 +90,7 @@ async function start() {
 
   greet();
   await refreshInbox();
+  await refreshSuggestions(mcp);
   setInterval(() => { if (document.visibilityState === "visible") void refreshInbox(); }, 20_000);
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") void refreshInbox(); });
 }
@@ -276,14 +278,15 @@ function asDealResult(r: CallToolResult): CallToolResult {
 
 function bindTabs() {
   for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-tab]")) {
-    tab.onclick = () => void openTab(tab.dataset.tab as "assistant" | "deals" | "posts");
+    tab.onclick = () => void openTab(tab.dataset.tab as "assistant" | "deals" | "posts" | "devices");
   }
 }
 
-async function openTab(name: "assistant" | "deals" | "posts") {
+async function openTab(name: "assistant" | "deals" | "posts" | "devices") {
   for (const t of document.querySelectorAll<HTMLButtonElement>("[data-tab]")) t.setAttribute("aria-selected", String(t.dataset.tab === name));
-  for (const p of ["assistant", "deals", "posts"]) $(`panel-${p}`).hidden = p !== name;
+  for (const p of ["assistant", "deals", "posts", "devices"]) $(`panel-${p}`).hidden = p !== name;
   if (name === "assistant") return;
+  if (name === "devices") return showDevices(auth);
   const tool = name === "deals" ? "get_deal_status" : "list_my_posts";
   const r = await mcp.call(tool, {});
   if (panels[name]) return panels[name]!.update(r);

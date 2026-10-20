@@ -23,6 +23,9 @@ export const SIGNAL_KINDS = ["todo", "conversation", "journal", "fact", "locatio
 export type SignalKind = (typeof SIGNAL_KINDS)[number];
 
 const KEEP_DAYS = 30;
+export async function purgeContext(db: Db) {
+  await db.query(`DELETE FROM context_signals WHERE created_at < now() - make_interval(days => $1)`, [KEEP_DAYS]);
+}
 /** A suggestion from a signal is offered for this long. */
 const FRESH_HOURS = 48;
 /** A place the user arrived at counts as where they are for this long. */
@@ -110,11 +113,12 @@ export async function rememberTimeZone(db: Db, userId: string, tz?: string) {
 export async function addContext(deps: Deps, userId: string, input: SignalInput) {
   const { db, ai } = deps;
   await ensureUser(db, userId);
-  await db.query(`DELETE FROM context_signals WHERE created_at < now() - make_interval(days => $1)`, [KEEP_DAYS]);
   await rememberTimeZone(db, userId, input.time_zone);
+  await purgeContext(db);
 
   const observedAt = parseDate(input.observed_at);
-  const text = input.text?.trim().slice(0, 500) || null;
+  const original = input.text?.trim().slice(0, 500) || null;
+  const text = original && looksLikeNeed(original) ? needClause(original) : null;
   const place = input.place?.trim().slice(0, 120) || null;
   if (input.external_id) {
     const { rows } = await db.query<{ id: string; status: string; suggestion: Suggestion | null }>(
@@ -170,7 +174,7 @@ async function fromSignal(
   };
 }
 
-const articled = (need: string) => (/^(a|an|the|some|my|someone|somebody)\b/i.test(need) ? need : `${/^[aeiou]/i.test(need) ? "an" : "a"} ${need}`);
+const articled = (need: string) => (/^(a|an|the|some|my|someone|somebody)\b/i.test(need) || /\bpaper\b/i.test(need) ? need : `${/^[aeiou]/i.test(need) ? "an" : "a"} ${need}`);
 
 /** The median budget of the user's past requests for the same kind of thing. */
 async function usualBudget(deps: Deps, userId: string, need: string, category: string | undefined, kind: Kind, unit: PriceUnit) {
@@ -230,6 +234,7 @@ function fromRoutine(r: Routine, day: string, tz: string): Suggestion {
 /** What the user may want now: fresh device suggestions, then routines that are due. */
 export async function getSuggestions(deps: Deps, userId: string, now = new Date()) {
   const { db } = deps;
+  await purgeContext(db);
   await ensureUser(db, userId);
   const { rows } = await db.query<{ suggestion: Suggestion }>(
     `SELECT suggestion FROM context_signals
@@ -286,7 +291,7 @@ export async function acceptSuggestion(deps: Deps, userId: string, suggestionId:
 export async function dismissSuggestion(deps: Deps, userId: string, suggestionId: string, forget = false, now = new Date()) {
   const found = await findSuggestion(deps, userId, suggestionId, now);
   if (found.signalId) {
-    await deps.db.query(`UPDATE context_signals SET status = 'dismissed', text = NULL WHERE id = $1`, [found.signalId]);
+    await deps.db.query(`UPDATE context_signals SET status = 'dismissed', text = NULL, suggestion = NULL WHERE id = $1`, [found.signalId]);
   } else {
     await recordRoutineFeedback(deps.db, userId, found.routineId!, forget ? "forget" : "dismissed", found.day!);
   }
@@ -323,6 +328,7 @@ async function findSuggestion(deps: Deps, userId: string, suggestionId: string, 
 
 export async function getMyRoutines(deps: Deps, userId: string, now = new Date()) {
   const { db } = deps;
+  await purgeContext(db);
   await ensureUser(db, userId);
   const { tz, routines, quiet } = await routinesFor(db, userId, now);
   const { rows: sources } = await db.query<{ source: string; last_seen: string | Date; signals: number }>(

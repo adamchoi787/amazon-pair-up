@@ -183,3 +183,11 @@ Code on Bedrock documented as the development workflow if we use it.
 
 Human-only steps: AWS account and Bedrock access, the Devpost form, the
 video recording and voice-over, GitHub repo visibility, and any Bee device.
+
+## Lifestyle implementation (local)
+
+| Capability | State | Human step |
+|---|---|---|
+| Bee context and replay | Implemented; demo data labelled | Validate a real Bee device before choosing its track |
+| Watch and Siri Shortcut | Browser view, device management and guide implemented | Test the Shortcut on a paired Watch |
+| Routine suggestions | For you, acceptance, dismissal and forget implemented | Record the demo |
