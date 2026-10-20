@@ -24,11 +24,13 @@ interface Deal {
   status: "proposed" | "confirmed" | "declined" | "replaced" | "expired" | "withdrawn";
   waiting_for: ("buyer" | "seller")[]; waiting_for_you: boolean;
   seller_confirmed: boolean;
-  meetup: { place: string | null; availability: string | null }; pickup: string | null; needed_by: string | null;
+  meetup: { place: string | null; availability: string | null; point?: MeetPoint | null }; pickup: string | null; needed_by: string | null;
   on_hold_until: string | null;
   price_check: { verdict: "typical" | "below_typical" | "above_typical" | "far_below" | "far_above"; typical_low: number; typical_high: number } | null;
   scheduling?: { status: "verified" | "needs_confirmation" | "conflict"; starts_at: string | null; ends_at: string | null; time_zone: string; provider_availability: string | null } | null;
 }
+type Arrival = "not_here" | "checked_in" | "confirmed";
+interface MeetPoint { point_id: string; name: string; status: "chosen" | "one_here" | "both_here"; you: Arrival; them: Arrival }
 interface Offer {
   offer_id: string; kind: Kind; title: string; condition: string | null; ask_price: number; price_unit: Unit; currency: string;
   location: string | null; status: string; within_budget_at_ask?: boolean; your_min_price?: number;
@@ -176,6 +178,33 @@ function placeRows(d: Deal) {
   ];
 }
 
+/** A PairUp Point: where to meet, each side's Ring-confirmed arrival, and the next step. */
+function pointPanel(d: Deal) {
+  const p = d.meetup.point;
+  const open = d.status === "proposed" || d.status === "confirmed";
+  if (!p) {
+    return open && d.your_role !== "observer"
+      ? h("div", { class: "actions" }, button("Meet at a PairUp Point", "secondary", () => act("choose_meetup_point", { deal_id: d.deal_id }, () => refresh(d.deal_id))))
+      : null;
+  }
+  const label = (who: string, a: Arrival) => chip(`${who}: ${a === "confirmed" ? "here, Ring confirmed" : a === "checked_in" ? "checked in" : "on the way"}`, a === "confirmed" ? "good" : a === "checked_in" ? "accent" : "muted");
+  return h("div", { class: "schedule-note", role: "note" },
+    h("strong", {}, p.status === "both_here" ? "Both here. Go ahead with the hand-off." : "PairUp Point with Ring"),
+    h("div", { class: "row" }, label("You", p.you), label(d.counterpart ?? "Them", p.them)),
+    h("p", { class: "small muted" }, "Press the Ring doorbell when you arrive. Ring reports only the time of the press; no video is kept."),
+    d.status === "confirmed" && p.you !== "confirmed"
+      ? h("div", { class: "actions" }, button("I'm here", "primary", () => act("check_in_at_point", { deal_id: d.deal_id }, () => refresh(d.deal_id))))
+      : null);
+}
+
+/** Reload one deal after a meet-up change. */
+function refresh(dealId: string) {
+  void app.callServerTool({ name: "get_deal_status", arguments: { deal_id: dealId } }).then((res) => {
+    const next = (res.structuredContent as Data | undefined)?.deals?.[0];
+    if (next) { replaceDeal(next); render(); }
+  }).catch(() => undefined);
+}
+
 function scheduleNote(d: Deal) {
   if (!d.scheduling || d.status !== "proposed") return null;
   const s = d.scheduling;
@@ -223,6 +252,7 @@ function dealCard(d: Deal, compact = false) {
         h("p", { class: "muted small" }, savingsLine(d)), priceNote(d)),
       h("div", { class: "deal-place" }, ...placeRows(d))),
     scheduleNote(d),
+    pointPanel(d),
     d.status === "confirmed" ? h("p", { class: "muted small" }, service ? "Booking agreed. Pay the helper directly after the job." : "Both sides agreed. Check the item and pay directly at handover.") : null,
     actions,
     d.status === "proposed" && d.on_hold_until ? h("p", { class: "muted small expiry" }, `On hold until ${when(d.on_hold_until)}`) : null,
