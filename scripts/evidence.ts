@@ -42,7 +42,8 @@ if (arn) {
     execFileSync("aws", ["bedrock-agentcore", "invoke-agent-runtime", "--agent-runtime-arn", arn, "--runtime-session-id", `pairup-evidence-${randomUUID()}`, "--content-type", "application/json", "--accept", "text/event-stream", "--payload", `fileb://${input}`, output], { stdio: "pipe", timeout: 90_000, windowsHide: true });
     const response = readFileSync(output, "utf8");
     const events = response.split(/\r?\n/).filter((l) => l.startsWith("data:")).map((l) => { try { return JSON.parse(l.slice(5).trim()); } catch { return null; } });
-    const passed = events.some((e) => typeof e?.text === "string" && e.text.trim()) && !/event:\s*error/.test(response) && !events.some((e) => e?.error || /link your PairUp account/i.test(e?.text ?? ""));
+    const spoken = events.map((e) => (typeof e?.text === "string" ? e.text : "")).join("");
+    const passed = spoken.trim().length > 0 && !/<\/?thinking>/i.test(spoken) && !/event:\s*error/.test(response) && !events.some((e) => e?.error || /link your PairUp account/i.test(e?.text ?? ""));
     entries.push({ check: "AgentCore invocation", passed, response });
   } catch { entries.push({ check: "AgentCore invocation", passed: false, response: "Invocation failed. Check AWS CLI credentials, runtime ARN, permissions and session logs locally; credentials are excluded from this report." }); }
   finally { for (const name of ['request.json', 'response.txt']) { const file = path.join(folder, name); if (existsSync(file)) unlinkSync(file); } rmdirSync(folder); }

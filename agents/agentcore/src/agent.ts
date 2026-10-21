@@ -43,12 +43,40 @@ Current time: ${now.toISOString()}.
 - An error with code "prohibited_item" or "restricted_item" means the market doesn't allow that post: say so, and never reword it to get around the rule.
 - After a confirmed deal you may ask how it went and call rate_deal with 1-5 stars. If the user complains about someone, confirm, then call report_user.`;
 
+/** Removes the model's <thinking>…</thinking> notes, which are never spoken. */
+export const stripThinking = (text: string) => text.replace(/<thinking>[\s\S]*?(<\/thinking>|$)/g, "").trim();
+
+/** Streams text with <thinking> blocks removed, even when a tag is split across deltas. */
+export async function* withoutThinking(deltas: AsyncIterable<string>) {
+  const OPEN = "<thinking>", CLOSE = "</thinking>";
+  let buffer = "", inside = false;
+  // Length of the longest buffer suffix that could still begin `tag`.
+  const partial = (tag: string) => {
+    for (let n = Math.min(tag.length - 1, buffer.length); n > 0; n--) if (tag.startsWith(buffer.slice(-n))) return n;
+    return 0;
+  };
+  for await (const delta of deltas) {
+    buffer += delta;
+    for (;;) {
+      const tag = inside ? CLOSE : OPEN, at = buffer.indexOf(tag);
+      if (at === -1) break;
+      if (!inside && at > 0) yield buffer.slice(0, at);
+      buffer = buffer.slice(at + tag.length);
+      inside = !inside;
+    }
+    const keep = partial(inside ? CLOSE : OPEN);
+    if (!inside && buffer.length > keep) yield buffer.slice(0, buffer.length - keep);
+    buffer = buffer.slice(buffer.length - keep);
+  }
+  if (!inside && buffer) yield buffer;
+}
+
 export function createPairUpAgent(o: PairUpAgentOptions) {
   const headers: Record<string, string> = {};
   if (o.token) headers.Authorization = `Bearer ${o.token}`;
   else if (o.userId) headers["X-User-Id"] = o.userId;
 
-  const mcp = new McpClient({ url: o.mcpUrl, headers, applicationName: "pairup-agentcore", applicationVersion: "0.7.0" });
+  const mcp = new McpClient({ url: o.mcpUrl, headers, applicationName: "pairup-agentcore", applicationVersion: "0.8.0" });
   const agent = new Agent({
     model: o.model ?? new BedrockModel({ region: o.region, modelId: o.modelId, temperature: 0.2, maxTokens: 600 }),
     tools: [mcp],
@@ -76,16 +104,19 @@ export function createPairUpAgent(o: PairUpAgentOptions) {
     async ask(text: string) {
       lastUserText = text;
       const result = await agent.invoke(text);
-      return result.toString().trim();
+      return stripThinking(result.toString());
     },
-    /** One user turn, streamed as text deltas. */
+    /** One user turn, streamed as spoken text deltas. */
     async *stream(text: string) {
       lastUserText = text;
-      for await (const event of agent.stream(text)) {
-        if (event.type !== "modelStreamUpdateEvent") continue;
-        const e = event.event;
-        if (e.type === "modelContentBlockDeltaEvent" && e.delta.type === "textDelta") yield e.delta.text;
+      async function* deltas() {
+        for await (const event of agent.stream(text)) {
+          if (event.type !== "modelStreamUpdateEvent") continue;
+          const e = event.event;
+          if (e.type === "modelContentBlockDeltaEvent" && e.delta.type === "textDelta") yield e.delta.text;
+        }
       }
+      yield* withoutThinking(deltas());
     },
     close: () => mcp.disconnect(),
   };

@@ -10,7 +10,7 @@ import { config } from "../../../src/config.js";
 import { openDb, type Db } from "../../../src/db/client.js";
 import { postOffer, ensureUser } from "../../../src/market/service.js";
 import { addContext } from "../../../src/market/context.js";
-import { createPairUpAgent, isExplicitYes } from "../src/agent.js";
+import { createPairUpAgent, isExplicitYes, stripThinking, withoutThinking } from "../src/agent.js";
 
 // The Strands agent against a real PairUp server (in-memory Postgres,
 // Streamable HTTP on a local port). A scripted model stands in for Bedrock, so
@@ -138,4 +138,11 @@ test('a Strands agent waits for approval before deleting data', async()=>{
     await pairup.ask('yes');
     assert.equal((await db.query("SELECT id FROM users WHERE id='u_delete_guard'")).rows.length,0);
   }finally{await pairup.close();}
+});
+
+test('thinking notes are never spoken, even when a tag is split across deltas', async()=>{
+  async function* chunks(){ yield* ['Hi <thi','nking>plan the tools</thin','king>there. <thinking>x</thinking>','Done <','b>'] }
+  let out=''; for await (const c of withoutThinking(chunks())) out+=c;
+  assert.equal(out,'Hi there. Done <b>');
+  assert.equal(stripThinking('<thinking>secret</thinking>You have two posts.'),'You have two posts.');
 });
