@@ -3,7 +3,7 @@
 PairUp makes three promises:
 
 1. **Faster and cheaper to buy what you need.** One sentence finds the thing or the
-   helper nearby, the price settles inside both private limits, and the whole price
+   helper, the price settles inside both private limits, and the whole price
    reaches the person on the other side.
 2. **Make personal business great.** Anyone with a spare calculator, a free afternoon
    or a trolley runs a small business by voice: no storefront, no listing form, no
@@ -135,7 +135,7 @@ quarter, and a move-in and move-out cycle that refills supply each year.
 
 - **Alexa+** becomes the voice for local buying and selling as well as shopping.
 - **Amazon Hub Lockers and Counters** become safe, public hand-off points.
-- **amazon.com** catches every need nobody nearby can meet: PairUp shows the new
+- **amazon.com** catches every need nobody can meet: PairUp shows the new
   price with a link.
 - **AWS** runs it: Bedrock, AgentCore, CloudFront, EC2 Graviton and CloudWatch.
 

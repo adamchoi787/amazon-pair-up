@@ -49,7 +49,7 @@ The person who sells or does the work always receives the full agreed price. Pai
 - **Protected payment:** a small flat fee, paid by the buyer, for online payment held until the hand-off is confirmed. Paying in person stays free.
 - **Agent access:** people use PairUp free. Commercial agents and apps that connect over MCP at volume pay for an access tier.
 - **Community partners:** universities, housing offices and apartment buildings license a local market, for example for move-out reuse that keeps furniture out of landfill.
-- **Amazon referrals:** requests nobody nearby can fill already go to Amazon search or Trade-In, which can earn referral income.
+- **Amazon referrals:** requests nobody can fill already go to Amazon search or Trade-In, which can earn referral income.
 
 Ranking and pricing carry no paid placement. Every post is ranked and priced by the same published rule.
 

@@ -1,4 +1,4 @@
-# PairUp — a voice-first C2C marketplace for Alexa+
+# PairUp — a C2C marketplace for Alexa+
 
 **Faster and cheaper to buy what you need. Make personal business great. C2C in the future.**
 

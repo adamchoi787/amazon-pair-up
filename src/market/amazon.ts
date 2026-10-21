@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 // Where the local market hands off to Amazon. PairUp covers what Amazon
 // retail doesn't serve (used items under $20, errands, an hour of help); when
 // the local market can't help, it points the person at Amazon instead:
-//   - a request nobody nearby can fill gets a search link and the new price,
+//   - a request nobody can fill gets a search link and the new price,
 //   - an item offer nobody is asking for, in a category Amazon Trade-In takes,
 //     gets a Trade-In link,
 //   - two people in the same area meet at an Amazon Hub Locker or Counter.

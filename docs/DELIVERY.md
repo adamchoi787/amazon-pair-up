@@ -1,6 +1,6 @@
 # Delivery
 
-PairUp pairs two people nearby, and most item deals change hands in person at
+PairUp pairs two people directly, and most item deals change hands in person at
 an Amazon Hub point. Some buyers want the item brought to them instead: they
 live in another neighborhood, they can't make the meet-up time, or the item is
 bulky. For those deals PairUp uses Amazon's own delivery network.

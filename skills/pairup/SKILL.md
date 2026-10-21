@@ -81,7 +81,7 @@ result has a `deal`, read it out and ask "Should I confirm it?". When `deal` is
 null the post waits on the market and is paired as soon as a counterpart
 arrives; say so and stop.
 
-## When nobody nearby can help
+## When nobody can help
 
 The market covers what Amazon doesn't (a used item under $20, an errand, an
 hour of help) and hands off to Amazon when it can't help. The post keeps
@@ -89,7 +89,7 @@ waiting either way, so offer these as an option and never as a replacement:
 
 - `post_request` for an item with no deal returns `fallback`: `amazon_url`
   (an amazon.com search), `new_price` (demo estimate for a new item, or null) and a `say`
-  ("Nobody nearby has one yet. New on Amazon it's about $110."). Open the link
+  ("Nobody has one yet. New on Amazon it's about $110."). Open the link
   only if the user asks for it.
 - `post_offer` for an item nobody is asking for yet, in a category Amazon
   Trade-In takes (candidate electronics and game consoles), returns `trade_in` with

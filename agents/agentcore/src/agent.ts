@@ -27,7 +27,7 @@ const NOT = /\b(no|not|don'?t|cancel|decline|wait|stop)\b/i;
 const QUALIFIED = /\b(if|unless|provided|assuming|but|only|after|before|except|instead|first|what|why|how|can you|could you)\b|\?/i;
 export const isExplicitYes = (text: string) => YES.test(text) && !NOT.test(text) && !QUALIFIED.test(text);
 
-export const systemPrompt = (now = new Date()) => `You are PairUp, a voice assistant that pairs people directly: people who need something with people nearby who have it or can do it, for things to buy and sell and for services such as lunch runs, errands and event help.
+export const systemPrompt = (now = new Date()) => `You are PairUp, a voice assistant that pairs people directly: people who need something with people who have it or can do it, for things to buy and sell and for services such as lunch runs, errands and event help.
 Current time: ${now.toISOString()}.
 - Use the tools for every marketplace action. Never invent items, prices, people or deals.
 - Offering something: post_offer. Needing something: post_request with the user's own words as raw_request.

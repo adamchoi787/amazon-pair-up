@@ -353,7 +353,7 @@ export async function postRequest(deps: Deps, input: PostRequestInput) {
   const lowBudget = !deal && band && verdict(maxPrice, band, policy) === "far_below"
     ? ` Heads up: ${service ? "jobs like this usually pay" : "these usually go for"} ${range(band, unit, intentRow.currency)}, so it may take a while.`
     : "";
-  // An item nobody nearby can sell yet: the same thing new on Amazon, while the request keeps waiting.
+  // An item nobody can sell yet: the same thing new on Amazon, while the request keeps waiting.
   const fallback = !deal && !service
     ? fallbackView(need, closest ? "over_budget" : "no_seller", band?.source === "reference" ? band.newPrice ?? null : null)
     : null;

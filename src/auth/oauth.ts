@@ -708,7 +708,7 @@ function consentPage(
     : "Sign in to PairUp";
   const intro = client.kind === "alexa" ? "<p>Sign in so Alexa can buy, sell and find help for you.</p>"
     : thirdParty ? consentDetails(client, params.redirect_uri)
-    : "<p>Sign in to buy, sell and get help from people nearby, by voice.</p>";
+    : "<p>Sign in to buy, sell and get help from other people.</p>";
 
   const amazon = methods.includes("amazon")
     ? `<form method="post" action="/oauth/authorize">${hidden}<button type="submit" name="method" value="amazon" class="amazon">Continue with Amazon</button></form>`

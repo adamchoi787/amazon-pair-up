@@ -240,11 +240,11 @@ const hubPlace = (hub: HubPoint) => `${hub.name}, ${hub.area} (demo location)`;
 const usd = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
 
 /**
- * For an item request nobody nearby can fill: the same thing new on Amazon.
+ * For an item request nobody can fill: the same thing new on Amazon.
  * The request keeps waiting; this is only the "if you can't wait" option.
  */
 export function fallbackView(need: string, reason: "no_seller" | "over_budget", newPrice: number | null) {
-  const lead = reason === "no_seller" ? "Nobody nearby has one yet." : "Nobody nearby has one in your budget yet.";
+  const lead = reason === "no_seller" ? "Nobody has one yet." : "Nobody has one in your budget yet.";
   return {
     reason,
     new_price: newPrice,

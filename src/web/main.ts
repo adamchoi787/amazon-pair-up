@@ -140,7 +140,7 @@ function greet() {
   const hero = el("div", "hero");
   hero.id = "hero";
   hero.append(mark(44), el("h1", "", `Hi${first ? ` ${first}` : ""}. What do you need?`),
-    el("p", "", "Buy or sell something, get an errand run, or find a hand for a job. Say it once and PairUp pairs you with someone nearby."));
+    el("p", "", "Buy or sell something, get an errand run, or find a hand for a job. Say it once and PairUp pairs you with someone who has it or can do it."));
   const examples = el("div", "examples");
   examples.setAttribute("aria-label", "Try an example");
   for (const [name, label, s] of [

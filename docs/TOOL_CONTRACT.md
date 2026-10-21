@@ -238,7 +238,7 @@ deterministic ([amazon.ts](../src/market/amazon.ts)).
 
 | When | Result field | What it carries |
 |---|---|---|
-| `post_request` for an item ends without a deal | `fallback` | `reason` (`no_seller`, or `over_budget` when offers exist but none fits the budget), `new_price` (curated demo estimate for a new item on Amazon.com, from `new_price` in `data/reference-prices.json`; `null` when no reference matches), `currency: "USD"`, `amazon_url` (`https://www.amazon.com/s?k=<need>`), `still_waiting: true`, `say` ("Nobody nearby has one yet. New on Amazon it's about $110.") |
+| `post_request` for an item ends without a deal | `fallback` | `reason` (`no_seller`, or `over_budget` when offers exist but none fits the budget), `new_price` (curated demo estimate for a new item on Amazon.com, from `new_price` in `data/reference-prices.json`; `null` when no reference matches), `currency: "USD"`, `amazon_url` (`https://www.amazon.com/s?k=<need>`), `still_waiting: true`, `say` ("Nobody has one yet. New on Amazon it's about $110.") |
 | `post_offer` for an item nobody is asking for, in a Trade-In category | `trade_in` | `category` (`electronics` or `game_consoles`, matched by whole words of the category and title; list in `data/trade-in-categories.json`), `url: "https://www.amazon.com/tradein"`, `say` |
 | a deal for an item where both sides are in the same area | `deal.meetup.hub_point` | That area's Amazon Hub Locker or Counter (`name`, `type` (`locker` or `counter`), `area`, `demo`); `meetup.place` names it as the suggested hand-off place |
 

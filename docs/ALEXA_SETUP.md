@@ -176,7 +176,7 @@ development stage is enough for the demo.
 **Name** (30 max): `PairUp`
 
 **Short description** (123 max):
-> Buy, sell and get help from people nearby, by voice. Alexa pairs you up and settles inside your private limits.
+> Buy, sell and get help from other people. Alexa pairs you up and settles inside your private limits.
 
 **Full description** (4000 max):
 > PairUp pairs people who need something with people who have it or can do it: a used calculator, someone to pick up your lunch, a helper for your event. You use it just by talking.
@@ -185,7 +185,7 @@ development stage is enough for the demo.
 >
 > Buying: tell Alexa what you need and the most you'd pay. PairUp finds the best seller by meaning and keywords, checks condition, quantity and price, and settles a fair price inside both people's limits in the same moment. If nobody has it yet, your request waits and Alexa pairs you as soon as someone lists one.
 >
-> Getting help: ask for someone to pick up your lunch, run an errand or help at your event, with a fee per job or an hourly rate. Alexa finds a person nearby who offers that kind of help, agrees the fee inside both limits, and tells you where and when.
+> Getting help: ask for someone to pick up your lunch, run an errand or help at your event, with a fee per job or an hourly rate. Alexa finds a person who offers that kind of help, agrees the fee inside both limits, and tells you where and when.
 >
 > Offering help: say what you can do and your rate, like lunch runs around campus for $4. Alexa brings you jobs as people ask, and you say yes to each one.
 >

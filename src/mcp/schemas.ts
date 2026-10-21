@@ -97,12 +97,12 @@ export const pointOut = z.object({
 }).describe("A PairUp Point: an unstaffed hand-off spot watched by one Ring camera or doorbell");
 
 export const fallbackOut = z.object({
-  reason: z.enum(["no_seller", "over_budget"]).describe("no_seller = nothing like it nearby; over_budget = nothing nearby within the budget"),
+  reason: z.enum(["no_seller", "over_budget"]).describe("no_seller = nothing like it; over_budget = nothing within the budget"),
   new_price: money.nullable().describe("Curated demo estimate for a new item on Amazon.com; null when unknown"),
   currency: z.literal("USD"),
   amazon_url: z.string().describe("amazon.com search for the request"),
   still_waiting: z.literal(true).describe("The request stays on the market and is paired when a seller lists one"),
-  say: z.string().describe("e.g. \"Nobody nearby has one yet. New on Amazon it's about $110.\""),
+  say: z.string().describe("e.g. \"Nobody has one yet. New on Amazon it's about $110.\""),
 }).describe("Items only, when no deal: the same thing new on Amazon, as an option if the user can't wait");
 
 export const tradeInOut = z.object({

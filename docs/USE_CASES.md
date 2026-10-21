@@ -6,7 +6,7 @@ range of markets we aim at. **Width** means how many separate markets one senten
 reach. **Depth** means how far a single person uses PairUp across a whole year. Each
 row names the seed data or feature that supports it today.
 
-Every use case needs a person nearby: a thing changes hands, or someone shows up and
+Every use case needs a real person: a thing changes hands, or someone shows up and
 does physical work. Work an AI agent can finish on its own stays out of this list.
 
 ## Width: six markets, one engine
@@ -53,7 +53,7 @@ The same person comes back all year, and needs get larger and more complex over 
 | Midterms | A graphing calculator today; lecture notes printed and brought to class | things + errand | The TI-84 story; a $3 errand that saves a trip across campus |
 | A flat tire | Bike tune-up and puncture repair | errand | A hands-on weekend fix on campus |
 | Club event | Three roles for one Saturday | organization | An agent staffs a whole event with no overlapping bookings |
-| Wants a Switch | Nobody nearby has one | things | The request waits; Amazon's new price is shown; the next seller is paired at once |
+| Wants a Switch | Nobody has one | things | The request waits; Amazon's new price is shown; the next seller is paired at once |
 | June, move-out | Sell the mini fridge, hire two hours of van help | things + hour | The year's biggest exchange, in two sentences |
 | Summer away | Cat sitting, plant watering | neighborhood | The relationship continues after the quarter ends |
 

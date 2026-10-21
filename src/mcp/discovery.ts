@@ -89,7 +89,7 @@ export async function serverCard(deps: Deps, cfg: CardConfig, host?: string) {
     protocolVersion: PROTOCOL_VERSION,
     serverInfo: SERVER_INFO,
     description:
-      "Voice-first C2C marketplace: pairs people who need an item or a service with people who have it or can do it, " +
+      "C2C marketplace: pairs people who need an item or a service with people who have it or can do it, " +
       "settles the price by a fixed rule inside both sides' private limits, and records each side's yes.",
     documentationUrl: `${REPO}#readme`,
     transport: { type: "streamable-http", endpoint: `${url}/mcp`, statelessCalls: true, sessions: cfg.mcpSessions },
@@ -121,7 +121,7 @@ export async function llmsTxt(deps: Deps, cfg: CardConfig, host?: string) {
     : `- Sessions are off on this server: poll get_deal_status for news. A far-off price returns an error with code confirm_price.`;
   return `# PairUp
 
-> A voice-first C2C marketplace for things and services. People post what they have, can do or need; the server pairs
+> A C2C marketplace for things and services. People post what they have, can do or need; the server pairs
 > each request with the best offer, settles the price by a fixed rule inside limits each side keeps private, and
 > asks both for a final yes.
 

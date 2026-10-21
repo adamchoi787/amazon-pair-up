@@ -11,7 +11,7 @@ import { outputs } from "../src/mcp/schemas.js";
 import { createMcpServer } from "../src/mcp/server.js";
 
 // Where the local market hands off to Amazon: a search link and the new price
-// when nobody nearby has the item, a Trade-In link for an item nobody is asking
+// when nobody has the item, a Trade-In link for an item nobody is asking
 // for, and an Amazon Hub point as the meet-up when both sides share an area.
 
 // ---------- the rules on their own ----------
@@ -67,7 +67,7 @@ async function clientAs(userId: string) {
   };
 }
 
-test("no seller nearby: the request waits, with the item new on Amazon as an option", async () => {
+test("no seller: the request waits, with the item new on Amazon as an option", async () => {
   const buyer = await clientAs("amz_buyer");
   const req = await buyer.call("post_request", { need: "TI-84 graphing calculator", max_price: 18 });
   assert.equal(req.deal, null);
@@ -76,7 +76,7 @@ test("no seller nearby: the request waits, with the item new on Amazon as an opt
   assert.equal(req.fallback.still_waiting, true);
   assert.equal(req.fallback.amazon_url, "https://www.amazon.com/s?k=TI-84%20graphing%20calculator");
   assert.equal(typeof req.fallback.new_price, "number", "the new price comes from the reference prices");
-  assert.equal(req.fallback.say, `Nobody nearby has one yet. New on Amazon it's about $${req.fallback.new_price} (demo estimate).`);
+  assert.equal(req.fallback.say, `Nobody has one yet. New on Amazon it's about $${req.fallback.new_price} (demo estimate).`);
   assert.match(req.say, /keep looking.*If you can't wait, it's about \$\d+ new on Amazon \(demo estimate\)\.$/);
   await buyer.close();
 });
@@ -89,7 +89,7 @@ test("nothing within budget: the closest offer is named and the Amazon option is
   assert.equal(req.deal, null);
   assert.equal(req.fallback.reason, "over_budget");
   assert.equal(req.fallback.new_price, null, "no reference price for a tent");
-  assert.equal(req.fallback.say, "Nobody nearby has one in your budget yet. You can also look for a new one on Amazon.");
+  assert.equal(req.fallback.say, "Nobody has one in your budget yet. You can also look for a new one on Amazon.");
   assert.match(req.say, /Want it at that price\? Otherwise I'll keep looking\.$/);
   for (const c of [seller, buyer]) await c.close();
 });
