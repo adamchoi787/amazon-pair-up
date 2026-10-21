@@ -9,7 +9,7 @@
 // routine is offered the way it is before noon. Ring arrivals use the signed local
 // webhook (scripts/ring-simulate.ts); Bee context uses the labelled replay fixture.
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
@@ -19,7 +19,15 @@ const ROOT = resolve(here, "../../../..");
 const OUT = resolve(here, "../public/assets/cap");
 const PORT = 3310;
 const BASE = `http://127.0.0.1:${PORT}`;
-const FAKE_NOW = process.env.FAKE_NOW ?? "2026-10-22T11:38:00-07:00";
+// With RING_ACCESS_TOKEN (a Ring Developer Playground token) and RING_DEVICE_ID, the
+// Ring beat uses the official Playground instead of the local webhook: the server
+// reads the device's Event History on each check-in (RING_SANDBOX counts the
+// Playground's on_demand live-view events), the clock stays real so Ring's
+// timestamps line up, and each doorbell moment waits for RING_FLAG to appear
+// after a live-view simulation has been started in the Playground.
+const LIVE_RING = !!(process.env.RING_ACCESS_TOKEN && process.env.RING_DEVICE_ID);
+const RING_FLAG = process.env.RING_FLAG ?? join(ROOT, ".data/ring-flag");
+const FAKE_NOW = LIVE_RING ? "" : process.env.FAKE_NOW ?? "2026-10-22T11:38:00-07:00";
 const ENV = {
   ...process.env,
   PORT: String(PORT),
@@ -27,8 +35,9 @@ const ENV = {
   AI_MODE: "mock",
   AUTH_MODE: "none",
   TZ: "America/Los_Angeles",
-  RING_HMAC_KEY: "video-local-test-key",
-  RING_POINT_DEVICES: "pt_uw_hub=video_doorbell_hub",
+  ...(LIVE_RING
+    ? { RING_SANDBOX: "true", RING_POINT_DEVICES: `pt_uw_hub=${process.env.RING_DEVICE_ID}` }
+    : { RING_HMAC_KEY: "video-local-test-key", RING_POINT_DEVICES: "pt_uw_hub=video_doorbell_hub" }),
   FAKE_NOW,
   NODE_OPTIONS: `--import=${pathToUrl(join(here, "fake-clock.mjs"))}`,
 };
@@ -137,7 +146,14 @@ async function watchPage(browser, name, device) {
   return w;
 }
 
-function ring(type = "button_press") {
+async function ring(type = "button_press") {
+  if (LIVE_RING) {
+    rmSync(RING_FLAG, { force: true });
+    console.log(`waiting for a Ring Playground simulation (touch ${RING_FLAG})`);
+    while (!existsSync(RING_FLAG)) await sleep(500);
+    rmSync(RING_FLAG, { force: true });
+    return;
+  }
   run("npx", ["tsx", "scripts/ring-simulate.ts", "--type", type], { ...ENV, PAIRUP_URL: BASE });
 }
 
@@ -207,7 +223,7 @@ async function main() {
       await settle(mei, 1500);
       meiCard = await card(mei, "PairUp Point");
       await cardShot(mei, meiCard, "card_ring_1_checkedin");
-      ring();
+      await ring();
       await sleep(800);
       await meiCard.getByRole("button", { name: /I'm here/ }).click().catch(() => {});
       await settle(mei, 2000);
@@ -223,7 +239,7 @@ async function main() {
       samDeal = await card(sam, "I'm here");
       await samDeal.getByRole("button", { name: /I'm here/ }).click();
       await settle(sam, 1200);
-      ring();
+      await ring();
       await sleep(800);
       await samDeal.getByRole("button", { name: /I'm here/ }).click().catch(() => {});
       await settle(sam, 2000);

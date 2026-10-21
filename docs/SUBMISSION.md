@@ -81,13 +81,13 @@ Project source: [rairurairu/amazon-pair-up](https://github.com/rairurairu/amazon
 
 Primary track: **Alexa+**. PairUp is a self-hosted MCP server (spec 2025-11-25, Streamable HTTP) and Agent Skill that make a complete, consent-based C2C workflow available to Alexa+. Ring arrival confirmation and Bee context are integrations inside that experience; we declare Alexa+ only. Mini challenges: **AWS Builder** and **Open Source**.
 
-## Bee track text
+## Bee integration text (supporting; not a declared track)
 
-An exam deadline can arrive before a student thinks to search a marketplace. PairUp consumes a need snippet from the student's Bee-recorded context through the CLI, API or an agent holding Bee's Skill/MCP. `add_context` and `get_suggestions` prepare a graphing-calculator request. The student supplies a budget when needed and explicitly accepts before anything is posted. The watch preview offers a compact approval surface. This serves Bee's education and productivity priorities. The final video must show the actual Bee/device-to-useful-action interaction; the synthetic fixture remains rehearsal evidence.
+An exam deadline can arrive before a student thinks to search a marketplace. PairUp consumes a need snippet from the student's Bee-recorded context through the CLI, API or an agent holding Bee's Skill/MCP. `add_context` and `get_suggestions` prepare a graphing-calculator request. The student supplies a budget when needed and explicitly accepts before anything is posted. The watch preview offers a compact approval surface. This serves Bee's education and productivity priorities. The video labels the Bee beat as a synthetic Bee-format fixture.
 
-## Ring track text
+## Ring integration text (supporting; not a declared track)
 
-**PairUp Point: safe hand-offs with one Ring doorbell and no staff.** Some people would rather not meet a stranger from the internet. On PairUp they pick a PairUp Point for their deal: a small unstaffed spot near the HUB on the UW campus, watched by one Ring doorbell. Each person presses the doorbell on arrival and tells PairUp “I'm here”. PairUp reads the point's Ring Event History through the Ring Partner API, accepts signed Ring webhooks, and confirms each arrival from a doorbell press or a person event within ten minutes. When Ring has confirmed both, the deal card and both voices say “Both here. Go ahead with the hand-off.” The rule is deterministic and privacy-first: PairUp keeps only the type and time of presence events, for 24 hours. Categories: access control and IoT. Code: `src/ring/`, `src/market/points.ts`, `test/points.test.ts`.
+**PairUp Point: safe hand-offs with one Ring doorbell and no staff.** Some people would rather not meet a stranger from the internet. On PairUp they pick a PairUp Point for their deal: a small unstaffed spot near the HUB on the UW campus, watched by one Ring doorbell. Each person presses the doorbell on arrival and tells PairUp “I'm here”. PairUp reads the point's Ring Event History through the Ring Partner API, accepts signed Ring webhooks, and confirms each arrival from a doorbell press or a person event within ten minutes. When Ring has confirmed both, the deal card and both voices say “Both here. Go ahead with the hand-off.” The rule is deterministic and privacy-first: PairUp keeps only the type and time of presence events, for 24 hours. Verified against the official Ring Developer Playground: PairUp read the simulated device's `on_demand` events through the Partner API and confirmed both arrivals. Categories: access control and IoT. Code: `src/ring/`, `src/market/points.ts`, `test/points.test.ts`.
 
 ## AWS Builder answer
 
@@ -124,6 +124,5 @@ Use the complete per-tool answer in [PRODUCT_FEEDBACK.md](PRODUCT_FEEDBACK.md), 
 - [x] Open Source contribution URL, project URL and contributing username prepared above.
 - [ ] Friction entries included.
 - [ ] Pilot results added if the UW pilot has run ([USER_VALIDATION.md](USER_VALIDATION.md)).
-- [ ] Bee track entered only with live data recorded through a Bee device or an Apple Watch running Bee software (the replay file and the iOS Shortcut path are demo aids).
-- [ ] Ring: the integrated video shows PairUp reading the Ring Playground (or a device) and confirming both arrivals; declare Ring alongside Alexa+ in Primary Track(s).
+- [x] Primary Track(s): Alexa+ only. Ring (Playground-verified) and Bee (replay-tested) are described as supporting integrations.
 - [ ] Hosted endpoint kept available through judging; submitted before the deadline.
