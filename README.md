@@ -58,6 +58,13 @@ person just says yes or no.
 - **C2C in the future.** Personal agents will buy and sell for people. PairUp is
   where they meet: any MCP agent connects, an open-source rule sets every price,
   and every deal ends with a human yes.
+- **Built for the hard deals.** A one-of-a-kind item, a one-off job, a need nobody
+  else lists: two private limits set the price, and an open request waits for the
+  right person.
+
+The seller always keeps the full price. PairUp earns from optional protected
+online payment (a small buyer fee, held until the hand-off), paid agent access,
+community licenses and Amazon referrals. Details: [docs/SUBMISSION.md](docs/SUBMISSION.md#business-model).
 
 Households hold about $3,000–4,000 of resellable items each, and 80% of discarded
 furniture goes to landfill. One UW campus alone could move about $1.9 million a

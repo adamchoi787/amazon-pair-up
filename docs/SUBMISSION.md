@@ -21,7 +21,9 @@ The same conversation books help. “Find someone to pick up my lunch from the H
 
 PairUp also learns your routines. After three weeks of weekday lunch runs, it offers the next one shortly before noon. A Bee to-do or an iPhone arrival at McCarty Hall can prepare a request too. Every suggestion waits for a yes.
 
-People can recall their deals, choose another option, decline, withdraw a post, rate the other side, report a problem or erase their data. Payment happens directly between the two people at hand-off.
+PairUp is built for needs that are hard to price, hard to find a customer for, or hard to arrange: a hand-built loft ladder, help carrying a keyboard piano up three floors, a fix for a wobbly drawer. Nobody has to know the "market price" first. Each side names a limit, and one rule settles the price between them. A request with no match yet stays open and pairs as soon as the right person posts. Both sides answer with a single yes, with no haggling. `test/hard-to-price.test.ts` covers both cases, and with Titan embeddings these posts score close to the TI-84 against its own listing (0.59 vs 0.63 similarity).
+
+People can recall their deals, choose another option, decline, withdraw a post, rate the other side, report a problem or erase their data. In the pilot, the two people pay each other at the hand-off. Online payment fits the same confirm step: the buyer pays on their yes, PairUp holds the money, and it reaches the seller when the hand-off is confirmed.
 
 ### How we built it
 PairUp is a self-hosted MCP server (protocol 2025-11-25, Streamable HTTP). The web app is a full MCP host: it discovers the tools, calls them as the signed-in user, renders sandboxed MCP Apps cards and plays the Alexa+ conversation by voice in any browser. Any MCP client can connect through OAuth 2.1 with Login with Amazon.
@@ -42,11 +44,20 @@ Requests are standing posts, and matching runs whenever either side posts. Agent
 
 **Scale.** The average US household holds $3,000–4,000 of resellable items (eBay Recommerce Report 2026). US secondhand apparel alone is projected to reach $74 billion by 2029 (ThredUp). 80% of discarded furniture goes to landfill (EPA). Our model for UW Seattle (52,316 students, 10% using it twice a month at $15) gives about $1.9 million a year in exchanges between students. Sources, inputs and the research papers behind them: [research/](../research/README.md).
 
+### Business model
+The person who sells or does the work always receives the full agreed price. PairUp earns from the services around the deal:
+- **Protected payment:** a small flat fee, paid by the buyer, for online payment held until the hand-off is confirmed. Paying in person stays free.
+- **Agent access:** people use PairUp free. Commercial agents and apps that connect over MCP at volume pay for an access tier.
+- **Community partners:** universities, housing offices and apartment buildings license a local market, for example for move-out reuse that keeps furniture out of landfill.
+- **Amazon referrals:** requests nobody nearby can fill already go to Amazon search or Trade-In, which can earn referral income.
+
+Ranking and pricing carry no paid placement. Every post is ranked and priced by the same published rule.
+
 ### Status
 The test suite covers matching, pricing, privacy, scheduling, OAuth, MCP transport and scripted agent conversations. The seed market, reference prices and Hub locations are labelled demo data, and the learning experiment runs on a simulated market. Next is an observed pilot with UW students ([USER_VALIDATION.md](USER_VALIDATION.md)).
 
 ### What's next
-Run the UW pilot, measure task success and points of confusion, then open the next Seattle campuses and neighborhoods. Connect the Amazon Hub locator and live retail prices in place of the demo lists.
+Run the UW pilot, measure task success and points of confusion, then open the next Seattle campuses and neighborhoods. Add online payment held until the hand-off (Stripe Connect or Amazon Pay). Connect the Amazon Hub locator and live retail prices in place of the demo lists.
 
 ### Built during the hackathon
 

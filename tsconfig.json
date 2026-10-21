@@ -11,5 +11,5 @@
     "types": ["node"]
   },
   "include": ["src", "scripts", "test"],
-  "exclude": ["src/web", "src/apps", "src/design"]
+  "exclude": ["src/web", "src/apps", "src/design", "scripts/video"]
 }

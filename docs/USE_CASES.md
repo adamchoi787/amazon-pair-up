@@ -24,6 +24,20 @@ These markets usually live in separate apps: resale sites, errand apps, handyman
 listings, club group chats and neighborhood forums. PairUp gives them one voice
 interface, one pairing rule and one trust system.
 
+## Hard to price, hard to sell, hard to arrange
+
+The engine works best where other markets struggle:
+
+| Hard part | Example | How PairUp handles it |
+|---|---|---|
+| **Hard to price** | A hand-built cedar loft ladder; a fix for a wobbly antique drawer | Each side names a private limit, and the rule settles between them. No reference price is needed. |
+| **Hard to find a customer** | Help carrying a keyboard piano up three floors | The request stays open and pairs the moment someone who can help posts. |
+| **Hard to arrange** | Any one-off deal between strangers | One sentence each, one settled price, one yes each. Meet at a public Hub point or a Ring-watched PairUp Point. |
+
+Covered by `test/hard-to-price.test.ts`. With Titan embeddings, these posts score
+0.59 against matching offers, close to the TI-84's 0.63 against its own listing;
+an unrelated pair scores 0.06.
+
 ## Depth: one UW student's year
 
 The same person comes back all year, and needs get larger and more complex over time.
