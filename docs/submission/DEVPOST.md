@@ -57,7 +57,7 @@ Our three goals: **faster and cheaper to buy what you need, make personal busine
 - Mei: *"I need a graphing calculator in good condition near UW campus today, max $18."*
 - PairUp proposes the TI-84 at **$18**, names a campus meeting point, holds the item and asks Mei for a yes. She says yes, Sam is notified, and they pay each other at the hand-off.
 
-**One open rule sets every price.** Each side names a limit and the buyer's budget becomes the offer. The deal settles at $\min(\text{ask},\ \text{buyer max})$ whenever that reaches the seller's private minimum. Nobody needs to know the market price, and nobody haggles.
+**One open rule sets every price.** Each side names a limit and the buyer's budget becomes the offer. The deal settles at $$\min(\text{ask},\ \text{buyer max})$$ whenever that reaches the seller's private minimum. Nobody needs to know the market price, and nobody haggles.
 
 **It books people, too.**
 - *"Find someone to pick up my lunch from the HUB to McCarty Hall by 12:30, $5"* reaches Priya, who already does lunch runs for $4.
