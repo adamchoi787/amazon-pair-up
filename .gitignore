@@ -5,3 +5,9 @@ dist/
 *.log
 .DS_Store
 codex-*.log
+
+# Video build outputs and tool environments
+/video/
+scripts/video/.venv/
+scripts/video/studio/node_modules/
+scripts/video/studio/public/assets/

@@ -78,6 +78,27 @@ that is **$250,000–$375,000 a year** that stays with UW students. The same inp
 across about 19 million US college students give **about $680 million a year** of
 exchange.
 
+### How PairUp earns (model)
+
+In the pilot the seller keeps the full price, ranking has no paid placement, and every
+deal is free. The streams below are future options, sized on the same UW inputs:
+about **125,600 deals and $1.9 million traded a year** (5,232 users × 2 deals × 12
+months × $15).
+
+| Stream | Inputs | Per campus a year |
+|---|---|---|
+| Community license (university, housing office or apartment operator) | Flat fee, assumed $25,000 a year | ~$25,000 (model) |
+| Protected online payment, buyer pays a flat $1 | 30% of deals use it: 37,670 deals; card processing on $15 is 2.9% + $0.30 = $0.74, leaving $0.26 a deal | ~$10,000 (model) |
+| Later: 3% seller fee on protected-payment deals only; cash deals stay free | 37,670 deals × $15 × 3% | ~$17,000 (model) |
+| Amazon referrals for requests nobody can fill | Small share of unmet requests buying on amazon.com | ~$1,000–2,000 (model) |
+| Agent access tier for commercial MCP agents | Volume pricing for apps and agents | Upside, not counted |
+| **Total** | Sum of the rows above | **~$36,000 before the seller fee, ~$54,000 with it (model)** |
+
+At 100 campuses and communities that is about **$3.6–5.4 million a year (model)**.
+Costs stay small: one Graviton EC2 server, Bedrock billed per call, and no hand-off
+staff, because Ring presence at PairUp Points corroborates each hand-off. Each new community therefore
+adds revenue at little added cost.
+
 ## Make personal business great
 
 Most people already have a small business in them: a desk to sell in June, a bike

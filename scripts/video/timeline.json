@@ -1,0 +1,915 @@
+{
+ "bpm": 150,
+ "beatsPerBar": 4,
+ "fps": 60,
+ "bars": 106,
+ "tailSeconds": 1.6,
+ "voices": {
+  "narrator": {
+   "voice": "en-US-AvaNeural",
+   "rate": "+10%",
+   "pitch": "+0Hz"
+  },
+  "sam": {
+   "voice": "en-US-AndrewNeural",
+   "rate": "+4%",
+   "pitch": "+0Hz",
+   "phone": true
+  },
+  "mei": {
+   "voice": "en-US-EmmaNeural",
+   "rate": "+4%",
+   "pitch": "+0Hz",
+   "phone": true
+  },
+  "tony": {
+   "voice": "en-US-BrianNeural",
+   "rate": "+6%",
+   "pitch": "+0Hz",
+   "phone": true
+  },
+  "pairup": {
+   "voice": "en-US-JennyNeural",
+   "rate": "+0%",
+   "pitch": "+0Hz",
+   "phone": true
+  }
+ },
+ "scenes": [
+  {
+   "id": "cold",
+   "start": 0,
+   "bars": 8
+  },
+  {
+   "id": "title",
+   "start": 8,
+   "bars": 4
+  },
+  {
+   "id": "what",
+   "start": 12,
+   "bars": 8
+  },
+  {
+   "id": "seller",
+   "start": 20,
+   "bars": 6
+  },
+  {
+   "id": "buyer",
+   "start": 26,
+   "bars": 8
+  },
+  {
+   "id": "deal",
+   "start": 34,
+   "bars": 4
+  },
+  {
+   "id": "ring",
+   "start": 38,
+   "bars": 10
+  },
+  {
+   "id": "services",
+   "start": 48,
+   "bars": 12
+  },
+  {
+   "id": "context",
+   "start": 60,
+   "bars": 8
+  },
+  {
+   "id": "tech",
+   "start": 68,
+   "bars": 16
+  },
+  {
+   "id": "impact",
+   "start": 84,
+   "bars": 12
+  },
+  {
+   "id": "finale",
+   "start": 96,
+   "bars": 10
+  }
+ ],
+ "lines": [
+  {
+   "id": "n01",
+   "who": "narrator",
+   "at": 0.5,
+   "until": 3.4,
+   "text": "It's eleven forty-seven at night. Your exam is at nine."
+  },
+  {
+   "id": "n02",
+   "who": "narrator",
+   "at": 3.5,
+   "until": 6.4,
+   "text": "And somewhere in the next dorm, the calculator you need is sitting in a drawer."
+  },
+  {
+   "id": "n03",
+   "who": "narrator",
+   "at": 6.5,
+   "until": 7.9,
+   "text": "What if you could just... say it?"
+  },
+  {
+   "id": "n04",
+   "who": "narrator",
+   "at": 10.02,
+   "until": 10.5,
+   "text": "Meet PairUp!"
+  },
+  {
+   "id": "n05",
+   "who": "narrator",
+   "at": 12.25,
+   "until": 17.1,
+   "text": "PairUp pairs people who need something with people who have it, or can help. Things and services, right here at UW in Seattle."
+  },
+  {
+   "id": "n06",
+   "who": "narrator",
+   "at": 17.25,
+   "until": 19.9,
+   "text": "Tell Alexa+ once, and PairUp finds your pair."
+  },
+  {
+   "id": "sam1",
+   "who": "sam",
+   "at": 20.25,
+   "until": 23.3,
+   "text": "Sell my TI-84 for twenty dollars. I'll take anything above fifteen."
+  },
+  {
+   "id": "n07",
+   "who": "narrator",
+   "at": 23.45,
+   "until": 25.95,
+   "text": "Sam sets his limit once, and it stays private."
+  },
+  {
+   "id": "mei1",
+   "who": "mei",
+   "at": 26.1,
+   "until": 29.5,
+   "text": "I need a graphing calculator in good condition near UW campus today. Max eighteen."
+  },
+  {
+   "id": "n08",
+   "who": "narrator",
+   "at": 29.6,
+   "until": 33.95,
+   "text": "Paired, instantly! Our open price rule settles it at eighteen dollars, with a meeting spot right on campus."
+  },
+  {
+   "id": "mei2",
+   "who": "mei",
+   "at": 34.0,
+   "until": 34.3,
+   "text": "Yes!"
+  },
+  {
+   "id": "n10",
+   "who": "narrator",
+   "at": 37.0,
+   "until": 37.95,
+   "text": "They pay each other at the hand-off."
+  },
+  {
+   "id": "n11",
+   "who": "narrator",
+   "at": 38.25,
+   "until": 42.1,
+   "text": "Meeting a stranger? Pick a PairUp Point: one Ring doorbell by the HUB. No staff needed."
+  },
+  {
+   "id": "n12",
+   "who": "narrator",
+   "at": 42.2,
+   "until": 44.98,
+   "text": "Each press confirms an arrival, and PairUp keeps only its type and time."
+  },
+  {
+   "id": "pu1",
+   "who": "pairup",
+   "at": 45.8,
+   "until": 47.7,
+   "text": "Both here. Go ahead with the hand-off."
+  },
+  {
+   "id": "n13",
+   "who": "narrator",
+   "at": 48.25,
+   "until": 49.4,
+   "text": "And it books people, too!"
+  },
+  {
+   "id": "tony1",
+   "who": "tony",
+   "at": 49.4,
+   "until": 52.68,
+   "text": "Find someone to pick up my lunch from the HUB to McCarty Hall by twelve thirty. Five dollars."
+  },
+  {
+   "id": "n14",
+   "who": "narrator",
+   "at": 52.75,
+   "until": 56.1,
+   "text": "Event help on Saturday, two to six? Ten dollars an hour, forty total, in Pacific time."
+  },
+  {
+   "id": "n15",
+   "who": "narrator",
+   "at": 56.25,
+   "until": 59.9,
+   "text": "The whole shift has to fit the helper's hours, bookings never overlap, and the helper gives the final yes."
+  },
+  {
+   "id": "n16",
+   "who": "narrator",
+   "at": 60.25,
+   "until": 64.1,
+   "text": "PairUp even learns your routine. Three weeks of lunch runs? It offers the next one before noon."
+  },
+  {
+   "id": "n17",
+   "who": "narrator",
+   "at": 64.25,
+   "until": 67.9,
+   "text": "A Bee note about tomorrow's exam becomes a ready request, waiting for your yes, right on your wrist."
+  },
+  {
+   "id": "n18",
+   "who": "narrator",
+   "at": 68.3,
+   "until": 71.8,
+   "text": "Under the hood: a production MCP server for Alexa+ and any agent."
+  },
+  {
+   "id": "n19",
+   "who": "narrator",
+   "at": 71.72,
+   "until": 75.65,
+   "text": "Amazon Bedrock understands people: Nova reads each request, and Titan embeddings power the search."
+  },
+  {
+   "id": "n20",
+   "who": "narrator",
+   "at": 75.75,
+   "until": 79.95,
+   "text": "Then code takes over: a Rust price rule, compiled to WebAssembly, settles every deal in exact cents."
+  },
+  {
+   "id": "n21",
+   "who": "narrator",
+   "at": 80.5,
+   "until": 83.4,
+   "text": "Live on AWS. A hundred seventy-five tests, all green."
+  },
+  {
+   "id": "n22",
+   "who": "narrator",
+   "at": 84.25,
+   "until": 87.6,
+   "text": "Resale sites keep up to twenty percent. On PairUp, the seller keeps every dollar."
+  },
+  {
+   "id": "n23",
+   "who": "narrator",
+   "at": 87.62,
+   "until": 91.5,
+   "text": "Seventy-three million Americans already earn on their own. Here, opening a business takes one sentence."
+  },
+  {
+   "id": "n24",
+   "who": "narrator",
+   "at": 91.6,
+   "until": 95.9,
+   "text": "Soon, agents will shop for us. PairUp gives them a fair place to meet, where a human always says yes."
+  },
+  {
+   "id": "n25",
+   "who": "narrator",
+   "at": 96.25,
+   "until": 100.3,
+   "text": "The price rule is open source, so anyone can check it. Next stop: a real pilot, right here at UW."
+  },
+  {
+   "id": "n26",
+   "who": "narrator",
+   "at": 99.53,
+   "until": 100.0,
+   "text": "PairUp."
+  },
+  {
+   "id": "n27",
+   "who": "narrator",
+   "at": 104.4,
+   "until": 104.99,
+   "text": "Say it once!"
+  }
+ ],
+ "cues": [
+  {
+   "at": 0.75,
+   "sfx": "flip",
+   "tag": "clock",
+   "gain": 0
+  },
+  {
+   "at": 2.0,
+   "sfx": "pop",
+   "tag": "chat1",
+   "gain": -4
+  },
+  {
+   "at": 2.5,
+   "sfx": "pop",
+   "tag": "chat2",
+   "gain": -4
+  },
+  {
+   "at": 3.0,
+   "sfx": "pop",
+   "tag": "chat3",
+   "gain": -4
+  },
+  {
+   "at": 3.25,
+   "sfx": "tick2",
+   "tag": "seen",
+   "gain": -6
+  },
+  {
+   "at": 4.0,
+   "sfx": "whoosh",
+   "tag": "map",
+   "gain": 0
+  },
+  {
+   "at": 4.5,
+   "sfx": "blip",
+   "tag": "dotYou",
+   "gain": -3
+  },
+  {
+   "at": 5.0,
+   "sfx": "blip",
+   "tag": "dotCalc",
+   "gain": -3
+  },
+  {
+   "at": 5.5,
+   "sfx": "zap",
+   "tag": "distance",
+   "gain": -8
+  },
+  {
+   "at": 8.0,
+   "sfx": "impact",
+   "tag": "drop1",
+   "gain": 0
+  },
+  {
+   "at": 10.5,
+   "sfx": "shimmer",
+   "tag": "tagline",
+   "gain": -4
+  },
+  {
+   "at": 11.75,
+   "sfx": "whoosh",
+   "tag": "outTitle",
+   "gain": -2
+  },
+  {
+   "at": 12.5,
+   "sfx": "swoosh",
+   "tag": "card1",
+   "gain": -3
+  },
+  {
+   "at": 13.0,
+   "sfx": "swoosh",
+   "tag": "card2",
+   "gain": -3
+  },
+  {
+   "at": 13.5,
+   "sfx": "swoosh",
+   "tag": "card3",
+   "gain": -3
+  },
+  {
+   "at": 16.0,
+   "sfx": "pindrop",
+   "tag": "pin",
+   "gain": -2
+  },
+  {
+   "at": 19.75,
+   "sfx": "whoosh",
+   "tag": "outWhat",
+   "gain": -2
+  },
+  {
+   "at": 20.0,
+   "sfx": "swoosh",
+   "tag": "phoneSam",
+   "gain": -4
+  },
+  {
+   "at": 20.3,
+   "sfx": "typing",
+   "tag": "typeSam",
+   "gain": -12
+  },
+  {
+   "at": 23.0,
+   "sfx": "send",
+   "tag": "sendSam",
+   "gain": -6
+  },
+  {
+   "at": 23.25,
+   "sfx": "pop",
+   "tag": "replySam",
+   "gain": -5
+  },
+  {
+   "at": 24.0,
+   "sfx": "pop",
+   "tag": "cardSam",
+   "gain": -3
+  },
+  {
+   "at": 24.6,
+   "sfx": "lock",
+   "tag": "lock",
+   "gain": -1
+  },
+  {
+   "at": 25.75,
+   "sfx": "whoosh",
+   "tag": "outSeller",
+   "gain": -2
+  },
+  {
+   "at": 26.0,
+   "sfx": "swoosh",
+   "tag": "phoneMei",
+   "gain": -4
+  },
+  {
+   "at": 26.2,
+   "sfx": "typing",
+   "tag": "typeMei",
+   "gain": -12
+  },
+  {
+   "at": 29.3,
+   "sfx": "send",
+   "tag": "sendMei",
+   "gain": -6
+  },
+  {
+   "at": 29.3,
+   "sfx": "sparkle",
+   "tag": "match",
+   "gain": -10
+  },
+  {
+   "at": 31.0,
+   "sfx": "swoosh",
+   "tag": "rail",
+   "gain": -10
+  },
+  {
+   "at": 32.0,
+   "sfx": "counter",
+   "tag": "slide",
+   "gain": -14
+  },
+  {
+   "at": 33.0,
+   "sfx": "stamp",
+   "tag": "price18",
+   "gain": -4
+  },
+  {
+   "at": 34.25,
+   "sfx": "impact",
+   "tag": "drop2",
+   "gain": -3
+  },
+  {
+   "at": 34.25,
+   "sfx": "pop",
+   "tag": "yesMei",
+   "gain": -1
+  },
+  {
+   "at": 34.5,
+   "sfx": "blip",
+   "tag": "yesSam",
+   "gain": -2
+  },
+  {
+   "at": 35.0,
+   "sfx": "cash",
+   "tag": "deal",
+   "gain": 0
+  },
+  {
+   "at": 35.02,
+   "sfx": "confetti",
+   "tag": "confetti",
+   "gain": -4
+  },
+  {
+   "at": 38.0,
+   "sfx": "whoosh",
+   "tag": "inRing",
+   "gain": -2
+  },
+  {
+   "at": 41.72,
+   "sfx": "dingdong",
+   "tag": "pressMei",
+   "gain": 0
+  },
+  {
+   "at": 42.1,
+   "sfx": "pop",
+   "tag": "checkMei",
+   "gain": -5
+  },
+  {
+   "at": 45.0,
+   "sfx": "dingdong",
+   "tag": "pressSam",
+   "gain": 0
+  },
+  {
+   "at": 45.3,
+   "sfx": "pop",
+   "tag": "checkSam",
+   "gain": -5
+  },
+  {
+   "at": 45.45,
+   "sfx": "chime",
+   "tag": "bothHere",
+   "gain": -8
+  },
+  {
+   "at": 47.75,
+   "sfx": "whoosh",
+   "tag": "outRing",
+   "gain": -2
+  },
+  {
+   "at": 49.5,
+   "sfx": "scribble",
+   "tag": "route",
+   "gain": -8
+  },
+  {
+   "at": 51.0,
+   "sfx": "pop",
+   "tag": "fee5",
+   "gain": -3
+  },
+  {
+   "at": 52.75,
+   "sfx": "swoosh",
+   "tag": "eventCard",
+   "gain": -3
+  },
+  {
+   "at": 54.0,
+   "sfx": "counter",
+   "tag": "total40",
+   "gain": -8
+  },
+  {
+   "at": 56.5,
+   "sfx": "stamp",
+   "tag": "block1",
+   "gain": -6
+  },
+  {
+   "at": 57.0,
+   "sfx": "stamp",
+   "tag": "block2",
+   "gain": -6
+  },
+  {
+   "at": 57.75,
+   "sfx": "buzz",
+   "tag": "overlap",
+   "gain": -6
+  },
+  {
+   "at": 58.5,
+   "sfx": "pop",
+   "tag": "helperYes",
+   "gain": -2
+  },
+  {
+   "at": 59.75,
+   "sfx": "whoosh",
+   "tag": "outServices",
+   "gain": -2
+  },
+  {
+   "at": 60.5,
+   "sfx": "blip",
+   "tag": "day0",
+   "gain": -12.0
+  },
+  {
+   "at": 60.75,
+   "sfx": "blip",
+   "tag": "day1",
+   "gain": -11.5
+  },
+  {
+   "at": 61.0,
+   "sfx": "blip",
+   "tag": "day2",
+   "gain": -11.0
+  },
+  {
+   "at": 61.25,
+   "sfx": "blip",
+   "tag": "day3",
+   "gain": -10.5
+  },
+  {
+   "at": 61.5,
+   "sfx": "blip",
+   "tag": "day4",
+   "gain": -10.0
+  },
+  {
+   "at": 61.75,
+   "sfx": "blip",
+   "tag": "day5",
+   "gain": -9.5
+  },
+  {
+   "at": 62.0,
+   "sfx": "blip",
+   "tag": "day6",
+   "gain": -9.0
+  },
+  {
+   "at": 62.25,
+   "sfx": "blip",
+   "tag": "day7",
+   "gain": -8.5
+  },
+  {
+   "at": 62.5,
+   "sfx": "blip",
+   "tag": "day8",
+   "gain": -8.0
+  },
+  {
+   "at": 62.75,
+   "sfx": "blip",
+   "tag": "day9",
+   "gain": -7.5
+  },
+  {
+   "at": 63.0,
+   "sfx": "swoosh",
+   "tag": "forYou",
+   "gain": -3
+  },
+  {
+   "at": 64.25,
+   "sfx": "pop",
+   "tag": "beeNote",
+   "gain": -3
+  },
+  {
+   "at": 65.5,
+   "sfx": "whoosh",
+   "tag": "fold",
+   "gain": -6
+  },
+  {
+   "at": 66.5,
+   "sfx": "swoosh",
+   "tag": "watch",
+   "gain": -4
+  },
+  {
+   "at": 67.25,
+   "sfx": "click",
+   "tag": "watchYes",
+   "gain": -2
+  },
+  {
+   "at": 68.0,
+   "sfx": "impact",
+   "tag": "drop3",
+   "gain": 0
+  },
+  {
+   "at": 69,
+   "sfx": "zap",
+   "tag": "node0",
+   "gain": -7
+  },
+  {
+   "at": 70,
+   "sfx": "zap",
+   "tag": "node1",
+   "gain": -7
+  },
+  {
+   "at": 71,
+   "sfx": "zap",
+   "tag": "node2",
+   "gain": -7
+  },
+  {
+   "at": 72,
+   "sfx": "zap",
+   "tag": "node3",
+   "gain": -7
+  },
+  {
+   "at": 73,
+   "sfx": "zap",
+   "tag": "node4",
+   "gain": -7
+  },
+  {
+   "at": 74,
+   "sfx": "zap",
+   "tag": "node5",
+   "gain": -7
+  },
+  {
+   "at": 75,
+   "sfx": "zap",
+   "tag": "node6",
+   "gain": -7
+  },
+  {
+   "at": 76.0,
+   "sfx": "typing",
+   "tag": "code",
+   "gain": -12
+  },
+  {
+   "at": 78.5,
+   "sfx": "stamp",
+   "tag": "settle",
+   "gain": -2
+  },
+  {
+   "at": 80.5,
+   "sfx": "stamp",
+   "tag": "ev0",
+   "gain": -6
+  },
+  {
+   "at": 81.0,
+   "sfx": "stamp",
+   "tag": "ev1",
+   "gain": -6
+  },
+  {
+   "at": 81.5,
+   "sfx": "stamp",
+   "tag": "ev2",
+   "gain": -6
+  },
+  {
+   "at": 82.0,
+   "sfx": "stamp",
+   "tag": "ev3",
+   "gain": -6
+  },
+  {
+   "at": 82.5,
+   "sfx": "stamp",
+   "tag": "ev4",
+   "gain": -6
+  },
+  {
+   "at": 83.0,
+   "sfx": "stamp",
+   "tag": "ev5",
+   "gain": -6
+  },
+  {
+   "at": 83.75,
+   "sfx": "whoosh",
+   "tag": "outTech",
+   "gain": -2
+  },
+  {
+   "at": 84.25,
+   "sfx": "impact",
+   "tag": "fees",
+   "gain": -6
+  },
+  {
+   "at": 85.5,
+   "sfx": "scratch",
+   "tag": "strike",
+   "gain": -4
+  },
+  {
+   "at": 86.0,
+   "sfx": "stamp",
+   "tag": "keep100",
+   "gain": 0
+  },
+  {
+   "at": 87.75,
+   "sfx": "counter",
+   "tag": "earners",
+   "gain": -6
+  },
+  {
+   "at": 89.5,
+   "sfx": "pop",
+   "tag": "bubble",
+   "gain": -3
+  },
+  {
+   "at": 91.75,
+   "sfx": "swarm",
+   "tag": "agents",
+   "gain": -6
+  },
+  {
+   "at": 93.5,
+   "sfx": "chime",
+   "tag": "humanYes",
+   "gain": -4
+  },
+  {
+   "at": 95.75,
+   "sfx": "whoosh",
+   "tag": "outImpact",
+   "gain": -2
+  },
+  {
+   "at": 96.0,
+   "sfx": "swoosh",
+   "tag": "repo",
+   "gain": -3
+  },
+  {
+   "at": 98.0,
+   "sfx": "pindrop",
+   "tag": "pilot",
+   "gain": -3
+  },
+  {
+   "at": 100.0,
+   "sfx": "impact",
+   "tag": "drop4",
+   "gain": 0
+  },
+  {
+   "at": 100.0,
+   "sfx": "confetti",
+   "tag": "finalConfetti",
+   "gain": -6
+  },
+  {
+   "at": 102.0,
+   "sfx": "shimmer",
+   "tag": "endcard",
+   "gain": -6
+  },
+  {
+   "at": 105.0,
+   "sfx": "impact",
+   "tag": "final",
+   "gain": -2
+  },
+  {
+   "at": 37.0,
+   "sfx": "whoosh",
+   "tag": "outDeal",
+   "gain": -6
+  }
+ ]
+}

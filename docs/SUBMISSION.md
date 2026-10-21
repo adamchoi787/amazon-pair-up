@@ -1,6 +1,6 @@
 # PairUp submission package
 
-Lead track: **Alexa+**. Also enter **Ring**, and **Bee** when its real device-data recording is complete. Enter both **AWS Builder** and **Open Source** mini challenges. We declare multiple tracks for one coherent project; award limits remain one track prize and one mini-challenge prize. The rules explicitly request Primary Track(s): [verified requirements](HACKATHON_RULES.md).
+Track: **Alexa+** (the only primary track declared). Ring and Bee are integrations inside the Alexa+ experience; neither is declared as a track. Enter both **AWS Builder** and **Open Source** mini challenges. Each project can win one track prize and one mini-challenge prize: [verified requirements](HACKATHON_RULES.md).
 Deadline: October 23, 2026, 12:00 PDT = October 24, 03:00 HKT.
 
 ## Description for Devpost
@@ -79,7 +79,7 @@ Project source: [rairurairu/amazon-pair-up](https://github.com/rairurairu/amazon
 
 ## Track declaration answer
 
-Alexa+ is our primary story: an MCP server and Agent Skill make a complete, consent-based C2C workflow available to a voice assistant. Ring adds a concrete hand-off: a device or official simulator supplies presence events that corroborate each person's check-in. Bee adds an education and personal-productivity entry point: an exam-related need captured through a Bee device or Bee software on Apple Watch becomes a prepared request, then waits for the student's approval. These are connected stages of the same product. We enter the supported tracks together and accept the one-track-prize limit. Both mini challenges apply to the same submission. Fire TV is outside our implementation.
+Primary track: **Alexa+**. PairUp is a self-hosted MCP server (spec 2025-11-25, Streamable HTTP) and Agent Skill that make a complete, consent-based C2C workflow available to Alexa+. Ring arrival confirmation and Bee context are integrations inside that experience; we declare Alexa+ only. Mini challenges: **AWS Builder** and **Open Source**.
 
 ## Bee track text
 

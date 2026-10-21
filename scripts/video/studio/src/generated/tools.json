@@ -1,0 +1,86 @@
+[
+ {
+  "name": "post_offer",
+  "title": "Offer an item or a service"
+ },
+ {
+  "name": "post_request",
+  "title": "Ask for an item or a service"
+ },
+ {
+  "name": "find_matches",
+  "title": "More options"
+ },
+ {
+  "name": "negotiate",
+  "title": "Get this one instead"
+ },
+ {
+  "name": "confirm_deal",
+  "title": "Say yes to a deal"
+ },
+ {
+  "name": "choose_handoff",
+  "title": "Meet up or deliver"
+ },
+ {
+  "name": "decline_deal",
+  "title": "Say no to a deal"
+ },
+ {
+  "name": "get_deal_status",
+  "title": "My deals"
+ },
+ {
+  "name": "list_my_posts",
+  "title": "My offers and requests"
+ },
+ {
+  "name": "withdraw_post",
+  "title": "Take down a post"
+ },
+ {
+  "name": "list_meetup_points",
+  "title": "PairUp Points nearby"
+ },
+ {
+  "name": "choose_meetup_point",
+  "title": "Meet at a PairUp Point"
+ },
+ {
+  "name": "check_in_at_point",
+  "title": "I'm at the PairUp Point"
+ },
+ {
+  "name": "report_user",
+  "title": "Report someone"
+ },
+ {
+  "name": "rate_deal",
+  "title": "Rate a deal"
+ },
+ {
+  "name": "delete_my_data",
+  "title": "Delete my data"
+ },
+ {
+  "name": "get_suggestions",
+  "title": "What I might need"
+ },
+ {
+  "name": "accept_suggestion",
+  "title": "Yes to a suggestion"
+ },
+ {
+  "name": "dismiss_suggestion",
+  "title": "No to a suggestion"
+ },
+ {
+  "name": "add_context",
+  "title": "Share context from a device"
+ },
+ {
+  "name": "get_my_routines",
+  "title": "What you've learned about me"
+ }
+]

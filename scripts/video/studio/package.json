@@ -1,0 +1,31 @@
+{
+  "name": "pairup-video-studio",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "still": "remotion still src/index.ts",
+    "render": "remotion render src/index.ts PairUp ../../../video/pairup-picture.mp4"
+  },
+  "dependencies": {
+    "@fontsource/anton": "^5.3.0",
+    "@fontsource/instrument-serif": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/space-grotesk": "^5.3.0",
+    "@remotion/cli": "^4.0.537",
+    "@remotion/fonts": "^4.0.537",
+    "@remotion/motion-blur": "^4.0.537",
+    "@remotion/noise": "^4.0.537",
+    "@remotion/paths": "^4.0.537",
+    "@remotion/shapes": "^4.0.537",
+    "@remotion/transitions": "^4.0.537",
+    "@types/react": "^19.3.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "remotion": "^4.0.537",
+    "typescript": "^7.0.2"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.1"
+  }
+}

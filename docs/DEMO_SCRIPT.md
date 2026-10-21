@@ -23,3 +23,19 @@ Record clean inserts of Ring Playground and successful AWS evidence before cutti
 | 2:35–2:55 | pairing-core repo, contributor/commit, tests; end on agreed deal | “We began with Carousell for agents, grew into C2C for products and services, then connected the hand-off and the context before it. The price primitive is open source. Next: an observed campus pilot.” |
 
 The Ring footage must demonstrate an official simulator or device; the local HMAC sender alone covers rehearsal. All entered tracks need visible evidence within the first three minutes. Keep credential windows, real private context and unrelated people out of the recording. Use footage/music/trademarks only with the necessary rights. Describe the browser as a simulated Alexa+ experience and the Hub flow as a demo model.
+
+## Built film: shot-to-script mapping
+
+The submission film is built from code as a 2:51 composite; the full storyboard, art direction and build steps are in [VIDEO_STORYBOARD.md](VIDEO_STORYBOARD.md). It covers the shot list above in this order:
+
+| Film time | Shot list row it covers | Source of the frames |
+|---|---|---|
+| 0:00–0:32 | Opening need and what PairUp is | Motion graphics; title drop |
+| 0:32–0:42 | Sam's listing with the private minimum | Real capture: `sam_*`, `card_sam_listing` |
+| 0:42–0:54 | Mei's request, TI-84 at $18, Hub meeting point, the open price rule | Real capture: `mei_*`, `card_mei_match`; pairing-core rule |
+| 0:54–1:01 | Mei's yes; Sam's side shows the agreed deal | Real capture: `mei_confirmed`, `sam_agreed` |
+| 1:01–1:17 | PairUp Point: doorbell presses, both check-ins, Both here, watch | Real capture through the signed local webhook (`card_ring_*`, `watch_mei_bothhere`), labelled LOCAL SIMULATED WEBHOOK |
+| 1:17–1:36 | Lunch run and Saturday 2–6 PM event help, $10/hr, $40, Pacific time | Real capture: `card_lunch`, `card_event` |
+| 1:36–1:49 | Learned lunch routine; Bee-format note to a ready request; watch | Real capture with the clock at 11:38 AM PT and the labelled fixture (`dock_*`, `watch_tony_suggestion`) |
+| 1:49–2:11 | Architecture, Bedrock, pairing-core, live evidence | Motion graphics from EVIDENCE.md and the real MCP tool list |
+| 2:11–2:51 | Impact, open source, the UW pilot and the close | Motion graphics from SUBMISSION.md |

@@ -1,0 +1,11 @@
+# Python tools for the video build (scripts/video/*.py). Python 3.10+.
+numpy
+scipy
+soundfile
+edge-tts
+faster-whisper
+pedalboard
+tinysoundfont
+pyloudnorm
+matplotlib
+pillow

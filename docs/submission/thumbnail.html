@@ -1,0 +1,63 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:1500px;height:1000px;overflow:hidden}
+  body{
+    font-family:"Segoe UI Variable Display","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+    background:
+      radial-gradient(900px 700px at 85% 15%, #7b63ff 0%, transparent 60%),
+      radial-gradient(800px 700px at 0% 100%, #3a22b8 0%, transparent 60%),
+      #5338e0;
+    color:#fff; position:relative;
+  }
+  .rings{position:absolute;right:-180px;bottom:-260px;opacity:.10}
+  .left{position:absolute;left:96px;top:150px;width:720px}
+  .brand{display:flex;align-items:center;gap:36px}
+  .brand h1{font-size:158px;font-weight:700;letter-spacing:-5px;line-height:1}
+  .tag{margin-top:56px;font-size:58px;font-weight:600;line-height:1.12;letter-spacing:-1px}
+  .sub{margin-top:28px;font-size:34px;font-weight:500;line-height:1.35;color:#e4dfff}
+  .pill{display:inline-flex;align-items:center;gap:14px;margin-top:56px;background:#fff;color:#4329c4;
+    font-size:32px;font-weight:700;padding:16px 30px;border-radius:999px}
+  .card{position:absolute;right:90px;top:200px;width:560px;background:#fff;color:#16151c;border-radius:36px;
+    padding:44px 44px 40px;box-shadow:0 40px 90px rgba(20,8,90,.45),0 8px 24px rgba(20,8,90,.25)}
+  .chip{display:inline-flex;align-items:center;gap:10px;background:#eeebfe;color:#4329c4;font-size:24px;font-weight:700;
+    padding:8px 18px;border-radius:999px}
+  .title{margin-top:24px;font-size:42px;font-weight:700;letter-spacing:-.8px;line-height:1.1}
+  .price{margin-top:18px;font-size:96px;font-weight:700;letter-spacing:-3px;color:#5338e0;font-variant-numeric:tabular-nums;line-height:1}
+  .meta{margin-top:14px;font-size:24px;color:#5d5b6b;line-height:1.4}
+  hr{border:0;border-top:2px solid #ecebf2;margin:30px 0 26px}
+  .row{display:flex;gap:14px}
+  .yes{flex:1;display:flex;align-items:center;gap:10px;background:#e3f4ea;color:#16794a;font-size:26px;font-weight:700;
+    padding:14px 18px;border-radius:16px}
+  .both{margin-top:22px;text-align:center;background:#5338e0;color:#fff;font-size:30px;font-weight:700;padding:20px;border-radius:18px}
+</style></head>
+<body>
+  <svg class="rings" width="900" height="900" viewBox="0 0 32 32"><circle cx="12.5" cy="16" r="6.25" fill="#fff"/><circle cx="19.5" cy="16" r="6.25" fill="none" stroke="#fff" stroke-width="2.4"/></svg>
+
+  <div class="left">
+    <div class="brand">
+      <svg width="150" height="150" viewBox="0 0 32 32"><rect width="32" height="32" rx="9.5" fill="#fff"/><circle cx="12.5" cy="16" r="6.25" fill="#5338e0"/><circle cx="19.5" cy="16" r="6.25" fill="none" stroke="#5338e0" stroke-width="2.4"/></svg>
+      <h1>PairUp</h1>
+    </div>
+    <div class="tag">Say what you need,<br>have or can do.</div>
+    <div class="sub">Items and errands between people.<br>One open price rule. Two yeses.</div>
+    <div class="pill">C2C marketplace for Alexa+</div>
+  </div>
+
+  <div class="card">
+    <span class="chip">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg>
+      Item · UW campus
+    </span>
+    <div class="title">TI-84 graphing calculator</div>
+    <div class="price">$18</div>
+    <div class="meta">Hand-off at a campus Hub Counter, today</div>
+    <hr>
+    <div class="row">
+      <div class="yes"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Seller</div>
+      <div class="yes"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Buyer</div>
+    </div>
+    <div class="both">Both said yes</div>
+  </div>
+</body></html>
